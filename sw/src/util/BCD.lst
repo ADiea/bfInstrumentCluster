@@ -1,0 +1,232 @@
+   1               		.file	"BCD.c"
+   2               	__SP_H__ = 0x3e
+   3               	__SP_L__ = 0x3d
+   4               	__SREG__ = 0x3f
+   5               	__tmp_reg__ = 0
+   6               	__zero_reg__ = 1
+   7               		.text
+   8               	.Ltext0:
+   9               		.cfi_sections	.debug_frame
+  10               		.section	.text.CHAR2BCD2,"ax",@progbits
+  11               	.global	CHAR2BCD2
+  13               	CHAR2BCD2:
+  14               	.LFB0:
+  15               		.file 1 "src/util/BCD.c"
+   1:src/util/BCD.c **** //***************************************************************************
+   2:src/util/BCD.c **** //
+   3:src/util/BCD.c **** //  File........: BCD.c
+   4:src/util/BCD.c **** //
+   5:src/util/BCD.c **** //  Author(s)...: ATMEL Norway
+   6:src/util/BCD.c **** //
+   7:src/util/BCD.c **** //  Target(s)...: ATmega169
+   8:src/util/BCD.c **** //
+   9:src/util/BCD.c **** //  Compiler....: IAR EWAAVR 2.28a
+  10:src/util/BCD.c **** //
+  11:src/util/BCD.c **** //  Description.: AVR Butterfly BCD conversion algorithms
+  12:src/util/BCD.c **** //
+  13:src/util/BCD.c **** //  Revisions...: 1.0
+  14:src/util/BCD.c **** //
+  15:src/util/BCD.c **** //  YYYYMMDD - VER. - COMMENT                                       - SIGN.
+  16:src/util/BCD.c **** //
+  17:src/util/BCD.c **** //  20030116 - 1.0  - Created                                       - KS
+  18:src/util/BCD.c **** //
+  19:src/util/BCD.c **** //***************************************************************************
+  20:src/util/BCD.c **** 
+  21:src/util/BCD.c **** 
+  22:src/util/BCD.c **** 
+  23:src/util/BCD.c **** /*****************************************************************************
+  24:src/util/BCD.c **** *
+  25:src/util/BCD.c **** *   Function name : CHAR2BCD2
+  26:src/util/BCD.c **** *
+  27:src/util/BCD.c **** *   Returns :       Binary coded decimal value of the input (2 digits)
+  28:src/util/BCD.c **** *
+  29:src/util/BCD.c **** *   Parameters :    Value between (0-99) to be encoded into BCD 
+  30:src/util/BCD.c **** *
+  31:src/util/BCD.c **** *   Purpose :       Convert a character into a BCD encoded character.
+  32:src/util/BCD.c **** *                   The input must be in the range 0 to 99.
+  33:src/util/BCD.c **** *                   The result is byte where the high and low nibbles
+  34:src/util/BCD.c **** *                   contain the tens and ones of the input.
+  35:src/util/BCD.c **** *
+  36:src/util/BCD.c **** *****************************************************************************/
+  37:src/util/BCD.c **** char CHAR2BCD2(char input)
+  38:src/util/BCD.c **** {
+  16               		.loc 1 38 0
+  17               		.cfi_startproc
+  18               	.LVL0:
+  19               	/* prologue: function */
+  20               	/* frame size = 0 */
+  21               	/* stack size = 0 */
+  22               	.L__stack_usage = 0
+  39:src/util/BCD.c ****     char high = 0;
+  23               		.loc 1 39 0
+  24 0000 20E0      		ldi r18,0
+  25               	.LVL1:
+  26               	.L2:
+  40:src/util/BCD.c ****     
+  41:src/util/BCD.c ****     
+  42:src/util/BCD.c ****     while (input >= 10)                 // Count tens
+  27               		.loc 1 42 0
+  28 0002 8A30      		cpi r24,lo8(10)
+  29 0004 00F0      		brlo .L5
+  43:src/util/BCD.c ****     {
+  44:src/util/BCD.c ****         high++;
+  30               		.loc 1 44 0
+  31 0006 2F5F      		subi r18,lo8(-(1))
+  32               	.LVL2:
+  45:src/util/BCD.c ****         input -= 10;
+  33               		.loc 1 45 0
+  34 0008 8A50      		subi r24,lo8(-(-10))
+  35               	.LVL3:
+  36 000a 00C0      		rjmp .L2
+  37               	.L5:
+  46:src/util/BCD.c ****     }
+  47:src/util/BCD.c **** 
+  48:src/util/BCD.c ****     return  (high << 4) | input;        // Add ones and return answer
+  38               		.loc 1 48 0
+  39 000c 90E1      		ldi r25,lo8(16)
+  40 000e 299F      		mul r18,r25
+  41 0010 9001      		movw r18,r0
+  42 0012 1124      		clr __zero_reg__
+  43               	.LVL4:
+  49:src/util/BCD.c **** }
+  44               		.loc 1 49 0
+  45 0014 822B      		or r24,r18
+  46               	.LVL5:
+  47 0016 0895      		ret
+  48               		.cfi_endproc
+  49               	.LFE0:
+  51               		.section	.text.CHAR2BCD3,"ax",@progbits
+  52               	.global	CHAR2BCD3
+  54               	CHAR2BCD3:
+  55               	.LFB1:
+  50:src/util/BCD.c **** 
+  51:src/util/BCD.c **** /*****************************************************************************
+  52:src/util/BCD.c **** *
+  53:src/util/BCD.c **** *   Function name : CHAR2BCD3
+  54:src/util/BCD.c **** *
+  55:src/util/BCD.c **** *   Returns :       Binary coded decimal value of the input (3 digits)
+  56:src/util/BCD.c **** *
+  57:src/util/BCD.c **** *   Parameters :    Value between (0-255) to be encoded into BCD 
+  58:src/util/BCD.c **** *
+  59:src/util/BCD.c **** *   Purpose :       Convert a character into a BCD encoded character.
+  60:src/util/BCD.c **** *                   The input must be in the range 0 to 255.
+  61:src/util/BCD.c **** *                   The result is an integer where the three lowest nibbles
+  62:src/util/BCD.c **** *                   contain the ones, tens and hundreds of the input.
+  63:src/util/BCD.c **** *
+  64:src/util/BCD.c **** *****************************************************************************/
+  65:src/util/BCD.c **** unsigned int CHAR2BCD3(char input)
+  66:src/util/BCD.c **** {
+  56               		.loc 1 66 0
+  57               		.cfi_startproc
+  58               	.LVL6:
+  59               	/* prologue: function */
+  60               	/* frame size = 0 */
+  61               	/* stack size = 0 */
+  62               	.L__stack_usage = 0
+  67:src/util/BCD.c ****     int high = 0;
+  68:src/util/BCD.c ****         
+  69:src/util/BCD.c ****     while (input >= 100)                // Count hundreds
+  63               		.loc 1 69 0
+  64 0000 8436      		cpi r24,lo8(100)
+  65 0002 00F0      		brlo .L10
+  66               	.LVL7:
+  70:src/util/BCD.c ****     {
+  71:src/util/BCD.c ****         high++;
+  72:src/util/BCD.c ****         input -= 100;
+  67               		.loc 1 72 0
+  68 0004 9CE9      		ldi r25,lo8(-100)
+  69 0006 980F      		add r25,r24
+  70               	.LVL8:
+  69:src/util/BCD.c ****     {
+  71               		.loc 1 69 0
+  72 0008 9436      		cpi r25,lo8(100)
+  73 000a 00F0      		brlo .L11
+  74               	.LVL9:
+  75               		.loc 1 72 0
+  76 000c 885C      		subi r24,lo8(-(56))
+  77               	.LVL10:
+  71:src/util/BCD.c ****         input -= 100;
+  78               		.loc 1 71 0
+  79 000e 22E0      		ldi r18,lo8(2)
+  80 0010 30E0      		ldi r19,0
+  81 0012 00C0      		rjmp .L7
+  82               	.LVL11:
+  83               	.L10:
+  67:src/util/BCD.c ****         
+  84               		.loc 1 67 0
+  85 0014 20E0      		ldi r18,0
+  86 0016 30E0      		ldi r19,0
+  87 0018 00C0      		rjmp .L7
+  88               	.LVL12:
+  89               	.L11:
+  69:src/util/BCD.c ****     {
+  90               		.loc 1 69 0
+  91 001a 892F      		mov r24,r25
+  71:src/util/BCD.c ****         input -= 100;
+  92               		.loc 1 71 0
+  93 001c 21E0      		ldi r18,lo8(1)
+  94 001e 30E0      		ldi r19,0
+  95               	.LVL13:
+  96               	.L7:
+  73:src/util/BCD.c ****     }
+  74:src/util/BCD.c **** 
+  75:src/util/BCD.c ****     high <<= 4;
+  97               		.loc 1 75 0
+  98 0020 44E0      		ldi r20,4
+  99               		1:
+ 100 0022 220F      		lsl r18
+ 101 0024 331F      		rol r19
+ 102 0026 4A95      		dec r20
+ 103 0028 01F4      		brne 1b
+ 104               	.LVL14:
+ 105               	.L8:
+  76:src/util/BCD.c ****     
+  77:src/util/BCD.c ****     while (input >= 10)                 // Count tens
+ 106               		.loc 1 77 0
+ 107 002a 8A30      		cpi r24,lo8(10)
+ 108 002c 00F0      		brlo .L12
+  78:src/util/BCD.c ****     {
+  79:src/util/BCD.c ****         high++;
+ 109               		.loc 1 79 0
+ 110 002e 2F5F      		subi r18,-1
+ 111 0030 3F4F      		sbci r19,-1
+ 112               	.LVL15:
+  80:src/util/BCD.c ****         input -= 10;
+ 113               		.loc 1 80 0
+ 114 0032 8A50      		subi r24,lo8(-(-10))
+ 115               	.LVL16:
+ 116 0034 00C0      		rjmp .L8
+ 117               	.L12:
+  81:src/util/BCD.c ****     }
+  82:src/util/BCD.c **** 
+  83:src/util/BCD.c ****     return  (high << 4) | input;        // Add ones and return answer
+ 118               		.loc 1 83 0
+ 119 0036 94E0      		ldi r25,4
+ 120               		1:
+ 121 0038 220F      		lsl r18
+ 122 003a 331F      		rol r19
+ 123 003c 9A95      		dec r25
+ 124 003e 01F4      		brne 1b
+ 125               	.LVL17:
+  84:src/util/BCD.c **** }
+ 126               		.loc 1 84 0
+ 127 0040 A901      		movw r20,r18
+ 128 0042 482B      		or r20,r24
+ 129 0044 CA01      		movw r24,r20
+ 130               	.LVL18:
+ 131 0046 0895      		ret
+ 132               		.cfi_endproc
+ 133               	.LFE1:
+ 135               		.text
+ 136               	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 BCD.c
+     /tmp/ccr9s9J5.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/ccr9s9J5.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/ccr9s9J5.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/ccr9s9J5.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/ccr9s9J5.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/ccr9s9J5.s:13     .text.CHAR2BCD2:0000000000000000 CHAR2BCD2
+     /tmp/ccr9s9J5.s:54     .text.CHAR2BCD3:0000000000000000 CHAR2BCD3
+
+NO UNDEFINED SYMBOLS

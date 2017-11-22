@@ -39,9 +39,6 @@
 // "// mtE" but forgot this for some changes esp. during debugging. 'diff' 
 // against the original code to see everything that has been changed.
 
-//mtA
-//#include <inavr.h>
-//#include "iom169.h"
 #include <stdint.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -54,7 +51,6 @@
 #warning "avr-libc >= version 1.4.5 recommended"
 #warning "This code has not been tested with older versions."
 #endif
-//mtE
 
 #include "main.h"
 #include "LCD_functions.h"
@@ -67,11 +63,7 @@
 #include "sound.h"
 #include "ADC.h"
 #include "dataflash.h"
-// mt #include "eeprom.h"
-// mt Test() is not realy needed 
-//- can not be accessed without external hardware
 #include "test.h"
-#include "vcard.h"
 #include "menu.h"
 
 #define pLCDREG_test (*(char *)(0xEC))
@@ -218,19 +210,13 @@ __attribute__ ((OS_main)) int main(void)
         
         
         // go to SLEEP
-        if(!gPlaying && !gUART)              // Do not enter Power save if using UART or playing tunes
+        if(!gPlaying )              // Do not enter Power save if using UART or playing tunes
         {
             if(PowerSave)
                 cbiBF(LCDCRA, 7);             // disable LCD
 
-            // mtA
-            // "Manual" Power-Save sleep - replaced by avr-libc functions
-            // SMCR = (3<<SM0) | (1<<SE);   // Enable Power-save mode
-            // asm volatile ("sleep"::);    // __sleep();  // Go to sleep
-            // mt 20070131 - avr-libc 1.4.x supports ATmega169 sleep
             set_sleep_mode(SLEEP_MODE_PWR_SAVE);
             sleep_mode();
-            // mtE
 
             if(PowerSave)
             {
@@ -250,22 +236,9 @@ __attribute__ ((OS_main)) int main(void)
         }
         else
         {
-           // mtA
-           // "Manual" Power-Save sleep - replaced by avr-libc functions
-           // SMCR = (1<<SE);            // Enable idle mode
-           // asm volatile ("sleep"::);  // __sleep();  // Go to sleep
-           // mt 20070131 - avr-libc 1.4.x supports ATmega169 sleep
            set_sleep_mode(SLEEP_MODE_IDLE);
            sleep_mode();
-           // mtE
         }
-
-        // mtA
-        // SMCR-reset is not needed since (from avr-libc Manual): 
-        // This [the sleep_mode] macro automatically takes care to 
-        // enable the sleep mode in the CPU before going to sleep, 
-        // and disable it again afterwards
-        // SMCR = 0;                       // Just woke, disable sleep
 
     } //End Main loop
 

@@ -1,0 +1,2605 @@
+   1               		.file	"main.c"
+   2               	__SP_H__ = 0x3e
+   3               	__SP_L__ = 0x3d
+   4               	__SREG__ = 0x3f
+   5               	__tmp_reg__ = 0
+   6               	__zero_reg__ = 1
+   7               		.text
+   8               	.Ltext0:
+   9               		.cfi_sections	.debug_frame
+  10               		.section	.text.BootFunc,"ax",@progbits
+  11               	.global	BootFunc
+  13               	BootFunc:
+  14               	.LFB6:
+  15               		.file 1 "src/main.c"
+   1:src/main.c    **** //***************************************************************************
+   2:src/main.c    **** //
+   3:src/main.c    **** //  File........: main.c
+   4:src/main.c    **** //
+   5:src/main.c    **** //  Author(s)...: ATMEL Norway
+   6:src/main.c    **** //
+   7:src/main.c    **** //  Target(s)...: ATmega169
+   8:src/main.c    **** //
+   9:src/main.c    **** //  Compiler....: AVR-GCC 4.3.2; avr-libc 1.6.6 (WinAVR 20090313)
+  10:src/main.c    **** //
+  11:src/main.c    **** //  Description.: AVR Butterfly main module
+  12:src/main.c    **** //
+  13:src/main.c    **** //  Revisions...: 1.0
+  14:src/main.c    **** //
+  15:src/main.c    **** //  YYYYMMDD - VER. - COMMENT                                        - SIGN.
+  16:src/main.c    **** //
+  17:src/main.c    **** //  20030116 - 1.0  - Created                                        - KS
+  18:src/main.c    **** //  20031009          port to avr-gcc/avr-libc                       - M.Thomas (*)
+  19:src/main.c    **** //  20031204          fixed imcompatibility with sleep-modes         - mt
+  20:src/main.c    **** //  20040218          fixed 'logical and' in calibration             - shc/mt
+  21:src/main.c    **** //  20040827          fixed avr-libc iom169.h compatibility
+  22:src/main.c    **** //                    added keyclick function (from version6)        - mt/v6
+  23:src/main.c    **** //  20050726          minor cleanup                                  - mt
+  24:src/main.c    **** //  20060107          modifications in KeyClick(), cleanups          - mt
+  25:src/main.c    **** //  20070129          update with code from Rev07, using 
+  26:src/main.c    **** //                    avr-gcc 4.1.1/avr-libc 1.4.5 (WinAVR_20070122) - mt
+  27:src/main.c    **** //  20070131          avr-libc sleep-functions/macros                - mt
+  28:src/main.c    **** //  20090702          attribute OS_main, avr-gcc 4.3.2 (WinAVR 3/09) - mt
+  29:src/main.c    **** //
+  30:src/main.c    **** //***************************************************************************
+  31:src/main.c    **** 
+  32:src/main.c    **** // (*) Martin Thomas, Kaiserslautern, Germany, e-mail: mthomas(at)rhrk.uni-kl.de 
+  33:src/main.c    **** // or eversmith(at)heizung-thomas.de
+  34:src/main.c    **** //
+  35:src/main.c    **** // I'm not working for ATMEL.
+  36:src/main.c    **** // The port is based on REV_06 of the ATMEL-Code (for IAR-C) with fixes/updates
+  37:src/main.c    **** // from REV_07.
+  38:src/main.c    **** // Initially I marked my changes with "// mt" or enclosed them with "// mtA" and 
+  39:src/main.c    **** // "// mtE" but forgot this for some changes esp. during debugging. 'diff' 
+  40:src/main.c    **** // against the original code to see everything that has been changed.
+  41:src/main.c    **** 
+  42:src/main.c    **** #include <stdint.h>
+  43:src/main.c    **** #include <avr/io.h>
+  44:src/main.c    **** #include <avr/interrupt.h>
+  45:src/main.c    **** #include <avr/pgmspace.h>
+  46:src/main.c    **** #include <avr/sleep.h>
+  47:src/main.c    **** #include <avr/wdt.h>
+  48:src/main.c    **** #include <avr/version.h>
+  49:src/main.c    **** 
+  50:src/main.c    **** #if __AVR_LIBC_VERSION__ < 10405UL
+  51:src/main.c    **** #warning "avr-libc >= version 1.4.5 recommended"
+  52:src/main.c    **** #warning "This code has not been tested with older versions."
+  53:src/main.c    **** #endif
+  54:src/main.c    **** 
+  55:src/main.c    **** #include "main.h"
+  56:src/main.c    **** #include "LCD_functions.h"
+  57:src/main.c    **** #include "LCD_driver.h"
+  58:src/main.c    **** #include "button.h"
+  59:src/main.c    **** #include "RTC.h"
+  60:src/main.c    **** #include "timer0.h"
+  61:src/main.c    **** #include "BCD.h"
+  62:src/main.c    **** #include "usart.h"
+  63:src/main.c    **** #include "sound.h"
+  64:src/main.c    **** #include "ADC.h"
+  65:src/main.c    **** #include "dataflash.h"
+  66:src/main.c    **** #include "test.h"
+  67:src/main.c    **** #include "menu.h"
+  68:src/main.c    **** 
+  69:src/main.c    **** #define pLCDREG_test (*(char *)(0xEC))
+  70:src/main.c    **** 
+  71:src/main.c    **** char PowerSaveTimeout = 30;     // Initial value, enable power save mode after 30 min
+  72:src/main.c    **** BOOL AutoPowerSave    = TRUE;   // Variable to enable/disable the Auto Power Save func
+  73:src/main.c    **** volatile BOOL gKeyClickStatus  = FALSE;  // Variable to enable/disable keyclick
+  74:src/main.c    **** 
+  75:src/main.c    **** char PowerSave = FALSE;
+  76:src/main.c    **** 
+  77:src/main.c    **** unsigned char state;  // holds the current state, according to "menu.h"
+  78:src/main.c    **** 
+  79:src/main.c    **** 
+  80:src/main.c    **** /*****************************************************************************
+  81:src/main.c    **** *
+  82:src/main.c    **** *   Function name : main
+  83:src/main.c    **** *
+  84:src/main.c    **** *   Returns :       None
+  85:src/main.c    **** *
+  86:src/main.c    **** *   Parameters :    None
+  87:src/main.c    **** *
+  88:src/main.c    **** *   Purpose :       Contains the main loop of the program
+  89:src/main.c    **** *
+  90:src/main.c    **** *****************************************************************************/
+  91:src/main.c    **** // mt __C_task void main(void)
+  92:src/main.c    **** __attribute__ ((OS_main)) int main(void)
+  93:src/main.c    **** {    
+  94:src/main.c    **** //  unsigned char state, nextstate;
+  95:src/main.c    ****     unsigned char nextstate;
+  96:src/main.c    ****     // mt static char __flash *statetext;
+  97:src/main.c    ****     PGM_P statetext;
+  98:src/main.c    ****     char (*pStateFunc)(char);
+  99:src/main.c    ****     char input;
+ 100:src/main.c    ****     uint8_t i, j; // char i;
+ 101:src/main.c    ****     char buttons;
+ 102:src/main.c    ****     char last_buttons;
+ 103:src/main.c    **** 
+ 104:src/main.c    ****     last_buttons='\0';  // mt
+ 105:src/main.c    **** 
+ 106:src/main.c    ****     // Initial state variables
+ 107:src/main.c    ****     state = ST_AVRBF;
+ 108:src/main.c    ****     nextstate = ST_AVRBF;
+ 109:src/main.c    ****     statetext = MT_AVRBF;
+ 110:src/main.c    ****     pStateFunc = NULL;
+ 111:src/main.c    **** 
+ 112:src/main.c    **** 
+ 113:src/main.c    ****     // Program initalization
+ 114:src/main.c    ****     Initialization();
+ 115:src/main.c    ****     sei(); // mt __enable_interrupt();
+ 116:src/main.c    **** 
+ 117:src/main.c    ****     for (;;)            // Main loop
+ 118:src/main.c    ****     {
+ 119:src/main.c    ****         if(!PowerSave)          // Do not enter main loop in power-save
+ 120:src/main.c    ****         {
+ 121:src/main.c    ****             // Plain menu text
+ 122:src/main.c    ****             if (statetext)
+ 123:src/main.c    ****             {
+ 124:src/main.c    ****                 LCD_puts_f(statetext, 1);
+ 125:src/main.c    ****                 LCD_Colon(0);
+ 126:src/main.c    ****                 statetext = NULL;
+ 127:src/main.c    ****             }
+ 128:src/main.c    ****  
+ 129:src/main.c    ****             input = getkey();           // Read buttons
+ 130:src/main.c    ****     
+ 131:src/main.c    ****             if (pStateFunc)
+ 132:src/main.c    ****             {
+ 133:src/main.c    ****                 // When in this state, we must call the state function
+ 134:src/main.c    ****                 nextstate = pStateFunc(input);
+ 135:src/main.c    ****             }
+ 136:src/main.c    ****             else if (input != KEY_NULL)
+ 137:src/main.c    ****             {
+ 138:src/main.c    ****                 // Plain menu, clock the state machine
+ 139:src/main.c    ****                 nextstate = StateMachine(state, input);
+ 140:src/main.c    ****             }
+ 141:src/main.c    ****     
+ 142:src/main.c    ****             if (nextstate != state)
+ 143:src/main.c    ****             {
+ 144:src/main.c    ****                 state = nextstate;
+ 145:src/main.c    ****                 // mt: for (i=0; menu_state[i].state; i++)
+ 146:src/main.c    ****                 for (i=0; (j=pgm_read_byte(&menu_state[i].state)); i++)
+ 147:src/main.c    ****                 {
+ 148:src/main.c    ****                     //mt: if (menu_state[i].state == state)
+ 149:src/main.c    ****                     //mt 1/06 if (pgm_read_byte(&menu_state[i].state) == state)
+ 150:src/main.c    ****                     if (j == state)
+ 151:src/main.c    ****                     {
+ 152:src/main.c    ****                         // mtA
+ 153:src/main.c    ****                         // mt - original: statetext =  menu_state[i].pText;
+ 154:src/main.c    ****                         // mt - original: pStateFunc = menu_state[i].pFunc;
+ 155:src/main.c    ****                         /// mt this is like the example from an avr-gcc guru (mailing-list):
+ 156:src/main.c    ****                         statetext =  (PGM_P) pgm_read_word(&menu_state[i].pText);
+ 157:src/main.c    ****                         // mt - store pointer to function from menu_state[i].pFunc in pStateFunc
+ 158:src/main.c    ****                         //// pStateFunc = pmttemp;	// oh je - wie soll ich das jemals debuggen - ?
+ 159:src/main.c    ****                         pStateFunc = (PGM_VOID_P) pgm_read_word(&menu_state[i].pFunc);
+ 160:src/main.c    ****                         // mtE
+ 161:src/main.c    ****                         break;
+ 162:src/main.c    ****                     }
+ 163:src/main.c    ****                 }
+ 164:src/main.c    ****             }
+ 165:src/main.c    ****         }
+ 166:src/main.c    ****         
+ 167:src/main.c    ****         
+ 168:src/main.c    ****         //enable ATmega169 power save modus if autopowersave
+ 169:src/main.c    ****         if(AutoPowerSave)
+ 170:src/main.c    ****         {
+ 171:src/main.c    ****             if(gPowerSaveTimer >= PowerSaveTimeout)
+ 172:src/main.c    ****             {
+ 173:src/main.c    ****                 state = ST_AVRBF;
+ 174:src/main.c    ****                 gPowerSaveTimer = 0;
+ 175:src/main.c    ****                 PowerSave = TRUE;
+ 176:src/main.c    ****             }
+ 177:src/main.c    ****         }
+ 178:src/main.c    ****         
+ 179:src/main.c    ****         
+ 180:src/main.c    ****         // If the joystick is held in the UP and DOWN position at the same time,
+ 181:src/main.c    ****         // activate test-mode
+ 182:src/main.c    ****         // mtA
+ 183:src/main.c    ****         // if( !(PINB & (1<<PORTB7)) && !(PINB & (1<<PORTB6)) )    
+ 184:src/main.c    ****         if( !(PINB & (1<<PINB7)) && !(PINB & (1<<PINB6)) ) {
+ 185:src/main.c    ****             Test();
+ 186:src/main.c    ****         }
+ 187:src/main.c    ****         // mtE
+ 188:src/main.c    ****         
+ 189:src/main.c    ****         // Check if the joystick has been in the same position for some time, 
+ 190:src/main.c    ****         // then activate auto press of the joystick
+ 191:src/main.c    ****         buttons = (~PINB) & PINB_MASK;
+ 192:src/main.c    ****         buttons |= (~PINE) & PINE_MASK;
+ 193:src/main.c    ****         
+ 194:src/main.c    ****         if( buttons != last_buttons ) 
+ 195:src/main.c    ****         {
+ 196:src/main.c    ****             last_buttons = buttons;
+ 197:src/main.c    ****             gAutoPressJoystick = FALSE;
+ 198:src/main.c    ****         }
+ 199:src/main.c    ****         else if( buttons )
+ 200:src/main.c    ****         {
+ 201:src/main.c    ****             if( gAutoPressJoystick == TRUE)
+ 202:src/main.c    ****             {
+ 203:src/main.c    ****                 PinChangeInterrupt();
+ 204:src/main.c    ****                 gAutoPressJoystick = AUTO;
+ 205:src/main.c    ****             }
+ 206:src/main.c    ****             else    
+ 207:src/main.c    ****                 gAutoPressJoystick = AUTO;
+ 208:src/main.c    ****         }
+ 209:src/main.c    **** 
+ 210:src/main.c    ****         
+ 211:src/main.c    ****         
+ 212:src/main.c    ****         // go to SLEEP
+ 213:src/main.c    ****         if(!gPlaying )              // Do not enter Power save if using UART or playing tunes
+ 214:src/main.c    ****         {
+ 215:src/main.c    ****             if(PowerSave)
+ 216:src/main.c    ****                 cbiBF(LCDCRA, 7);             // disable LCD
+ 217:src/main.c    **** 
+ 218:src/main.c    ****             set_sleep_mode(SLEEP_MODE_PWR_SAVE);
+ 219:src/main.c    ****             sleep_mode();
+ 220:src/main.c    **** 
+ 221:src/main.c    ****             if(PowerSave)
+ 222:src/main.c    ****             {
+ 223:src/main.c    ****                 if(!(PINB & 0x40))              // press UP to wake from SLEEP
+ 224:src/main.c    ****                 {
+ 225:src/main.c    ****                     PowerSave = FALSE;
+ 226:src/main.c    ****                     
+ 227:src/main.c    ****                     for(i = 0; i < 20; i++ ) // set all LCD segment register to the variable ucSegm
+ 228:src/main.c    ****                     {
+ 229:src/main.c    ****                         *(&pLCDREG_test + i) = 0x00;
+ 230:src/main.c    ****                     }
+ 231:src/main.c    ****                     
+ 232:src/main.c    ****                     sbiBF(LCDCRA, 7);           // enable LCD
+ 233:src/main.c    ****                     input = getkey();           // Read buttons
+ 234:src/main.c    ****                 }
+ 235:src/main.c    ****             }
+ 236:src/main.c    ****         }
+ 237:src/main.c    ****         else
+ 238:src/main.c    ****         {
+ 239:src/main.c    ****            set_sleep_mode(SLEEP_MODE_IDLE);
+ 240:src/main.c    ****            sleep_mode();
+ 241:src/main.c    ****         }
+ 242:src/main.c    **** 
+ 243:src/main.c    ****     } //End Main loop
+ 244:src/main.c    **** 
+ 245:src/main.c    ****     return 0; // mt
+ 246:src/main.c    **** }
+ 247:src/main.c    **** 
+ 248:src/main.c    **** 
+ 249:src/main.c    **** 
+ 250:src/main.c    **** 
+ 251:src/main.c    **** /*****************************************************************************
+ 252:src/main.c    **** *
+ 253:src/main.c    **** *   Function name : StateMachine
+ 254:src/main.c    **** *
+ 255:src/main.c    **** *   Returns :       nextstate
+ 256:src/main.c    **** *
+ 257:src/main.c    **** *   Parameters :    state, stimuli
+ 258:src/main.c    **** *
+ 259:src/main.c    **** *   Purpose :       Shifts between the different states
+ 260:src/main.c    **** *
+ 261:src/main.c    **** *****************************************************************************/
+ 262:src/main.c    **** unsigned char StateMachine(char state, unsigned char stimuli)
+ 263:src/main.c    **** {
+ 264:src/main.c    ****     unsigned char nextstate = state;    // Default stay in same state
+ 265:src/main.c    ****     unsigned char i, j;
+ 266:src/main.c    **** 
+ 267:src/main.c    ****     // mt: for (i=0; menu_nextstate[i].state; i++)
+ 268:src/main.c    ****     for (i=0; ( j=pgm_read_byte(&menu_nextstate[i].state) ); i++ )
+ 269:src/main.c    ****     {
+ 270:src/main.c    ****         // mt: if (menu_nextstate[i].state == state && menu_nextstate[i].input == stimuli)
+ 271:src/main.c    ****         // mt 1/06 : if (pgm_read_byte(&menu_nextstate[i].state) == state && 
+ 272:src/main.c    ****         if ( j == state && 
+ 273:src/main.c    ****              pgm_read_byte(&menu_nextstate[i].input) == stimuli)
+ 274:src/main.c    ****         {
+ 275:src/main.c    ****             // This is the one!
+ 276:src/main.c    ****             // mt: nextstate = menu_nextstate[i].nextstate;
+ 277:src/main.c    ****             nextstate = pgm_read_byte(&menu_nextstate[i].nextstate);
+ 278:src/main.c    ****             break;
+ 279:src/main.c    ****         }
+ 280:src/main.c    ****     }
+ 281:src/main.c    **** 
+ 282:src/main.c    ****     return nextstate;
+ 283:src/main.c    **** }
+ 284:src/main.c    **** 
+ 285:src/main.c    **** 
+ 286:src/main.c    **** 
+ 287:src/main.c    **** 
+ 288:src/main.c    **** /*****************************************************************************
+ 289:src/main.c    **** *
+ 290:src/main.c    **** *   Function name : Initialization
+ 291:src/main.c    **** *
+ 292:src/main.c    **** *   Returns :       None
+ 293:src/main.c    **** *
+ 294:src/main.c    **** *   Parameters :    None
+ 295:src/main.c    **** *
+ 296:src/main.c    **** *   Purpose :       Initializate the different modules
+ 297:src/main.c    **** *
+ 298:src/main.c    **** *****************************************************************************/
+ 299:src/main.c    **** void Initialization(void)
+ 300:src/main.c    **** {
+ 301:src/main.c    ****     char tst;           // dummy
+ 302:src/main.c    **** 
+ 303:src/main.c    ****     OSCCAL_calibration();       // calibrate the OSCCAL byte
+ 304:src/main.c    ****         
+ 305:src/main.c    ****     CLKPR = (1<<CLKPCE);        // set Clock Prescaler Change Enable
+ 306:src/main.c    **** 
+ 307:src/main.c    ****     // set prescaler = 8, Inter RC 8Mhz / 8 = 1Mhz
+ 308:src/main.c    ****     CLKPR = (1<<CLKPS1) | (1<<CLKPS0);
+ 309:src/main.c    **** 
+ 310:src/main.c    ****     // Disable Analog Comparator (power save)
+ 311:src/main.c    ****     ACSR = (1<<ACD);
+ 312:src/main.c    **** 
+ 313:src/main.c    ****     // Disable Digital input on PF0-2 (power save)
+ 314:src/main.c    ****     DIDR0 = (7<<ADC0D);
+ 315:src/main.c    **** 
+ 316:src/main.c    ****     // mt PORTB = (15<<PORTB0);       // Enable pullup on 
+ 317:src/main.c    ****     PORTB = (15<<PB0);       // Enable pullup on 
+ 318:src/main.c    ****     // mt PORTE = (15<<PORTE4);
+ 319:src/main.c    ****     PORTE = (15<<PE4);
+ 320:src/main.c    **** 
+ 321:src/main.c    ****     sbiBF(DDRB, 5);               // set OC1A as output
+ 322:src/main.c    ****     sbiBF(PORTB, 5);              // set OC1A high
+ 323:src/main.c    ****             
+ 324:src/main.c    ****     Button_Init();              // Initialize pin change interrupt on joystick
+ 325:src/main.c    ****     
+ 326:src/main.c    ****     RTC_init();                 // Start timer2 asynchronous, used for RTC clock
+ 327:src/main.c    **** 
+ 328:src/main.c    ****     Timer0_Init();              // Used when playing music etc.
+ 329:src/main.c    **** 
+ 330:src/main.c    ****     USART_Init(12);             // Baud rate = 9600bps
+ 331:src/main.c    ****     
+ 332:src/main.c    ****     DF_SPI_init();              // init the SPI interface to communicate with the DataFlash
+ 333:src/main.c    ****     
+ 334:src/main.c    ****     tst = Read_DF_status();
+ 335:src/main.c    **** 
+ 336:src/main.c    ****     DF_CS_inactive;             // disable DataFlash
+ 337:src/main.c    ****         
+ 338:src/main.c    ****     LCD_Init();                 // initialize the LCD
+ 339:src/main.c    **** }
+ 340:src/main.c    **** 
+ 341:src/main.c    **** 
+ 342:src/main.c    **** 
+ 343:src/main.c    **** 
+ 344:src/main.c    **** 
+ 345:src/main.c    **** /*****************************************************************************
+ 346:src/main.c    **** *
+ 347:src/main.c    **** *   Function name : BootFunc
+ 348:src/main.c    **** *
+ 349:src/main.c    **** *   Returns :       char ST_state (to the state-machine)
+ 350:src/main.c    **** *
+ 351:src/main.c    **** *   Parameters :    char input (from joystick)
+ 352:src/main.c    **** *
+ 353:src/main.c    **** *   Purpose :       Reset the ATmega169 which will cause it to start up in the 
+ 354:src/main.c    **** *                   Bootloader-section. (the BOOTRST-fuse must be programmed)
+ 355:src/main.c    **** *
+ 356:src/main.c    **** *****************************************************************************/
+ 357:src/main.c    **** // mt __flash char TEXT_BOOT[]                     
+ 358:src/main.c    **** // mt - as in jw-patch: const char TEXT_BOOT[] PROGMEM	= "Jump to bootloader";
+ 359:src/main.c    **** 
+ 360:src/main.c    **** char BootFunc(char input)
+ 361:src/main.c    **** {
+  16               		.loc 1 361 0
+  17               		.cfi_startproc
+  18               	.LVL0:
+  19               	/* prologue: function */
+  20               	/* frame size = 0 */
+  21               	/* stack size = 0 */
+  22               	.L__stack_usage = 0
+ 362:src/main.c    ****     static char enter = 1;
+ 363:src/main.c    ****     
+ 364:src/main.c    ****     if(enter)
+  23               		.loc 1 364 0
+  24 0000 9091 0000 		lds r25,enter.1942
+  25 0004 9923      		tst r25
+  26 0006 01F0      		breq .L2
+ 365:src/main.c    ****     {
+ 366:src/main.c    ****         enter = 0;
+  27               		.loc 1 366 0
+  28 0008 1092 0000 		sts enter.1942,__zero_reg__
+ 367:src/main.c    ****         // mt jw LCD_puts_f(TEXT_BOOT, 1);
+ 368:src/main.c    ****         LCD_puts_f(PSTR("Jump to bootloader"), 1);
+  29               		.loc 1 368 0
+  30 000c 61E0      		ldi r22,lo8(1)
+  31 000e 80E0      		ldi r24,lo8(__c.1943)
+  32 0010 90E0      		ldi r25,hi8(__c.1943)
+  33               	.LVL1:
+  34 0012 0E94 0000 		call LCD_puts_f
+  35               	.LVL2:
+  36 0016 00C0      		rjmp .L6
+  37               	.LVL3:
+  38               	.L2:
+ 369:src/main.c    ****     }
+ 370:src/main.c    ****     else if(input == KEY_ENTER)
+  39               		.loc 1 370 0
+  40 0018 8130      		cpi r24,lo8(1)
+  41 001a 01F4      		brne .L4
+ 371:src/main.c    ****     {
+ 372:src/main.c    ****         WDTCR = (1<<WDCE) | (1<<WDE);     //Enable Watchdog Timer to give reset
+  42               		.loc 1 372 0
+  43 001c 88E1      		ldi r24,lo8(24)
+  44               	.LVL4:
+  45 001e 8093 6000 		sts 96,r24
+  46               	.L5:
+ 373:src/main.c    ****         while(1);   // wait for watchdog-reset, since the BOOTRST-fuse is 
+  47               		.loc 1 373 0 discriminator 1
+  48 0022 00C0      		rjmp .L5
+  49               	.LVL5:
+  50               	.L4:
+ 374:src/main.c    ****                     // programmed, the Boot-section will be entered upon reset.
+ 375:src/main.c    ****     }
+ 376:src/main.c    ****     else if (input == KEY_PREV)
+  51               		.loc 1 376 0
+  52 0024 8330      		cpi r24,lo8(3)
+  53 0026 01F4      		brne .L6
+ 377:src/main.c    ****     {
+ 378:src/main.c    ****         enter = 1;
+  54               		.loc 1 378 0
+  55 0028 81E0      		ldi r24,lo8(1)
+  56               	.LVL6:
+  57 002a 8093 0000 		sts enter.1942,r24
+ 379:src/main.c    ****         return ST_OPTIONS_BOOT;
+  58               		.loc 1 379 0
+  59 002e 8EE5      		ldi r24,lo8(94)
+  60 0030 0895      		ret
+  61               	.L6:
+ 380:src/main.c    ****     }
+ 381:src/main.c    ****     
+ 382:src/main.c    ****     return ST_OPTIONS_BOOT_FUNC;
+  62               		.loc 1 382 0
+  63 0032 8FE5      		ldi r24,lo8(95)
+ 383:src/main.c    **** }
+  64               		.loc 1 383 0
+  65 0034 0895      		ret
+  66               		.cfi_endproc
+  67               	.LFE6:
+  69               		.section	.text.PowerSaveFunc,"ax",@progbits
+  70               	.global	PowerSaveFunc
+  72               	PowerSaveFunc:
+  73               	.LFB7:
+ 384:src/main.c    **** 
+ 385:src/main.c    **** 
+ 386:src/main.c    **** 
+ 387:src/main.c    **** 
+ 388:src/main.c    **** 
+ 389:src/main.c    **** /*****************************************************************************
+ 390:src/main.c    **** *
+ 391:src/main.c    **** *   Function name : PowerSaveFunc
+ 392:src/main.c    **** *
+ 393:src/main.c    **** *   Returns :       char ST_state (to the state-machine)
+ 394:src/main.c    **** *
+ 395:src/main.c    **** *   Parameters :    char input (from joystick)
+ 396:src/main.c    **** *
+ 397:src/main.c    **** *   Purpose :       Enable power save
+ 398:src/main.c    **** *
+ 399:src/main.c    **** *****************************************************************************/
+ 400:src/main.c    **** // mt __flash char TEXT_POWER[]                     = "Press enter to sleep";
+ 401:src/main.c    **** // mt jw const char TEXT_POWER[]  PROGMEM  = "Press enter to sleep";
+ 402:src/main.c    **** 
+ 403:src/main.c    **** char PowerSaveFunc(char input)
+ 404:src/main.c    **** {
+  74               		.loc 1 404 0
+  75               		.cfi_startproc
+  76               	.LVL7:
+  77               	/* prologue: function */
+  78               	/* frame size = 0 */
+  79               	/* stack size = 0 */
+  80               	.L__stack_usage = 0
+ 405:src/main.c    ****     static char enter = 1;    
+ 406:src/main.c    ****     
+ 407:src/main.c    ****     if(enter)
+  81               		.loc 1 407 0
+  82 0000 9091 0000 		lds r25,enter.1949
+  83 0004 9923      		tst r25
+  84 0006 01F0      		breq .L9
+ 408:src/main.c    ****     {
+ 409:src/main.c    ****         enter = 0;
+  85               		.loc 1 409 0
+  86 0008 1092 0000 		sts enter.1949,__zero_reg__
+ 410:src/main.c    ****         //mt jw LCD_puts_f(TEXT_POWER, 1);
+ 411:src/main.c    ****         LCD_puts_f(PSTR("Press enter to sleep"), 1);
+  87               		.loc 1 411 0
+  88 000c 61E0      		ldi r22,lo8(1)
+  89 000e 80E0      		ldi r24,lo8(__c.1950)
+  90 0010 90E0      		ldi r25,hi8(__c.1950)
+  91               	.LVL8:
+  92 0012 0E94 0000 		call LCD_puts_f
+  93               	.LVL9:
+  94 0016 00C0      		rjmp .L12
+  95               	.LVL10:
+  96               	.L9:
+ 412:src/main.c    ****     }
+ 413:src/main.c    ****     else if(input == KEY_ENTER)
+  97               		.loc 1 413 0
+  98 0018 8130      		cpi r24,lo8(1)
+  99 001a 01F4      		brne .L11
+ 414:src/main.c    ****     {
+ 415:src/main.c    ****         PowerSave = TRUE;
+ 100               		.loc 1 415 0
+ 101 001c 8093 0000 		sts PowerSave,r24
+ 416:src/main.c    ****         enter = 1;
+ 102               		.loc 1 416 0
+ 103 0020 8093 0000 		sts enter.1949,r24
+ 417:src/main.c    ****         return ST_AVRBF;
+ 104               		.loc 1 417 0
+ 105 0024 8AE0      		ldi r24,lo8(10)
+ 106               	.LVL11:
+ 107 0026 0895      		ret
+ 108               	.LVL12:
+ 109               	.L11:
+ 418:src/main.c    ****     }
+ 419:src/main.c    ****     else if (input == KEY_PREV)
+ 110               		.loc 1 419 0
+ 111 0028 8330      		cpi r24,lo8(3)
+ 112 002a 01F4      		brne .L12
+ 420:src/main.c    ****     {
+ 421:src/main.c    ****         enter = 1;
+ 113               		.loc 1 421 0
+ 114 002c 81E0      		ldi r24,lo8(1)
+ 115               	.LVL13:
+ 116 002e 8093 0000 		sts enter.1949,r24
+ 422:src/main.c    ****         return ST_OPTIONS_POWER_SAVE;
+ 117               		.loc 1 422 0
+ 118 0032 80E6      		ldi r24,lo8(96)
+ 119 0034 0895      		ret
+ 120               	.L12:
+ 423:src/main.c    ****     }
+ 424:src/main.c    ****         
+ 425:src/main.c    ****     return ST_OPTIONS_POWER_SAVE_FUNC;
+ 121               		.loc 1 425 0
+ 122 0036 81E6      		ldi r24,lo8(97)
+ 426:src/main.c    **** 
+ 427:src/main.c    **** }
+ 123               		.loc 1 427 0
+ 124 0038 0895      		ret
+ 125               		.cfi_endproc
+ 126               	.LFE7:
+ 128               		.section	.text.AutoPowerShowMin,"ax",@progbits
+ 130               	AutoPowerShowMin:
+ 131               	.LFB8:
+ 428:src/main.c    **** 
+ 429:src/main.c    **** 
+ 430:src/main.c    **** 
+ 431:src/main.c    **** 
+ 432:src/main.c    **** /*****************************************************************************
+ 433:src/main.c    **** *
+ 434:src/main.c    **** *   Function name : AutoPower
+ 435:src/main.c    **** *
+ 436:src/main.c    **** *   Returns :       char ST_state (to the state-machine)
+ 437:src/main.c    **** *
+ 438:src/main.c    **** *   Parameters :    char input (from joystick)
+ 439:src/main.c    **** *
+ 440:src/main.c    **** *   Purpose :       Enable/Disable auto power save
+ 441:src/main.c    **** *
+ 442:src/main.c    **** *****************************************************************************/
+ 443:src/main.c    **** 
+ 444:src/main.c    **** static void AutoPowerShowMin(void)
+ 445:src/main.c    **** {
+ 132               		.loc 1 445 0
+ 133               		.cfi_startproc
+ 134 0000 CF93      		push r28
+ 135               	.LCFI0:
+ 136               		.cfi_def_cfa_offset 3
+ 137               		.cfi_offset 28, -2
+ 138 0002 DF93      		push r29
+ 139               	.LCFI1:
+ 140               		.cfi_def_cfa_offset 4
+ 141               		.cfi_offset 29, -3
+ 142               	/* prologue: function */
+ 143               	/* frame size = 0 */
+ 144               	/* stack size = 2 */
+ 145               	.L__stack_usage = 2
+ 446:src/main.c    **** 	char PH,PL; 
+ 447:src/main.c    **** 	
+ 448:src/main.c    **** 	PH = CHAR2BCD2(PowerSaveTimeout);
+ 146               		.loc 1 448 0
+ 147 0004 8091 0000 		lds r24,PowerSaveTimeout
+ 148 0008 0E94 0000 		call CHAR2BCD2
+ 149               	.LVL14:
+ 150 000c C82F      		mov r28,r24
+ 151               	.LVL15:
+ 449:src/main.c    **** 	PL = (PH & 0x0F) + '0';
+ 450:src/main.c    **** 	PH = (PH >> 4) + '0';
+ 152               		.loc 1 450 0
+ 153 000e D82F      		mov r29,r24
+ 154 0010 D295      		swap r29
+ 155 0012 DF70      		andi r29,lo8(15)
+ 156               	.LVL16:
+ 451:src/main.c    **** 	
+ 452:src/main.c    **** 	LCD_putc(0, 'M');
+ 157               		.loc 1 452 0
+ 158 0014 6DE4      		ldi r22,lo8(77)
+ 159 0016 80E0      		ldi r24,0
+ 160               	.LVL17:
+ 161 0018 0E94 0000 		call LCD_putc
+ 162               	.LVL18:
+ 453:src/main.c    **** 	LCD_putc(1, 'I');
+ 163               		.loc 1 453 0
+ 164 001c 69E4      		ldi r22,lo8(73)
+ 165 001e 81E0      		ldi r24,lo8(1)
+ 166 0020 0E94 0000 		call LCD_putc
+ 167               	.LVL19:
+ 454:src/main.c    **** 	LCD_putc(2, 'N');
+ 168               		.loc 1 454 0
+ 169 0024 6EE4      		ldi r22,lo8(78)
+ 170 0026 82E0      		ldi r24,lo8(2)
+ 171 0028 0E94 0000 		call LCD_putc
+ 172               	.LVL20:
+ 455:src/main.c    **** 	LCD_putc(3, ' ');
+ 173               		.loc 1 455 0
+ 174 002c 60E2      		ldi r22,lo8(32)
+ 175 002e 83E0      		ldi r24,lo8(3)
+ 176 0030 0E94 0000 		call LCD_putc
+ 177               	.LVL21:
+ 450:src/main.c    **** 	
+ 178               		.loc 1 450 0
+ 179 0034 60E3      		ldi r22,lo8(48)
+ 180 0036 6D0F      		add r22,r29
+ 181               	.LVL22:
+ 456:src/main.c    **** 	LCD_putc(4, PH);
+ 182               		.loc 1 456 0
+ 183 0038 84E0      		ldi r24,lo8(4)
+ 184 003a 0E94 0000 		call LCD_putc
+ 185               	.LVL23:
+ 449:src/main.c    **** 	PH = (PH >> 4) + '0';
+ 186               		.loc 1 449 0
+ 187 003e 6C2F      		mov r22,r28
+ 188 0040 6F70      		andi r22,lo8(15)
+ 189 0042 605D      		subi r22,lo8(-(48))
+ 190               	.LVL24:
+ 457:src/main.c    **** 	LCD_putc(5, PL);
+ 191               		.loc 1 457 0
+ 192 0044 85E0      		ldi r24,lo8(5)
+ 193 0046 0E94 0000 		call LCD_putc
+ 194               	.LVL25:
+ 458:src/main.c    **** 	LCD_putc(6, '\0');
+ 195               		.loc 1 458 0
+ 196 004a 60E0      		ldi r22,0
+ 197 004c 86E0      		ldi r24,lo8(6)
+ 198 004e 0E94 0000 		call LCD_putc
+ 199               	.LVL26:
+ 459:src/main.c    **** 	
+ 460:src/main.c    **** 	LCD_UpdateRequired(TRUE, 0);
+ 200               		.loc 1 460 0
+ 201 0052 60E0      		ldi r22,0
+ 202 0054 81E0      		ldi r24,lo8(1)
+ 203               	/* epilogue start */
+ 461:src/main.c    **** }
+ 204               		.loc 1 461 0
+ 205 0056 DF91      		pop r29
+ 206               	.LVL27:
+ 207 0058 CF91      		pop r28
+ 208               	.LVL28:
+ 460:src/main.c    **** }
+ 209               		.loc 1 460 0
+ 210 005a 0C94 0000 		jmp LCD_UpdateRequired
+ 211               	.LVL29:
+ 212               		.cfi_endproc
+ 213               	.LFE8:
+ 215               		.section	.text.AutoPower,"ax",@progbits
+ 216               	.global	AutoPower
+ 218               	AutoPower:
+ 219               	.LFB9:
+ 462:src/main.c    **** 
+ 463:src/main.c    **** char AutoPower(char input)
+ 464:src/main.c    **** {
+ 220               		.loc 1 464 0
+ 221               		.cfi_startproc
+ 222               	.LVL30:
+ 223               	/* prologue: function */
+ 224               	/* frame size = 0 */
+ 225               	/* stack size = 0 */
+ 226               	.L__stack_usage = 0
+ 465:src/main.c    ****     static char enter = 1;    
+ 466:src/main.c    ****     
+ 467:src/main.c    ****     if(enter)
+ 227               		.loc 1 467 0
+ 228 0000 9091 0000 		lds r25,enter.1960
+ 229 0004 9923      		tst r25
+ 230 0006 01F0      		breq .L15
+ 468:src/main.c    ****     {
+ 469:src/main.c    ****         enter = 0;
+ 231               		.loc 1 469 0
+ 232 0008 1092 0000 		sts enter.1960,__zero_reg__
+ 470:src/main.c    ****         
+ 471:src/main.c    ****         if(AutoPowerSave)  
+ 233               		.loc 1 471 0
+ 234 000c 8091 0000 		lds r24,AutoPowerSave
+ 235               	.LVL31:
+ 236 0010 8111      		cpse r24,__zero_reg__
+ 237 0012 00C0      		rjmp .L28
+ 472:src/main.c    ****             AutoPowerShowMin();
+ 473:src/main.c    ****         else
+ 474:src/main.c    ****             LCD_puts_f(PSTR("Off"),1);	// mt LCD_puts("Off", 1);        
+ 238               		.loc 1 474 0
+ 239 0014 61E0      		ldi r22,lo8(1)
+ 240 0016 80E0      		ldi r24,lo8(__c.1961)
+ 241 0018 90E0      		ldi r25,hi8(__c.1961)
+ 242 001a 00C0      		rjmp .L27
+ 243               	.LVL32:
+ 244               	.L15:
+ 475:src/main.c    ****     }
+ 476:src/main.c    ****     else if(input == KEY_ENTER)
+ 245               		.loc 1 476 0
+ 246 001c 8130      		cpi r24,lo8(1)
+ 247 001e 01F4      		brne .L18
+ 477:src/main.c    ****     {
+ 478:src/main.c    ****          enter = 1;
+ 248               		.loc 1 478 0
+ 249 0020 8093 0000 		sts enter.1960,r24
+ 479:src/main.c    **** 
+ 480:src/main.c    ****          return ST_OPTIONS_AUTO_POWER_SAVE;
+ 250               		.loc 1 480 0
+ 251 0024 82E6      		ldi r24,lo8(98)
+ 252               	.LVL33:
+ 253 0026 0895      		ret
+ 254               	.LVL34:
+ 255               	.L18:
+ 481:src/main.c    ****     }
+ 482:src/main.c    ****     else if (input == KEY_PLUS)
+ 256               		.loc 1 482 0
+ 257 0028 8430      		cpi r24,lo8(4)
+ 258 002a 01F4      		brne .L19
+ 483:src/main.c    ****     {
+ 484:src/main.c    **** 
+ 485:src/main.c    ****         PowerSaveTimeout += 5;
+ 259               		.loc 1 485 0
+ 260 002c 8091 0000 		lds r24,PowerSaveTimeout
+ 261               	.LVL35:
+ 262 0030 8B5F      		subi r24,lo8(-(5))
+ 486:src/main.c    ****          
+ 487:src/main.c    ****         if(PowerSaveTimeout > 90)
+ 263               		.loc 1 487 0
+ 264 0032 8B35      		cpi r24,lo8(91)
+ 265 0034 00F0      		brlo .L20
+ 488:src/main.c    ****         {
+ 489:src/main.c    ****             PowerSaveTimeout = 90;
+ 266               		.loc 1 489 0
+ 267 0036 8AE5      		ldi r24,lo8(90)
+ 268 0038 8093 0000 		sts PowerSaveTimeout,r24
+ 269 003c 00C0      		rjmp .L23
+ 270               	.L20:
+ 485:src/main.c    ****          
+ 271               		.loc 1 485 0
+ 272 003e 8093 0000 		sts PowerSaveTimeout,r24
+ 273               	.L22:
+ 490:src/main.c    ****         }
+ 491:src/main.c    ****         else
+ 492:src/main.c    ****         {    
+ 493:src/main.c    ****             AutoPowerSave = TRUE;
+ 274               		.loc 1 493 0
+ 275 0042 81E0      		ldi r24,lo8(1)
+ 276 0044 8093 0000 		sts AutoPowerSave,r24
+ 277               	.L28:
+ 494:src/main.c    ****             AutoPowerShowMin();
+ 278               		.loc 1 494 0
+ 279 0048 0E94 0000 		call AutoPowerShowMin
+ 280               	.LVL36:
+ 281 004c 00C0      		rjmp .L23
+ 282               	.LVL37:
+ 283               	.L19:
+ 495:src/main.c    ****         }
+ 496:src/main.c    ****     }
+ 497:src/main.c    ****     else if (input == KEY_MINUS)
+ 284               		.loc 1 497 0
+ 285 004e 8530      		cpi r24,lo8(5)
+ 286 0050 01F4      		brne .L23
+ 498:src/main.c    ****     {
+ 499:src/main.c    ****         if(PowerSaveTimeout)
+ 287               		.loc 1 499 0
+ 288 0052 8091 0000 		lds r24,PowerSaveTimeout
+ 289               	.LVL38:
+ 290 0056 8823      		tst r24
+ 291 0058 01F0      		breq .L21
+ 500:src/main.c    ****             PowerSaveTimeout -= 5;
+ 292               		.loc 1 500 0
+ 293 005a 8550      		subi r24,lo8(-(-5))
+ 294 005c 8093 0000 		sts PowerSaveTimeout,r24
+ 295               	.L21:
+ 501:src/main.c    **** 
+ 502:src/main.c    ****         if(PowerSaveTimeout < 5)
+ 296               		.loc 1 502 0
+ 297 0060 8091 0000 		lds r24,PowerSaveTimeout
+ 298 0064 8530      		cpi r24,lo8(5)
+ 299 0066 00F4      		brsh .L22
+ 503:src/main.c    ****         {
+ 504:src/main.c    ****             AutoPowerSave = FALSE;
+ 300               		.loc 1 504 0
+ 301 0068 1092 0000 		sts AutoPowerSave,__zero_reg__
+ 505:src/main.c    ****             PowerSaveTimeout = 0;
+ 302               		.loc 1 505 0
+ 303 006c 1092 0000 		sts PowerSaveTimeout,__zero_reg__
+ 506:src/main.c    ****             LCD_puts_f(PSTR("Off"),1);	// mt LCD_puts("Off", 1);
+ 304               		.loc 1 506 0
+ 305 0070 61E0      		ldi r22,lo8(1)
+ 306 0072 80E0      		ldi r24,lo8(__c.1963)
+ 307 0074 90E0      		ldi r25,hi8(__c.1963)
+ 308               	.L27:
+ 309 0076 0E94 0000 		call LCD_puts_f
+ 310               	.LVL39:
+ 311               	.L23:
+ 507:src/main.c    ****         }
+ 508:src/main.c    ****         else
+ 509:src/main.c    ****         {   
+ 510:src/main.c    ****             AutoPowerSave = TRUE;
+ 511:src/main.c    ****             AutoPowerShowMin();
+ 512:src/main.c    ****         }
+ 513:src/main.c    ****     }
+ 514:src/main.c    ****         
+ 515:src/main.c    ****     return ST_OPTIONS_AUTO_POWER_SAVE_FUNC;    
+ 312               		.loc 1 515 0
+ 313 007a 83E6      		ldi r24,lo8(99)
+ 516:src/main.c    **** }
+ 314               		.loc 1 516 0
+ 315 007c 0895      		ret
+ 316               		.cfi_endproc
+ 317               	.LFE9:
+ 319               		.section	.text.KeyClick,"ax",@progbits
+ 320               	.global	KeyClick
+ 322               	KeyClick:
+ 323               	.LFB10:
+ 517:src/main.c    **** 
+ 518:src/main.c    **** 
+ 519:src/main.c    **** 
+ 520:src/main.c    **** 
+ 521:src/main.c    **** /*****************************************************************************
+ 522:src/main.c    **** *
+ 523:src/main.c    **** *   Function name : KeyClick
+ 524:src/main.c    **** *
+ 525:src/main.c    **** *   Returns :       char ST_state (to the state-machine)
+ 526:src/main.c    **** *
+ 527:src/main.c    **** *   Parameters :    char input (from joystick)
+ 528:src/main.c    **** *
+ 529:src/main.c    **** *   Purpose :       Enable/Disable keyclick
+ 530:src/main.c    **** *
+ 531:src/main.c    **** *****************************************************************************/
+ 532:src/main.c    **** char KeyClick(char input)
+ 533:src/main.c    **** {
+ 324               		.loc 1 533 0
+ 325               		.cfi_startproc
+ 326               	.LVL40:
+ 327               	/* prologue: function */
+ 328               	/* frame size = 0 */
+ 329               	/* stack size = 0 */
+ 330               	.L__stack_usage = 0
+ 534:src/main.c    **** 	static uint8_t enter = 1;
+ 535:src/main.c    **** 	uint8_t show;
+ 536:src/main.c    **** 
+ 537:src/main.c    **** 	if ( enter ) {
+ 331               		.loc 1 537 0
+ 332 0000 9091 0000 		lds r25,enter.1968
+ 333 0004 9923      		tst r25
+ 334 0006 01F0      		breq .L37
+ 538:src/main.c    **** 		enter = 0;
+ 335               		.loc 1 538 0
+ 336 0008 1092 0000 		sts enter.1968,__zero_reg__
+ 337               	.LVL41:
+ 539:src/main.c    **** 		show  = 1;
+ 338               		.loc 1 539 0
+ 339 000c 91E0      		ldi r25,lo8(1)
+ 340 000e 00C0      		rjmp .L30
+ 341               	.LVL42:
+ 342               	.L37:
+ 540:src/main.c    **** 	}
+ 541:src/main.c    **** 	else {
+ 542:src/main.c    **** 		show = 0;
+ 343               		.loc 1 542 0
+ 344 0010 90E0      		ldi r25,0
+ 345               	.L30:
+ 346               	.LVL43:
+ 543:src/main.c    **** 	}
+ 544:src/main.c    **** 		
+ 545:src/main.c    **** 	if (input == KEY_ENTER)
+ 347               		.loc 1 545 0
+ 348 0012 8130      		cpi r24,lo8(1)
+ 349 0014 01F4      		brne .L31
+ 546:src/main.c    **** 	{
+ 547:src/main.c    **** 		enter = 1;
+ 350               		.loc 1 547 0
+ 351 0016 8093 0000 		sts enter.1968,r24
+ 548:src/main.c    **** 		return ST_OPTIONS_KEYCLICK;
+ 352               		.loc 1 548 0
+ 353 001a 84E6      		ldi r24,lo8(100)
+ 354               	.LVL44:
+ 355 001c 0895      		ret
+ 356               	.LVL45:
+ 357               	.L31:
+ 549:src/main.c    **** 	}
+ 550:src/main.c    **** 
+ 551:src/main.c    **** 	if ( (input == KEY_PLUS) || (input == KEY_MINUS) ) {
+ 358               		.loc 1 551 0
+ 359 001e 8450      		subi r24,lo8(-(-4))
+ 360               	.LVL46:
+ 361 0020 8230      		cpi r24,lo8(2)
+ 362 0022 00F4      		brsh .L33
+ 552:src/main.c    **** 		gKeyClickStatus = ~gKeyClickStatus;
+ 363               		.loc 1 552 0
+ 364 0024 8091 0000 		lds r24,gKeyClickStatus
+ 365               	.LVL47:
+ 366 0028 8095      		com r24
+ 367 002a 8093 0000 		sts gKeyClickStatus,r24
+ 368               	.LVL48:
+ 369 002e 00C0      		rjmp .L34
+ 370               	.LVL49:
+ 371               	.L33:
+ 553:src/main.c    **** 		show = 1;
+ 554:src/main.c    **** 	}
+ 555:src/main.c    **** 
+ 556:src/main.c    **** 	if ( show ) {
+ 372               		.loc 1 556 0
+ 373 0030 9923      		tst r25
+ 374 0032 01F0      		breq .L38
+ 375               	.LVL50:
+ 376               	.L34:
+ 557:src/main.c    **** 		if ( gKeyClickStatus )
+ 377               		.loc 1 557 0
+ 378 0034 8091 0000 		lds r24,gKeyClickStatus
+ 558:src/main.c    **** 			LCD_puts_f(PSTR("On"),1);
+ 379               		.loc 1 558 0
+ 380 0038 61E0      		ldi r22,lo8(1)
+ 557:src/main.c    **** 		if ( gKeyClickStatus )
+ 381               		.loc 1 557 0
+ 382 003a 8823      		tst r24
+ 383 003c 01F0      		breq .L35
+ 384               		.loc 1 558 0
+ 385 003e 80E0      		ldi r24,lo8(__c.1970)
+ 386 0040 90E0      		ldi r25,hi8(__c.1970)
+ 387 0042 00C0      		rjmp .L39
+ 388               	.L35:
+ 559:src/main.c    **** 		else
+ 560:src/main.c    **** 			LCD_puts_f(PSTR("Off"),1);
+ 389               		.loc 1 560 0
+ 390 0044 80E0      		ldi r24,lo8(__c.1972)
+ 391 0046 90E0      		ldi r25,hi8(__c.1972)
+ 392               	.L39:
+ 393 0048 0E94 0000 		call LCD_puts_f
+ 394               	.LVL51:
+ 561:src/main.c    **** 		LCD_UpdateRequired(TRUE, 0);
+ 395               		.loc 1 561 0
+ 396 004c 60E0      		ldi r22,0
+ 397 004e 81E0      		ldi r24,lo8(1)
+ 398 0050 0E94 0000 		call LCD_UpdateRequired
+ 399               	.LVL52:
+ 400               	.L38:
+ 562:src/main.c    **** 	}
+ 563:src/main.c    **** 
+ 564:src/main.c    **** 	return ST_OPTIONS_KEYCLICK_FUNC;
+ 401               		.loc 1 564 0
+ 402 0054 85E6      		ldi r24,lo8(101)
+ 565:src/main.c    **** }
+ 403               		.loc 1 565 0
+ 404 0056 0895      		ret
+ 405               		.cfi_endproc
+ 406               	.LFE10:
+ 408               		.section	.text.Revision,"ax",@progbits
+ 409               	.global	Revision
+ 411               	Revision:
+ 412               	.LFB12:
+ 566:src/main.c    **** 
+ 567:src/main.c    **** 
+ 568:src/main.c    **** 
+ 569:src/main.c    **** 
+ 570:src/main.c    **** /*****************************************************************************
+ 571:src/main.c    **** *
+ 572:src/main.c    **** *   Function name : Delay
+ 573:src/main.c    **** *
+ 574:src/main.c    **** *   Returns :       None
+ 575:src/main.c    **** *
+ 576:src/main.c    **** *   Parameters :    unsigned int millisec
+ 577:src/main.c    **** *
+ 578:src/main.c    **** *   Purpose :       Delay-loop
+ 579:src/main.c    **** *
+ 580:src/main.c    **** *****************************************************************************/
+ 581:src/main.c    **** void Delay(unsigned int millisec)
+ 582:src/main.c    **** {
+ 583:src/main.c    **** 	// mt, int i did not work in the simulator:  int i; 
+ 584:src/main.c    **** 	uint8_t i;
+ 585:src/main.c    **** 
+ 586:src/main.c    **** 	while (millisec--) {
+ 587:src/main.c    **** 		for (i=0; i<125; i++) {
+ 588:src/main.c    **** 			asm volatile ("nop"::);
+ 589:src/main.c    **** 		}
+ 590:src/main.c    **** 	}
+ 591:src/main.c    **** }
+ 592:src/main.c    **** 
+ 593:src/main.c    **** 
+ 594:src/main.c    **** 
+ 595:src/main.c    **** /*****************************************************************************
+ 596:src/main.c    **** *
+ 597:src/main.c    **** *   Function name : Revision
+ 598:src/main.c    **** *
+ 599:src/main.c    **** *   Returns :       None
+ 600:src/main.c    **** *
+ 601:src/main.c    **** *   Parameters :    char input
+ 602:src/main.c    **** *
+ 603:src/main.c    **** *   Purpose :       Display the software revision
+ 604:src/main.c    **** *
+ 605:src/main.c    **** *****************************************************************************/
+ 606:src/main.c    **** char Revision(char input)
+ 607:src/main.c    **** {
+ 413               		.loc 1 607 0
+ 414               		.cfi_startproc
+ 415               	.LVL53:
+ 416               	/* prologue: function */
+ 417               	/* frame size = 0 */
+ 418               	/* stack size = 0 */
+ 419               	.L__stack_usage = 0
+ 608:src/main.c    ****     static char enter = 1;
+ 609:src/main.c    ****     
+ 610:src/main.c    ****     if(enter)
+ 420               		.loc 1 610 0
+ 421 0000 9091 0000 		lds r25,enter.1987
+ 422 0004 9923      		tst r25
+ 423 0006 01F0      		breq .L41
+ 611:src/main.c    ****     {
+ 612:src/main.c    ****         enter = 0;
+ 424               		.loc 1 612 0
+ 425 0008 1092 0000 		sts enter.1987,__zero_reg__
+ 613:src/main.c    ****         
+ 614:src/main.c    ****         LCD_putc(0, 'R');
+ 426               		.loc 1 614 0
+ 427 000c 62E5      		ldi r22,lo8(82)
+ 428 000e 80E0      		ldi r24,0
+ 429               	.LVL54:
+ 430 0010 0E94 0000 		call LCD_putc
+ 431               	.LVL55:
+ 615:src/main.c    ****         LCD_putc(1, 'E');
+ 432               		.loc 1 615 0
+ 433 0014 65E4      		ldi r22,lo8(69)
+ 434 0016 81E0      		ldi r24,lo8(1)
+ 435 0018 0E94 0000 		call LCD_putc
+ 436               	.LVL56:
+ 616:src/main.c    ****         LCD_putc(2, 'V');
+ 437               		.loc 1 616 0
+ 438 001c 66E5      		ldi r22,lo8(86)
+ 439 001e 82E0      		ldi r24,lo8(2)
+ 440 0020 0E94 0000 		call LCD_putc
+ 441               	.LVL57:
+ 617:src/main.c    ****         // mtA 
+ 618:src/main.c    ****         // LCD_putc(3, ' ');
+ 619:src/main.c    ****         LCD_putc(3, (SWHIGH + 0x30)); // LCD_putc(4, (SWHIGH + 0x30));       //SWHIGH/LOW are defin
+ 442               		.loc 1 619 0
+ 443 0024 60E3      		ldi r22,lo8(48)
+ 444 0026 83E0      		ldi r24,lo8(3)
+ 445 0028 0E94 0000 		call LCD_putc
+ 446               	.LVL58:
+ 620:src/main.c    ****         LCD_putc(4, (SWLOW + 0x30)); // LCD_putc(5, (SWLOW + 0x30));
+ 447               		.loc 1 620 0
+ 448 002c 67E3      		ldi r22,lo8(55)
+ 449 002e 84E0      		ldi r24,lo8(4)
+ 450 0030 0E94 0000 		call LCD_putc
+ 451               	.LVL59:
+ 621:src/main.c    ****         LCD_putc(5, (SWLOWLOW + 0x30)); // LCD_putc(5, (SWLOW + 0x30));
+ 452               		.loc 1 621 0
+ 453 0034 66E3      		ldi r22,lo8(54)
+ 454 0036 85E0      		ldi r24,lo8(5)
+ 455 0038 0E94 0000 		call LCD_putc
+ 456               	.LVL60:
+ 622:src/main.c    ****         LCD_putc(6, '\0');
+ 457               		.loc 1 622 0
+ 458 003c 60E0      		ldi r22,0
+ 459 003e 86E0      		ldi r24,lo8(6)
+ 460 0040 0E94 0000 		call LCD_putc
+ 461               	.LVL61:
+ 623:src/main.c    ****         // mtE
+ 624:src/main.c    ****         
+ 625:src/main.c    ****         LCD_UpdateRequired(TRUE, 0);          
+ 462               		.loc 1 625 0
+ 463 0044 60E0      		ldi r22,0
+ 464 0046 81E0      		ldi r24,lo8(1)
+ 465 0048 0E94 0000 		call LCD_UpdateRequired
+ 466               	.LVL62:
+ 467 004c 00C0      		rjmp .L43
+ 468               	.LVL63:
+ 469               	.L41:
+ 626:src/main.c    ****     }
+ 627:src/main.c    ****     else if (input == KEY_PREV)
+ 470               		.loc 1 627 0
+ 471 004e 8330      		cpi r24,lo8(3)
+ 472 0050 01F4      		brne .L43
+ 628:src/main.c    ****     {
+ 629:src/main.c    ****         enter = 1;
+ 473               		.loc 1 629 0
+ 474 0052 81E0      		ldi r24,lo8(1)
+ 475               	.LVL64:
+ 476 0054 8093 0000 		sts enter.1987,r24
+ 630:src/main.c    ****         return ST_AVRBF;
+ 477               		.loc 1 630 0
+ 478 0058 8AE0      		ldi r24,lo8(10)
+ 479 005a 0895      		ret
+ 480               	.L43:
+ 631:src/main.c    ****     }
+ 632:src/main.c    ****     
+ 633:src/main.c    ****     return ST_AVRBF_REV;
+ 481               		.loc 1 633 0
+ 482 005c 8BE0      		ldi r24,lo8(11)
+ 634:src/main.c    **** }
+ 483               		.loc 1 634 0
+ 484 005e 0895      		ret
+ 485               		.cfi_endproc
+ 486               	.LFE12:
+ 488               		.section	.text.StateMachine,"ax",@progbits
+ 489               	.global	StateMachine
+ 491               	StateMachine:
+ 492               	.LFB4:
+ 263:src/main.c    ****     unsigned char nextstate = state;    // Default stay in same state
+ 493               		.loc 1 263 0
+ 494               		.cfi_startproc
+ 495               	.LVL65:
+ 496               	/* prologue: function */
+ 497               	/* frame size = 0 */
+ 498               	/* stack size = 0 */
+ 499               	.L__stack_usage = 0
+ 268:src/main.c    ****     {
+ 500               		.loc 1 268 0
+ 501 0000 70E0      		ldi r23,0
+ 502               	.LVL66:
+ 503               	.L45:
+ 504               	.LBB2:
+ 268:src/main.c    ****     {
+ 505               		.loc 1 268 0 is_stmt 0 discriminator 1
+ 506 0002 472F      		mov r20,r23
+ 507 0004 50E0      		ldi r21,0
+ 508               	.LVL67:
+ 509 0006 9A01      		movw r18,r20
+ 510 0008 220F      		lsl r18
+ 511 000a 331F      		rol r19
+ 512 000c 240F      		add r18,r20
+ 513 000e 351F      		adc r19,r21
+ 514 0010 F901      		movw r30,r18
+ 515 0012 E050      		subi r30,lo8(-(menu_nextstate))
+ 516 0014 F040      		sbci r31,hi8(-(menu_nextstate))
+ 517               	/* #APP */
+ 518               	 ;  268 "src/main.c" 1
+ 519 0016 9491      		lpm r25, Z
+ 520               		
+ 521               	 ;  0 "" 2
+ 522               	.LVL68:
+ 523               	/* #NOAPP */
+ 524               	.LBE2:
+ 525 0018 9923      		tst r25
+ 526 001a 01F0      		breq .L49
+ 272:src/main.c    ****              pgm_read_byte(&menu_nextstate[i].input) == stimuli)
+ 527               		.loc 1 272 0 is_stmt 1
+ 528 001c 9813      		cpse r25,r24
+ 529 001e 00C0      		rjmp .L46
+ 530               	.LVL69:
+ 531               	.LBB3:
+ 273:src/main.c    ****         {
+ 532               		.loc 1 273 0 discriminator 1
+ 533 0020 F901      		movw r30,r18
+ 534 0022 E050      		subi r30,lo8(-(menu_nextstate+1))
+ 535 0024 F040      		sbci r31,hi8(-(menu_nextstate+1))
+ 536               	/* #APP */
+ 537               	 ;  273 "src/main.c" 1
+ 538 0026 E491      		lpm r30, Z
+ 539               		
+ 540               	 ;  0 "" 2
+ 541               	.LVL70:
+ 542               	/* #NOAPP */
+ 543               	.LBE3:
+ 272:src/main.c    ****              pgm_read_byte(&menu_nextstate[i].input) == stimuli)
+ 544               		.loc 1 272 0 discriminator 1
+ 545 0028 E613      		cpse r30,r22
+ 546 002a 00C0      		rjmp .L46
+ 547               	.LVL71:
+ 548               	.LBB4:
+ 277:src/main.c    ****             break;
+ 549               		.loc 1 277 0
+ 550 002c F901      		movw r30,r18
+ 551               	.LVL72:
+ 552 002e E050      		subi r30,lo8(-(menu_nextstate+2))
+ 553 0030 F040      		sbci r31,hi8(-(menu_nextstate+2))
+ 554               	/* #APP */
+ 555               	 ;  277 "src/main.c" 1
+ 556 0032 8491      		lpm r24, Z
+ 557               		
+ 558               	 ;  0 "" 2
+ 559               	.LVL73:
+ 560               	/* #NOAPP */
+ 561               	.LBE4:
+ 278:src/main.c    ****         }
+ 562               		.loc 1 278 0
+ 563 0034 0895      		ret
+ 564               	.LVL74:
+ 565               	.L46:
+ 268:src/main.c    ****     {
+ 566               		.loc 1 268 0 discriminator 2
+ 567 0036 7F5F      		subi r23,lo8(-(1))
+ 568               	.LVL75:
+ 569 0038 00C0      		rjmp .L45
+ 570               	.LVL76:
+ 571               	.L49:
+ 283:src/main.c    **** 
+ 572               		.loc 1 283 0
+ 573 003a 0895      		ret
+ 574               		.cfi_endproc
+ 575               	.LFE4:
+ 577               		.section	.text.Delay,"ax",@progbits
+ 578               	.global	Delay
+ 580               	Delay:
+ 581               	.LFB11:
+ 582:src/main.c    **** 	// mt, int i did not work in the simulator:  int i; 
+ 582               		.loc 1 582 0
+ 583               		.cfi_startproc
+ 584               	.LVL77:
+ 585               	/* prologue: function */
+ 586               	/* frame size = 0 */
+ 587               	/* stack size = 0 */
+ 588               	.L__stack_usage = 0
+ 589               	.L51:
+ 586:src/main.c    **** 		for (i=0; i<125; i++) {
+ 590               		.loc 1 586 0
+ 591               	.LVL78:
+ 592 0000 0197      		sbiw r24,1
+ 593 0002 00F0      		brcs .L55
+ 594 0004 2DE7      		ldi r18,lo8(125)
+ 595               	.L52:
+ 596               	.LVL79:
+ 588:src/main.c    **** 		}
+ 597               		.loc 1 588 0 discriminator 3
+ 598               	/* #APP */
+ 599               	 ;  588 "src/main.c" 1
+ 600 0006 0000      		nop
+ 601               	 ;  0 "" 2
+ 602               	.LVL80:
+ 603               	/* #NOAPP */
+ 604 0008 2150      		subi r18,lo8(-(-1))
+ 605               	.LVL81:
+ 587:src/main.c    **** 			asm volatile ("nop"::);
+ 606               		.loc 1 587 0 discriminator 3
+ 607 000a 01F4      		brne .L52
+ 608 000c 00C0      		rjmp .L51
+ 609               	.LVL82:
+ 610               	.L55:
+ 611               	/* epilogue start */
+ 591:src/main.c    **** 
+ 612               		.loc 1 591 0
+ 613 000e 0895      		ret
+ 614               		.cfi_endproc
+ 615               	.LFE11:
+ 617               		.section	.text.OSCCAL_calibration,"ax",@progbits
+ 618               	.global	OSCCAL_calibration
+ 620               	OSCCAL_calibration:
+ 621               	.LFB13:
+ 635:src/main.c    **** 
+ 636:src/main.c    **** 
+ 637:src/main.c    **** 
+ 638:src/main.c    **** 
+ 639:src/main.c    **** /*****************************************************************************
+ 640:src/main.c    **** *
+ 641:src/main.c    **** *   Function name : OSCCAL_calibration
+ 642:src/main.c    **** *
+ 643:src/main.c    **** *   Returns :       None
+ 644:src/main.c    **** *
+ 645:src/main.c    **** *   Parameters :    None
+ 646:src/main.c    **** *
+ 647:src/main.c    **** *   Purpose :       Calibrate the internal OSCCAL byte, using the external 
+ 648:src/main.c    **** *                   32,768 kHz crystal as reference
+ 649:src/main.c    **** *
+ 650:src/main.c    **** *****************************************************************************/
+ 651:src/main.c    **** void OSCCAL_calibration(void)
+ 652:src/main.c    **** {
+ 622               		.loc 1 652 0
+ 623               		.cfi_startproc
+ 624               	/* prologue: function */
+ 625               	/* frame size = 0 */
+ 626               	/* stack size = 0 */
+ 627               	.L__stack_usage = 0
+ 628               	.LVL83:
+ 653:src/main.c    ****     unsigned char calibrate = FALSE;
+ 654:src/main.c    ****     int temp;
+ 655:src/main.c    ****     unsigned char tempL;
+ 656:src/main.c    **** 
+ 657:src/main.c    ****     CLKPR = (1<<CLKPCE);        // set Clock Prescaler Change Enable
+ 629               		.loc 1 657 0
+ 630 0000 80E8      		ldi r24,lo8(-128)
+ 631 0002 8093 6100 		sts 97,r24
+ 658:src/main.c    ****     // set prescaler = 8, Inter RC 8Mhz / 8 = 1Mhz
+ 659:src/main.c    ****     CLKPR = (1<<CLKPS1) | (1<<CLKPS0);
+ 632               		.loc 1 659 0
+ 633 0006 83E0      		ldi r24,lo8(3)
+ 634 0008 8093 6100 		sts 97,r24
+ 660:src/main.c    ****     
+ 661:src/main.c    ****     TIMSK2 = 0;             //disable OCIE2A and TOIE2
+ 635               		.loc 1 661 0
+ 636 000c 1092 7000 		sts 112,__zero_reg__
+ 662:src/main.c    **** 
+ 663:src/main.c    ****     ASSR = (1<<AS2);        //select asynchronous operation of timer2 (32,768kHz)
+ 637               		.loc 1 663 0
+ 638 0010 88E0      		ldi r24,lo8(8)
+ 639 0012 8093 B600 		sts 182,r24
+ 664:src/main.c    ****     
+ 665:src/main.c    ****     OCR2A = 200;            // set timer2 compare value 
+ 640               		.loc 1 665 0
+ 641 0016 88EC      		ldi r24,lo8(-56)
+ 642 0018 8093 B300 		sts 179,r24
+ 666:src/main.c    **** 
+ 667:src/main.c    ****     TIMSK0 = 0;             // delete any interrupt sources
+ 643               		.loc 1 667 0
+ 644 001c 1092 6E00 		sts 110,__zero_reg__
+ 668:src/main.c    ****         
+ 669:src/main.c    ****     TCCR1B = (1<<CS10);     // start timer1 with no prescaling
+ 645               		.loc 1 669 0
+ 646 0020 81E0      		ldi r24,lo8(1)
+ 647 0022 8093 8100 		sts 129,r24
+ 670:src/main.c    ****     TCCR2A = (1<<CS20);     // start timer2 with no prescaling
+ 648               		.loc 1 670 0
+ 649 0026 8093 B000 		sts 176,r24
+ 650               	.L57:
+ 671:src/main.c    **** 
+ 672:src/main.c    ****     while((ASSR & 0x01) | (ASSR & 0x04));       //wait for TCN2UB and TCR2UB to be cleared
+ 651               		.loc 1 672 0 discriminator 1
+ 652 002a 8091 B600 		lds r24,182
+ 653 002e 9091 B600 		lds r25,182
+ 654 0032 9470      		andi r25,lo8(4)
+ 655 0034 8170      		andi r24,lo8(1)
+ 656 0036 892B      		or r24,r25
+ 657 0038 01F4      		brne .L57
+ 673:src/main.c    **** 
+ 674:src/main.c    ****     Delay(1000);    // wait for external crystal to stabilise
+ 658               		.loc 1 674 0
+ 659 003a 88EE      		ldi r24,lo8(-24)
+ 660 003c 93E0      		ldi r25,lo8(3)
+ 661 003e 0E94 0000 		call Delay
+ 662               	.LVL84:
+ 675:src/main.c    ****     
+ 676:src/main.c    ****     while(!calibrate)
+ 677:src/main.c    ****     {
+ 678:src/main.c    ****         cli(); // mt __disable_interrupt();  // disable global interrupt
+ 679:src/main.c    ****         
+ 680:src/main.c    ****         TIFR1 = 0xFF;   // delete TIFR1 flags
+ 663               		.loc 1 680 0
+ 664 0042 2FEF      		ldi r18,lo8(-1)
+ 681:src/main.c    ****         TIFR2 = 0xFF;   // delete TIFR2 flags
+ 682:src/main.c    ****         
+ 683:src/main.c    ****         TCNT1H = 0;     // clear timer1 counter
+ 684:src/main.c    ****         TCNT1L = 0;
+ 685:src/main.c    ****         TCNT2 = 0;      // clear timer2 counter
+ 686:src/main.c    ****            
+ 687:src/main.c    ****         // shc/mt while ( !(TIFR2 && (1<<OCF2A)) );   // wait for timer2 compareflag    
+ 688:src/main.c    ****         while ( !(TIFR2 & (1<<OCF2A)) );   // wait for timer2 compareflag
+ 689:src/main.c    **** 
+ 690:src/main.c    ****         TCCR1B = 0; // stop timer1
+ 691:src/main.c    **** 
+ 692:src/main.c    ****         sei(); // __enable_interrupt();  // enable global interrupt
+ 693:src/main.c    ****     
+ 694:src/main.c    ****         // shc/mt if ( (TIFR1 && (1<<TOV1)) )
+ 695:src/main.c    ****         if ( (TIFR1 & (1<<TOV1)) )
+ 696:src/main.c    ****         {
+ 697:src/main.c    ****             temp = 0xFFFF;      // if timer1 overflows, set the temp to 0xFFFF
+ 698:src/main.c    ****         }
+ 699:src/main.c    ****         else
+ 700:src/main.c    ****         {   // read out the timer1 counter value
+ 701:src/main.c    ****             tempL = TCNT1L;
+ 702:src/main.c    ****             temp = TCNT1H;
+ 703:src/main.c    ****             temp = (temp << 8);
+ 704:src/main.c    ****             temp += tempL;
+ 705:src/main.c    ****         }
+ 706:src/main.c    ****     
+ 707:src/main.c    ****         if (temp > 6250)
+ 708:src/main.c    ****         {
+ 709:src/main.c    ****             OSCCAL--;   // the internRC oscillator runs to fast, decrease the OSCCAL
+ 710:src/main.c    ****         }
+ 711:src/main.c    ****         else if (temp < 6120)
+ 712:src/main.c    ****         {
+ 713:src/main.c    ****             OSCCAL++;   // the internRC oscillator runs to slow, increase the OSCCAL
+ 714:src/main.c    ****         }
+ 715:src/main.c    ****         else
+ 716:src/main.c    ****             calibrate = TRUE;   // the interRC is correct
+ 665               		.loc 1 716 0
+ 666 0044 31E0      		ldi r19,lo8(1)
+ 667               	.LVL85:
+ 668               	.L62:
+ 678:src/main.c    ****         
+ 669               		.loc 1 678 0
+ 670               	/* #APP */
+ 671               	 ;  678 "src/main.c" 1
+ 672 0046 F894      		cli
+ 673               	 ;  0 "" 2
+ 680:src/main.c    ****         TIFR2 = 0xFF;   // delete TIFR2 flags
+ 674               		.loc 1 680 0
+ 675               	/* #NOAPP */
+ 676 0048 26BB      		out 0x16,r18
+ 681:src/main.c    ****         TIFR2 = 0xFF;   // delete TIFR2 flags
+ 677               		.loc 1 681 0
+ 678 004a 27BB      		out 0x17,r18
+ 683:src/main.c    ****         TCNT1L = 0;
+ 679               		.loc 1 683 0
+ 680 004c 1092 8500 		sts 133,__zero_reg__
+ 684:src/main.c    ****         TCNT2 = 0;      // clear timer2 counter
+ 681               		.loc 1 684 0
+ 682 0050 1092 8400 		sts 132,__zero_reg__
+ 685:src/main.c    ****            
+ 683               		.loc 1 685 0
+ 684 0054 1092 B200 		sts 178,__zero_reg__
+ 685               	.L58:
+ 688:src/main.c    **** 
+ 686               		.loc 1 688 0 discriminator 1
+ 687 0058 B99B      		sbis 0x17,1
+ 688 005a 00C0      		rjmp .L58
+ 690:src/main.c    **** 
+ 689               		.loc 1 690 0
+ 690 005c 1092 8100 		sts 129,__zero_reg__
+ 692:src/main.c    ****     
+ 691               		.loc 1 692 0
+ 692               	/* #APP */
+ 693               	 ;  692 "src/main.c" 1
+ 694 0060 7894      		sei
+ 695               	 ;  0 "" 2
+ 695:src/main.c    ****         {
+ 696               		.loc 1 695 0
+ 697               	/* #NOAPP */
+ 698 0062 B099      		sbic 0x16,0
+ 699 0064 00C0      		rjmp .L59
+ 701:src/main.c    ****             temp = TCNT1H;
+ 700               		.loc 1 701 0
+ 701 0066 4091 8400 		lds r20,132
+ 702               	.LVL86:
+ 702:src/main.c    ****             temp = (temp << 8);
+ 703               		.loc 1 702 0
+ 704 006a 8091 8500 		lds r24,133
+ 705 006e 90E0      		ldi r25,0
+ 706               	.LVL87:
+ 703:src/main.c    ****             temp += tempL;
+ 707               		.loc 1 703 0
+ 708 0070 982F      		mov r25,r24
+ 709 0072 8827      		clr r24
+ 710               	.LVL88:
+ 704:src/main.c    ****         }
+ 711               		.loc 1 704 0
+ 712 0074 840F      		add r24,r20
+ 713 0076 911D      		adc r25,__zero_reg__
+ 714               	.LVL89:
+ 707:src/main.c    ****         {
+ 715               		.loc 1 707 0
+ 716 0078 8B36      		cpi r24,107
+ 717 007a 48E1      		ldi r20,24
+ 718 007c 9407      		cpc r25,r20
+ 719               	.LVL90:
+ 720 007e 04F0      		brlt .L60
+ 709:src/main.c    ****         }
+ 721               		.loc 1 709 0
+ 722 0080 8091 6600 		lds r24,102
+ 723               	.LVL91:
+ 724 0084 8150      		subi r24,lo8(-(-1))
+ 725 0086 00C0      		rjmp .L69
+ 726               	.LVL92:
+ 727               	.L60:
+ 711:src/main.c    ****         {
+ 728               		.loc 1 711 0
+ 729 0088 883E      		cpi r24,-24
+ 730 008a 9741      		sbci r25,23
+ 731 008c 04F4      		brge .L63
+ 732               	.LVL93:
+ 733               	.L59:
+ 713:src/main.c    ****         }
+ 734               		.loc 1 713 0
+ 735 008e 8091 6600 		lds r24,102
+ 736 0092 8F5F      		subi r24,lo8(-(1))
+ 737               	.L69:
+ 738 0094 8093 6600 		sts 102,r24
+ 739 0098 80E0      		ldi r24,0
+ 740 009a 00C0      		rjmp .L61
+ 741               	.LVL94:
+ 742               	.L63:
+ 743               		.loc 1 716 0
+ 744 009c 81E0      		ldi r24,lo8(1)
+ 745               	.LVL95:
+ 746               	.L61:
+ 717:src/main.c    **** 
+ 718:src/main.c    ****         TCCR1B = (1<<CS10); // start timer1
+ 747               		.loc 1 718 0
+ 748 009e 3093 8100 		sts 129,r19
+ 676:src/main.c    ****     {
+ 749               		.loc 1 676 0
+ 750 00a2 8823      		tst r24
+ 751 00a4 01F0      		breq .L62
+ 752               	/* epilogue start */
+ 719:src/main.c    ****     }
+ 720:src/main.c    **** }
+ 753               		.loc 1 720 0
+ 754 00a6 0895      		ret
+ 755               		.cfi_endproc
+ 756               	.LFE13:
+ 758               		.section	.text.Initialization,"ax",@progbits
+ 759               	.global	Initialization
+ 761               	Initialization:
+ 762               	.LFB5:
+ 300:src/main.c    ****     char tst;           // dummy
+ 763               		.loc 1 300 0
+ 764               		.cfi_startproc
+ 765               	/* prologue: function */
+ 766               	/* frame size = 0 */
+ 767               	/* stack size = 0 */
+ 768               	.L__stack_usage = 0
+ 303:src/main.c    ****         
+ 769               		.loc 1 303 0
+ 770 0000 0E94 0000 		call OSCCAL_calibration
+ 771               	.LVL96:
+ 305:src/main.c    **** 
+ 772               		.loc 1 305 0
+ 773 0004 E1E6      		ldi r30,lo8(97)
+ 774 0006 F0E0      		ldi r31,0
+ 775 0008 80E8      		ldi r24,lo8(-128)
+ 776 000a 8083      		st Z,r24
+ 308:src/main.c    **** 
+ 777               		.loc 1 308 0
+ 778 000c 93E0      		ldi r25,lo8(3)
+ 779 000e 9083      		st Z,r25
+ 311:src/main.c    **** 
+ 780               		.loc 1 311 0
+ 781 0010 80BF      		out 0x30,r24
+ 314:src/main.c    **** 
+ 782               		.loc 1 314 0
+ 783 0012 87E0      		ldi r24,lo8(7)
+ 784 0014 8093 7E00 		sts 126,r24
+ 317:src/main.c    ****     // mt PORTE = (15<<PORTE4);
+ 785               		.loc 1 317 0
+ 786 0018 8FE0      		ldi r24,lo8(15)
+ 787 001a 85B9      		out 0x5,r24
+ 319:src/main.c    **** 
+ 788               		.loc 1 319 0
+ 789 001c 80EF      		ldi r24,lo8(-16)
+ 790 001e 8EB9      		out 0xe,r24
+ 321:src/main.c    ****     sbiBF(PORTB, 5);              // set OC1A high
+ 791               		.loc 1 321 0
+ 792 0020 259A      		sbi 0x4,5
+ 322:src/main.c    ****             
+ 793               		.loc 1 322 0
+ 794 0022 2D9A      		sbi 0x5,5
+ 324:src/main.c    ****     
+ 795               		.loc 1 324 0
+ 796 0024 0E94 0000 		call Button_Init
+ 797               	.LVL97:
+ 326:src/main.c    **** 
+ 798               		.loc 1 326 0
+ 799 0028 0E94 0000 		call RTC_init
+ 800               	.LVL98:
+ 328:src/main.c    **** 
+ 801               		.loc 1 328 0
+ 802 002c 0E94 0000 		call Timer0_Init
+ 803               	.LVL99:
+ 330:src/main.c    ****     
+ 804               		.loc 1 330 0
+ 805 0030 8CE0      		ldi r24,lo8(12)
+ 806 0032 90E0      		ldi r25,0
+ 807 0034 0E94 0000 		call USART_Init
+ 808               	.LVL100:
+ 332:src/main.c    ****     
+ 809               		.loc 1 332 0
+ 810 0038 0E94 0000 		call DF_SPI_init
+ 811               	.LVL101:
+ 334:src/main.c    **** 
+ 812               		.loc 1 334 0
+ 813 003c 0E94 0000 		call Read_DF_status
+ 814               	.LVL102:
+ 336:src/main.c    ****         
+ 815               		.loc 1 336 0
+ 816 0040 289A      		sbi 0x5,0
+ 338:src/main.c    **** }
+ 817               		.loc 1 338 0
+ 818 0042 0C94 0000 		jmp LCD_Init
+ 819               	.LVL103:
+ 820               		.cfi_endproc
+ 821               	.LFE5:
+ 823               		.section	.text.startup.main,"ax",@progbits
+ 824               	.global	main
+ 826               	main:
+ 827               	.LFB3:
+  93:src/main.c    **** //  unsigned char state, nextstate;
+ 828               		.loc 1 93 0
+ 829               		.cfi_startproc
+ 830               	/* prologue: function */
+ 831               	/* frame size = 0 */
+ 832               	/* stack size = 0 */
+ 833               	.L__stack_usage = 0
+ 834               	.LVL104:
+ 107:src/main.c    ****     nextstate = ST_AVRBF;
+ 835               		.loc 1 107 0
+ 836 0000 8AE0      		ldi r24,lo8(10)
+ 837 0002 8093 0000 		sts state,r24
+ 838               	.LVL105:
+ 114:src/main.c    ****     sei(); // mt __enable_interrupt();
+ 839               		.loc 1 114 0
+ 840 0006 0E94 0000 		call Initialization
+ 841               	.LVL106:
+ 115:src/main.c    **** 
+ 842               		.loc 1 115 0
+ 843               	/* #APP */
+ 844               	 ;  115 "src/main.c" 1
+ 845 000a 7894      		sei
+ 846               	 ;  0 "" 2
+ 104:src/main.c    **** 
+ 847               		.loc 1 104 0
+ 848               	/* #NOAPP */
+ 849 000c D12C      		mov r13,__zero_reg__
+ 110:src/main.c    **** 
+ 850               		.loc 1 110 0
+ 851 000e 00E0      		ldi r16,0
+ 852 0010 10E0      		ldi r17,0
+ 109:src/main.c    ****     pStateFunc = NULL;
+ 853               		.loc 1 109 0
+ 854 0012 80E0      		ldi r24,lo8(MT_AVRBF)
+ 855 0014 E82E      		mov r14,r24
+ 856 0016 80E0      		ldi r24,hi8(MT_AVRBF)
+ 857 0018 F82E      		mov r15,r24
+ 108:src/main.c    ****     statetext = MT_AVRBF;
+ 858               		.loc 1 108 0
+ 859 001a DAE0      		ldi r29,lo8(10)
+ 860               	.LBB5:
+ 146:src/main.c    ****                 {
+ 861               		.loc 1 146 0
+ 862 001c 95E0      		ldi r25,lo8(5)
+ 863 001e B92E      		mov r11,r25
+ 864               	.LBE5:
+ 173:src/main.c    ****                 gPowerSaveTimer = 0;
+ 865               		.loc 1 173 0
+ 866 0020 2AE0      		ldi r18,lo8(10)
+ 867 0022 A22E      		mov r10,r18
+ 207:src/main.c    ****         }
+ 868               		.loc 1 207 0
+ 869 0024 33E0      		ldi r19,lo8(3)
+ 870 0026 C32E      		mov r12,r19
+ 871               	.LVL107:
+ 872               	.L72:
+ 119:src/main.c    ****         {
+ 873               		.loc 1 119 0
+ 874 0028 8091 0000 		lds r24,PowerSave
+ 875 002c 8111      		cpse r24,__zero_reg__
+ 876 002e 00C0      		rjmp .L73
+ 122:src/main.c    ****             {
+ 877               		.loc 1 122 0
+ 878 0030 E114      		cp r14,__zero_reg__
+ 879 0032 F104      		cpc r15,__zero_reg__
+ 880 0034 01F0      		breq .L74
+ 124:src/main.c    ****                 LCD_Colon(0);
+ 881               		.loc 1 124 0
+ 882 0036 61E0      		ldi r22,lo8(1)
+ 883 0038 C701      		movw r24,r14
+ 884 003a 0E94 0000 		call LCD_puts_f
+ 885               	.LVL108:
+ 125:src/main.c    ****                 statetext = NULL;
+ 886               		.loc 1 125 0
+ 887 003e 80E0      		ldi r24,0
+ 888 0040 0E94 0000 		call LCD_Colon
+ 889               	.LVL109:
+ 890               	.L74:
+ 129:src/main.c    ****     
+ 891               		.loc 1 129 0
+ 892 0044 0E94 0000 		call getkey
+ 893               	.LVL110:
+ 131:src/main.c    ****             {
+ 894               		.loc 1 131 0
+ 895 0048 0115      		cp r16,__zero_reg__
+ 896 004a 1105      		cpc r17,__zero_reg__
+ 897 004c 01F0      		breq .L75
+ 134:src/main.c    ****             }
+ 898               		.loc 1 134 0
+ 899 004e F801      		movw r30,r16
+ 900 0050 0995      		icall
+ 901               	.LVL111:
+ 902 0052 00C0      		rjmp .L109
+ 903               	.LVL112:
+ 904               	.L75:
+ 136:src/main.c    ****             {
+ 905               		.loc 1 136 0
+ 906 0054 8823      		tst r24
+ 907 0056 01F0      		breq .L76
+ 139:src/main.c    ****             }
+ 908               		.loc 1 139 0
+ 909 0058 682F      		mov r22,r24
+ 910 005a 8091 0000 		lds r24,state
+ 911               	.LVL113:
+ 912 005e 0E94 0000 		call StateMachine
+ 913               	.LVL114:
+ 914               	.L109:
+ 915 0062 D82F      		mov r29,r24
+ 916               	.LVL115:
+ 917               	.L76:
+ 142:src/main.c    ****             {
+ 918               		.loc 1 142 0
+ 919 0064 8091 0000 		lds r24,state
+ 920 0068 D817      		cp r29,r24
+ 921 006a 01F0      		breq .L89
+ 144:src/main.c    ****                 // mt: for (i=0; menu_state[i].state; i++)
+ 922               		.loc 1 144 0
+ 923 006c D093 0000 		sts state,r29
+ 924               	.LVL116:
+ 146:src/main.c    ****                 {
+ 925               		.loc 1 146 0
+ 926 0070 20E0      		ldi r18,0
+ 927               	.LVL117:
+ 928               	.L77:
+ 929               	.LBB6:
+ 146:src/main.c    ****                 {
+ 930               		.loc 1 146 0 is_stmt 0 discriminator 1
+ 931 0072 B29E      		mul r11,r18
+ 932 0074 C001      		movw r24,r0
+ 933 0076 1124      		clr __zero_reg__
+ 934 0078 FC01      		movw r30,r24
+ 935 007a E050      		subi r30,lo8(-(menu_state))
+ 936 007c F040      		sbci r31,hi8(-(menu_state))
+ 937               	/* #APP */
+ 938               	 ;  146 "src/main.c" 1
+ 939 007e E491      		lpm r30, Z
+ 940               		
+ 941               	 ;  0 "" 2
+ 942               	.LVL118:
+ 943               	/* #NOAPP */
+ 944               	.LBE6:
+ 945 0080 EE23      		tst r30
+ 946 0082 01F0      		breq .L89
+ 150:src/main.c    ****                     {
+ 947               		.loc 1 150 0 is_stmt 1
+ 948 0084 ED13      		cpse r30,r29
+ 949 0086 00C0      		rjmp .L78
+ 950               	.LBB7:
+ 156:src/main.c    ****                         // mt - store pointer to function from menu_state[i].pFunc in pStateFunc
+ 951               		.loc 1 156 0
+ 952 0088 FC01      		movw r30,r24
+ 953               	.LVL119:
+ 954 008a E050      		subi r30,lo8(-(menu_state+1))
+ 955 008c F040      		sbci r31,hi8(-(menu_state+1))
+ 956               	.LVL120:
+ 957               	.LBE7:
+ 958               	/* #APP */
+ 959               	 ;  156 "src/main.c" 1
+ 960 008e E590      		lpm r14, Z+
+ 961 0090 F490      		lpm r15, Z
+ 962               		
+ 963               	 ;  0 "" 2
+ 964               	.LVL121:
+ 965               	/* #NOAPP */
+ 966               	.LBB8:
+ 159:src/main.c    ****                         // mtE
+ 967               		.loc 1 159 0
+ 968 0092 FC01      		movw r30,r24
+ 969 0094 E050      		subi r30,lo8(-(menu_state+3))
+ 970 0096 F040      		sbci r31,hi8(-(menu_state+3))
+ 971               	.LVL122:
+ 972               	.LBE8:
+ 973               	/* #APP */
+ 974               	 ;  159 "src/main.c" 1
+ 975 0098 0591      		lpm r16, Z+
+ 976 009a 1491      		lpm r17, Z
+ 977               		
+ 978               	 ;  0 "" 2
+ 979               	.LVL123:
+ 161:src/main.c    ****                     }
+ 980               		.loc 1 161 0
+ 981               	/* #NOAPP */
+ 982 009c 00C0      		rjmp .L73
+ 983               	.LVL124:
+ 984               	.L78:
+ 146:src/main.c    ****                 {
+ 985               		.loc 1 146 0 discriminator 2
+ 986 009e 2F5F      		subi r18,lo8(-(1))
+ 987               	.LVL125:
+ 988 00a0 00C0      		rjmp .L77
+ 989               	.LVL126:
+ 990               	.L89:
+ 991 00a2 E12C      		mov r14,__zero_reg__
+ 992 00a4 F12C      		mov r15,__zero_reg__
+ 993               	.LVL127:
+ 994               	.L73:
+ 169:src/main.c    ****         {
+ 995               		.loc 1 169 0
+ 996 00a6 8091 0000 		lds r24,AutoPowerSave
+ 997 00aa 8823      		tst r24
+ 998 00ac 01F0      		breq .L80
+ 171:src/main.c    ****             {
+ 999               		.loc 1 171 0
+ 1000 00ae 9091 0000 		lds r25,gPowerSaveTimer
+ 1001 00b2 8091 0000 		lds r24,PowerSaveTimeout
+ 1002 00b6 9817      		cp r25,r24
+ 1003 00b8 00F0      		brlo .L80
+ 173:src/main.c    ****                 gPowerSaveTimer = 0;
+ 1004               		.loc 1 173 0
+ 1005 00ba A092 0000 		sts state,r10
+ 174:src/main.c    ****                 PowerSave = TRUE;
+ 1006               		.loc 1 174 0
+ 1007 00be 1092 0000 		sts gPowerSaveTimer,__zero_reg__
+ 175:src/main.c    ****             }
+ 1008               		.loc 1 175 0
+ 1009 00c2 81E0      		ldi r24,lo8(1)
+ 1010 00c4 8093 0000 		sts PowerSave,r24
+ 1011               	.L80:
+ 184:src/main.c    ****             Test();
+ 1012               		.loc 1 184 0
+ 1013 00c8 1F99      		sbic 0x3,7
+ 1014 00ca 00C0      		rjmp .L81
+ 184:src/main.c    ****             Test();
+ 1015               		.loc 1 184 0 is_stmt 0 discriminator 1
+ 1016 00cc 1E9B      		sbis 0x3,6
+ 185:src/main.c    ****         }
+ 1017               		.loc 1 185 0 is_stmt 1
+ 1018 00ce 0E94 0000 		call Test
+ 1019               	.LVL128:
+ 1020               	.L81:
+ 191:src/main.c    ****         buttons |= (~PINE) & PINE_MASK;
+ 1021               		.loc 1 191 0
+ 1022 00d2 C3B1      		in r28,0x3
+ 1023               	.LVL129:
+ 192:src/main.c    ****         
+ 1024               		.loc 1 192 0
+ 1025 00d4 2CB1      		in r18,0xc
+ 1026 00d6 30E0      		ldi r19,0
+ 1027 00d8 2095      		com r18
+ 1028 00da 3095      		com r19
+ 1029 00dc 2C70      		andi r18,12
+ 1030 00de 3327      		clr r19
+ 191:src/main.c    ****         buttons |= (~PINE) & PINE_MASK;
+ 1031               		.loc 1 191 0
+ 1032 00e0 C095      		com r28
+ 1033               	.LVL130:
+ 1034 00e2 C07D      		andi r28,lo8(-48)
+ 1035               	.LVL131:
+ 192:src/main.c    ****         
+ 1036               		.loc 1 192 0
+ 1037 00e4 C22B      		or r28,r18
+ 1038               	.LVL132:
+ 194:src/main.c    ****         {
+ 1039               		.loc 1 194 0
+ 1040 00e6 CD15      		cp r28,r13
+ 1041 00e8 01F0      		breq .L82
+ 1042               	.LVL133:
+ 197:src/main.c    ****         }
+ 1043               		.loc 1 197 0
+ 1044 00ea 1092 0000 		sts gAutoPressJoystick,__zero_reg__
+ 1045 00ee 00C0      		rjmp .L83
+ 1046               	.LVL134:
+ 1047               	.L82:
+ 199:src/main.c    ****         {
+ 1048               		.loc 1 199 0
+ 1049 00f0 DD20      		tst r13
+ 1050 00f2 01F0      		breq .L83
+ 201:src/main.c    ****             {
+ 1051               		.loc 1 201 0
+ 1052 00f4 8091 0000 		lds r24,gAutoPressJoystick
+ 1053 00f8 8130      		cpi r24,lo8(1)
+ 1054 00fa 01F4      		brne .L84
+ 203:src/main.c    ****                 gAutoPressJoystick = AUTO;
+ 1055               		.loc 1 203 0
+ 1056 00fc 0E94 0000 		call PinChangeInterrupt
+ 1057               	.LVL135:
+ 1058               	.L84:
+ 207:src/main.c    ****         }
+ 1059               		.loc 1 207 0
+ 1060 0100 C092 0000 		sts gAutoPressJoystick,r12
+ 1061               	.LVL136:
+ 1062               	.L83:
+ 213:src/main.c    ****         {
+ 1063               		.loc 1 213 0
+ 1064 0104 8091 0000 		lds r24,gPlaying
+ 1065 0108 8111      		cpse r24,__zero_reg__
+ 1066 010a 00C0      		rjmp .L85
+ 215:src/main.c    ****                 cbiBF(LCDCRA, 7);             // disable LCD
+ 1067               		.loc 1 215 0
+ 1068 010c 8091 0000 		lds r24,PowerSave
+ 1069 0110 8823      		tst r24
+ 1070 0112 01F0      		breq .L86
+ 216:src/main.c    **** 
+ 1071               		.loc 1 216 0
+ 1072 0114 8091 E400 		lds r24,228
+ 1073 0118 8F77      		andi r24,lo8(127)
+ 1074 011a 8093 E400 		sts 228,r24
+ 1075               	.L86:
+ 218:src/main.c    ****             sleep_mode();
+ 1076               		.loc 1 218 0
+ 1077 011e 83B7      		in r24,0x33
+ 1078 0120 817F      		andi r24,lo8(-15)
+ 1079 0122 8660      		ori r24,lo8(6)
+ 1080 0124 83BF      		out 0x33,r24
+ 219:src/main.c    **** 
+ 1081               		.loc 1 219 0
+ 1082 0126 83B7      		in r24,0x33
+ 1083 0128 8160      		ori r24,lo8(1)
+ 1084 012a 83BF      		out 0x33,r24
+ 1085               	/* #APP */
+ 1086               	 ;  219 "src/main.c" 1
+ 1087 012c 8895      		sleep
+ 1088               		
+ 1089               	 ;  0 "" 2
+ 1090               	/* #NOAPP */
+ 1091 012e 83B7      		in r24,0x33
+ 1092 0130 8E7F      		andi r24,lo8(-2)
+ 1093 0132 83BF      		out 0x33,r24
+ 221:src/main.c    ****             {
+ 1094               		.loc 1 221 0
+ 1095 0134 8091 0000 		lds r24,PowerSave
+ 1096 0138 8111      		cpse r24,__zero_reg__
+ 1097 013a 00C0      		rjmp .L110
+ 1098               	.L87:
+ 192:src/main.c    ****         
+ 1099               		.loc 1 192 0
+ 1100 013c DC2E      		mov r13,r28
+ 1101 013e 00C0      		rjmp .L72
+ 1102               	.L110:
+ 223:src/main.c    ****                 {
+ 1103               		.loc 1 223 0
+ 1104 0140 1E99      		sbic 0x3,6
+ 1105 0142 00C0      		rjmp .L87
+ 225:src/main.c    ****                     
+ 1106               		.loc 1 225 0
+ 1107 0144 1092 0000 		sts PowerSave,__zero_reg__
+ 1108               	.LVL137:
+ 1109 0148 ECEE      		ldi r30,lo8(-20)
+ 1110 014a F0E0      		ldi r31,0
+ 1111               	.LVL138:
+ 1112               	.L88:
+ 229:src/main.c    ****                     }
+ 1113               		.loc 1 229 0 discriminator 3
+ 1114 014c 1192      		st Z+,__zero_reg__
+ 1115               	.LVL139:
+ 227:src/main.c    ****                     {
+ 1116               		.loc 1 227 0 discriminator 3
+ 1117 014e E115      		cp r30,__zero_reg__
+ 1118 0150 81E0      		ldi r24,1
+ 1119 0152 F807      		cpc r31,r24
+ 1120 0154 01F4      		brne .L88
+ 232:src/main.c    ****                     input = getkey();           // Read buttons
+ 1121               		.loc 1 232 0
+ 1122 0156 8091 E400 		lds r24,228
+ 1123 015a 8068      		ori r24,lo8(-128)
+ 1124 015c 8093 E400 		sts 228,r24
+ 233:src/main.c    ****                 }
+ 1125               		.loc 1 233 0
+ 1126 0160 0E94 0000 		call getkey
+ 1127               	.LVL140:
+ 1128 0164 00C0      		rjmp .L87
+ 1129               	.L85:
+ 239:src/main.c    ****            sleep_mode();
+ 1130               		.loc 1 239 0
+ 1131 0166 83B7      		in r24,0x33
+ 1132 0168 817F      		andi r24,lo8(-15)
+ 1133 016a 83BF      		out 0x33,r24
+ 240:src/main.c    ****         }
+ 1134               		.loc 1 240 0
+ 1135 016c 83B7      		in r24,0x33
+ 1136 016e 8160      		ori r24,lo8(1)
+ 1137 0170 83BF      		out 0x33,r24
+ 1138               	/* #APP */
+ 1139               	 ;  240 "src/main.c" 1
+ 1140 0172 8895      		sleep
+ 1141               		
+ 1142               	 ;  0 "" 2
+ 1143               	/* #NOAPP */
+ 1144 0174 83B7      		in r24,0x33
+ 1145 0176 8E7F      		andi r24,lo8(-2)
+ 1146 0178 83BF      		out 0x33,r24
+ 1147 017a 00C0      		rjmp .L87
+ 1148               		.cfi_endproc
+ 1149               	.LFE3:
+ 1151               		.section	.data.enter.1987,"aw",@progbits
+ 1154               	enter.1987:
+ 1155 0000 01        		.byte	1
+ 1156               		.section	.progmem.data.__c.1972,"a",@progbits
+ 1159               	__c.1972:
+ 1160 0000 4F66 6600 		.string	"Off"
+ 1161               		.section	.progmem.data.__c.1970,"a",@progbits
+ 1164               	__c.1970:
+ 1165 0000 4F6E 00   		.string	"On"
+ 1166               		.section	.data.enter.1968,"aw",@progbits
+ 1169               	enter.1968:
+ 1170 0000 01        		.byte	1
+ 1171               		.section	.progmem.data.__c.1963,"a",@progbits
+ 1174               	__c.1963:
+ 1175 0000 4F66 6600 		.string	"Off"
+ 1176               		.section	.progmem.data.__c.1961,"a",@progbits
+ 1179               	__c.1961:
+ 1180 0000 4F66 6600 		.string	"Off"
+ 1181               		.section	.data.enter.1960,"aw",@progbits
+ 1184               	enter.1960:
+ 1185 0000 01        		.byte	1
+ 1186               		.section	.progmem.data.__c.1950,"a",@progbits
+ 1189               	__c.1950:
+ 1190 0000 5072 6573 		.string	"Press enter to sleep"
+ 1190      7320 656E 
+ 1190      7465 7220 
+ 1190      746F 2073 
+ 1190      6C65 6570 
+ 1191               		.section	.data.enter.1949,"aw",@progbits
+ 1194               	enter.1949:
+ 1195 0000 01        		.byte	1
+ 1196               		.section	.progmem.data.__c.1943,"a",@progbits
+ 1199               	__c.1943:
+ 1200 0000 4A75 6D70 		.string	"Jump to bootloader"
+ 1200      2074 6F20 
+ 1200      626F 6F74 
+ 1200      6C6F 6164 
+ 1200      6572 00
+ 1201               		.section	.data.enter.1942,"aw",@progbits
+ 1204               	enter.1942:
+ 1205 0000 01        		.byte	1
+ 1206               		.comm	state,1,1
+ 1207               	.global	PowerSave
+ 1208               		.section	.bss.PowerSave,"aw",@nobits
+ 1211               	PowerSave:
+ 1212 0000 00        		.zero	1
+ 1213               	.global	gKeyClickStatus
+ 1214               		.section	.bss.gKeyClickStatus,"aw",@nobits
+ 1217               	gKeyClickStatus:
+ 1218 0000 00        		.zero	1
+ 1219               	.global	AutoPowerSave
+ 1220               		.section	.data.AutoPowerSave,"aw",@progbits
+ 1223               	AutoPowerSave:
+ 1224 0000 01        		.byte	1
+ 1225               	.global	PowerSaveTimeout
+ 1226               		.section	.data.PowerSaveTimeout,"aw",@progbits
+ 1229               	PowerSaveTimeout:
+ 1230 0000 1E        		.byte	30
+ 1231               	.global	menu_state
+ 1232               		.section	.progmem.data.menu_state,"a",@progbits
+ 1235               	menu_state:
+ 1236 0000 0A        		.byte	10
+ 1237 0001 0000      		.word	MT_AVRBF
+ 1238 0003 0000      		.word	0
+ 1239 0005 0B        		.byte	11
+ 1240 0006 0000      		.word	0
+ 1241 0008 0000      		.word	gs(Revision)
+ 1242 000a 14        		.byte	20
+ 1243 000b 0000      		.word	MT_TIME
+ 1244 000d 0000      		.word	0
+ 1245 000f 15        		.byte	21
+ 1246 0010 0000      		.word	MT_TIME_CLOCK
+ 1247 0012 0000      		.word	0
+ 1248 0014 16        		.byte	22
+ 1249 0015 0000      		.word	0
+ 1250 0017 0000      		.word	gs(ShowClock)
+ 1251 0019 17        		.byte	23
+ 1252 001a 0000      		.word	MT_TIME_CLOCK_ADJUST
+ 1253 001c 0000      		.word	0
+ 1254 001e 18        		.byte	24
+ 1255 001f 0000      		.word	0
+ 1256 0021 0000      		.word	gs(SetClock)
+ 1257 0023 19        		.byte	25
+ 1258 0024 0000      		.word	MT_TIME_CLOCKFORMAT_ADJUST
+ 1259 0026 0000      		.word	0
+ 1260 0028 24        		.byte	36
+ 1261 0029 0000      		.word	0
+ 1262 002b 0000      		.word	gs(SetClockFormat)
+ 1263 002d 1B        		.byte	27
+ 1264 002e 0000      		.word	MT_TIME_DATE
+ 1265 0030 0000      		.word	0
+ 1266 0032 1C        		.byte	28
+ 1267 0033 0000      		.word	0
+ 1268 0035 0000      		.word	gs(ShowDate)
+ 1269 0037 1D        		.byte	29
+ 1270 0038 0000      		.word	MT_TIME_DATE_ADJUST
+ 1271 003a 0000      		.word	0
+ 1272 003c 1E        		.byte	30
+ 1273 003d 0000      		.word	0
+ 1274 003f 0000      		.word	gs(SetDate)
+ 1275 0041 1F        		.byte	31
+ 1276 0042 0000      		.word	MT_TIME_DATEFORMAT_ADJUST
+ 1277 0044 0000      		.word	0
+ 1278 0046 20        		.byte	32
+ 1279 0047 0000      		.word	0
+ 1280 0049 0000      		.word	gs(SetDateFormat)
+ 1281 004b 28        		.byte	40
+ 1282 004c 0000      		.word	MT_MUSIC
+ 1283 004e 0000      		.word	0
+ 1284 0050 2A        		.byte	42
+ 1285 0051 0000      		.word	0
+ 1286 0053 0000      		.word	gs(SelectSound)
+ 1287 0055 2B        		.byte	43
+ 1288 0056 0000      		.word	0
+ 1289 0058 0000      		.word	gs(Sound)
+ 1290 005a 3C        		.byte	60
+ 1291 005b 0000      		.word	MT_TEMPERATURE
+ 1292 005d 0000      		.word	0
+ 1293 005f 3D        		.byte	61
+ 1294 0060 0000      		.word	0
+ 1295 0062 0000      		.word	gs(TemperatureFunc)
+ 1296 0064 46        		.byte	70
+ 1297 0065 0000      		.word	MT_VOLTAGE
+ 1298 0067 0000      		.word	0
+ 1299 0069 47        		.byte	71
+ 1300 006a 0000      		.word	0
+ 1301 006c 0000      		.word	gs(VoltageFunc)
+ 1302 006e 50        		.byte	80
+ 1303 006f 0000      		.word	MT_LIGHT
+ 1304 0071 0000      		.word	0
+ 1305 0073 51        		.byte	81
+ 1306 0074 0000      		.word	0
+ 1307 0076 0000      		.word	gs(LightFunc)
+ 1308 0078 5A        		.byte	90
+ 1309 0079 0000      		.word	MT_OPTIONS
+ 1310 007b 0000      		.word	0
+ 1311 007d 5B        		.byte	91
+ 1312 007e 0000      		.word	MT_OPTIONS_DISPLAY
+ 1313 0080 0000      		.word	0
+ 1314 0082 5C        		.byte	92
+ 1315 0083 0000      		.word	MT_OPTIONS_DISPLAY_CONTRAST
+ 1316 0085 0000      		.word	0
+ 1317 0087 5D        		.byte	93
+ 1318 0088 0000      		.word	0
+ 1319 008a 0000      		.word	gs(SetContrast)
+ 1320 008c 5E        		.byte	94
+ 1321 008d 0000      		.word	MT_OPTIONS_BOOT
+ 1322 008f 0000      		.word	0
+ 1323 0091 5F        		.byte	95
+ 1324 0092 0000      		.word	0
+ 1325 0094 0000      		.word	gs(BootFunc)
+ 1326 0096 60        		.byte	96
+ 1327 0097 0000      		.word	MT_OPTIONS_POWER_SAVE
+ 1328 0099 0000      		.word	0
+ 1329 009b 61        		.byte	97
+ 1330 009c 0000      		.word	0
+ 1331 009e 0000      		.word	gs(PowerSaveFunc)
+ 1332 00a0 62        		.byte	98
+ 1333 00a1 0000      		.word	MT_OPTIONS_AUTO_POWER_SAVE
+ 1334 00a3 0000      		.word	0
+ 1335 00a5 63        		.byte	99
+ 1336 00a6 0000      		.word	0
+ 1337 00a8 0000      		.word	gs(AutoPower)
+ 1338 00aa 64        		.byte	100
+ 1339 00ab 0000      		.word	MT_OPTIONS_KEYCLICK
+ 1340 00ad 0000      		.word	0
+ 1341 00af 65        		.byte	101
+ 1342 00b0 0000      		.word	0
+ 1343 00b2 0000      		.word	gs(KeyClick)
+ 1344 00b4 00        		.byte	0
+ 1345 00b5 0000      		.word	0
+ 1346 00b7 0000      		.word	0
+ 1347               	.global	menu_nextstate
+ 1348               		.section	.progmem.data.menu_nextstate,"a",@progbits
+ 1351               	menu_nextstate:
+ 1352 0000 0A        		.byte	10
+ 1353 0001 04        		.byte	4
+ 1354 0002 5A        		.byte	90
+ 1355 0003 0A        		.byte	10
+ 1356 0004 02        		.byte	2
+ 1357 0005 0B        		.byte	11
+ 1358 0006 0A        		.byte	10
+ 1359 0007 05        		.byte	5
+ 1360 0008 14        		.byte	20
+ 1361 0009 0B        		.byte	11
+ 1362 000a 03        		.byte	3
+ 1363 000b 0A        		.byte	10
+ 1364 000c 14        		.byte	20
+ 1365 000d 04        		.byte	4
+ 1366 000e 0A        		.byte	10
+ 1367 000f 14        		.byte	20
+ 1368 0010 02        		.byte	2
+ 1369 0011 15        		.byte	21
+ 1370 0012 14        		.byte	20
+ 1371 0013 03        		.byte	3
+ 1372 0014 0A        		.byte	10
+ 1373 0015 14        		.byte	20
+ 1374 0016 05        		.byte	5
+ 1375 0017 28        		.byte	40
+ 1376 0018 15        		.byte	21
+ 1377 0019 04        		.byte	4
+ 1378 001a 1B        		.byte	27
+ 1379 001b 15        		.byte	21
+ 1380 001c 02        		.byte	2
+ 1381 001d 16        		.byte	22
+ 1382 001e 15        		.byte	21
+ 1383 001f 03        		.byte	3
+ 1384 0020 14        		.byte	20
+ 1385 0021 15        		.byte	21
+ 1386 0022 05        		.byte	5
+ 1387 0023 1B        		.byte	27
+ 1388 0024 17        		.byte	23
+ 1389 0025 04        		.byte	4
+ 1390 0026 19        		.byte	25
+ 1391 0027 17        		.byte	23
+ 1392 0028 01        		.byte	1
+ 1393 0029 18        		.byte	24
+ 1394 002a 17        		.byte	23
+ 1395 002b 03        		.byte	3
+ 1396 002c 16        		.byte	22
+ 1397 002d 17        		.byte	23
+ 1398 002e 05        		.byte	5
+ 1399 002f 19        		.byte	25
+ 1400 0030 19        		.byte	25
+ 1401 0031 04        		.byte	4
+ 1402 0032 17        		.byte	23
+ 1403 0033 19        		.byte	25
+ 1404 0034 01        		.byte	1
+ 1405 0035 24        		.byte	36
+ 1406 0036 19        		.byte	25
+ 1407 0037 03        		.byte	3
+ 1408 0038 16        		.byte	22
+ 1409 0039 19        		.byte	25
+ 1410 003a 05        		.byte	5
+ 1411 003b 17        		.byte	23
+ 1412 003c 1B        		.byte	27
+ 1413 003d 04        		.byte	4
+ 1414 003e 15        		.byte	21
+ 1415 003f 1B        		.byte	27
+ 1416 0040 02        		.byte	2
+ 1417 0041 1C        		.byte	28
+ 1418 0042 1B        		.byte	27
+ 1419 0043 03        		.byte	3
+ 1420 0044 14        		.byte	20
+ 1421 0045 1B        		.byte	27
+ 1422 0046 05        		.byte	5
+ 1423 0047 15        		.byte	21
+ 1424 0048 1D        		.byte	29
+ 1425 0049 04        		.byte	4
+ 1426 004a 1F        		.byte	31
+ 1427 004b 1D        		.byte	29
+ 1428 004c 01        		.byte	1
+ 1429 004d 1E        		.byte	30
+ 1430 004e 1D        		.byte	29
+ 1431 004f 03        		.byte	3
+ 1432 0050 1C        		.byte	28
+ 1433 0051 1D        		.byte	29
+ 1434 0052 05        		.byte	5
+ 1435 0053 1F        		.byte	31
+ 1436 0054 1F        		.byte	31
+ 1437 0055 04        		.byte	4
+ 1438 0056 1D        		.byte	29
+ 1439 0057 1F        		.byte	31
+ 1440 0058 01        		.byte	1
+ 1441 0059 20        		.byte	32
+ 1442 005a 1F        		.byte	31
+ 1443 005b 03        		.byte	3
+ 1444 005c 1C        		.byte	28
+ 1445 005d 1F        		.byte	31
+ 1446 005e 05        		.byte	5
+ 1447 005f 1D        		.byte	29
+ 1448 0060 28        		.byte	40
+ 1449 0061 04        		.byte	4
+ 1450 0062 14        		.byte	20
+ 1451 0063 28        		.byte	40
+ 1452 0064 02        		.byte	2
+ 1453 0065 2A        		.byte	42
+ 1454 0066 28        		.byte	40
+ 1455 0067 03        		.byte	3
+ 1456 0068 0A        		.byte	10
+ 1457 0069 28        		.byte	40
+ 1458 006a 05        		.byte	5
+ 1459 006b 3C        		.byte	60
+ 1460 006c 29        		.byte	41
+ 1461 006d 02        		.byte	2
+ 1462 006e 2A        		.byte	42
+ 1463 006f 29        		.byte	41
+ 1464 0070 03        		.byte	3
+ 1465 0071 28        		.byte	40
+ 1466 0072 3C        		.byte	60
+ 1467 0073 04        		.byte	4
+ 1468 0074 28        		.byte	40
+ 1469 0075 3C        		.byte	60
+ 1470 0076 02        		.byte	2
+ 1471 0077 3D        		.byte	61
+ 1472 0078 3C        		.byte	60
+ 1473 0079 03        		.byte	3
+ 1474 007a 0A        		.byte	10
+ 1475 007b 3C        		.byte	60
+ 1476 007c 05        		.byte	5
+ 1477 007d 46        		.byte	70
+ 1478 007e 46        		.byte	70
+ 1479 007f 04        		.byte	4
+ 1480 0080 3C        		.byte	60
+ 1481 0081 46        		.byte	70
+ 1482 0082 02        		.byte	2
+ 1483 0083 47        		.byte	71
+ 1484 0084 46        		.byte	70
+ 1485 0085 03        		.byte	3
+ 1486 0086 0A        		.byte	10
+ 1487 0087 46        		.byte	70
+ 1488 0088 05        		.byte	5
+ 1489 0089 50        		.byte	80
+ 1490 008a 50        		.byte	80
+ 1491 008b 04        		.byte	4
+ 1492 008c 46        		.byte	70
+ 1493 008d 50        		.byte	80
+ 1494 008e 02        		.byte	2
+ 1495 008f 51        		.byte	81
+ 1496 0090 50        		.byte	80
+ 1497 0091 03        		.byte	3
+ 1498 0092 0A        		.byte	10
+ 1499 0093 50        		.byte	80
+ 1500 0094 05        		.byte	5
+ 1501 0095 5A        		.byte	90
+ 1502 0096 5A        		.byte	90
+ 1503 0097 04        		.byte	4
+ 1504 0098 50        		.byte	80
+ 1505 0099 5A        		.byte	90
+ 1506 009a 02        		.byte	2
+ 1507 009b 5B        		.byte	91
+ 1508 009c 5A        		.byte	90
+ 1509 009d 03        		.byte	3
+ 1510 009e 0A        		.byte	10
+ 1511 009f 5A        		.byte	90
+ 1512 00a0 05        		.byte	5
+ 1513 00a1 0A        		.byte	10
+ 1514 00a2 5B        		.byte	91
+ 1515 00a3 04        		.byte	4
+ 1516 00a4 64        		.byte	100
+ 1517 00a5 5B        		.byte	91
+ 1518 00a6 02        		.byte	2
+ 1519 00a7 5C        		.byte	92
+ 1520 00a8 5B        		.byte	91
+ 1521 00a9 03        		.byte	3
+ 1522 00aa 5A        		.byte	90
+ 1523 00ab 5B        		.byte	91
+ 1524 00ac 05        		.byte	5
+ 1525 00ad 5E        		.byte	94
+ 1526 00ae 5C        		.byte	92
+ 1527 00af 01        		.byte	1
+ 1528 00b0 5D        		.byte	93
+ 1529 00b1 5C        		.byte	92
+ 1530 00b2 03        		.byte	3
+ 1531 00b3 5B        		.byte	91
+ 1532 00b4 5E        		.byte	94
+ 1533 00b5 04        		.byte	4
+ 1534 00b6 5B        		.byte	91
+ 1535 00b7 5E        		.byte	94
+ 1536 00b8 02        		.byte	2
+ 1537 00b9 5F        		.byte	95
+ 1538 00ba 5E        		.byte	94
+ 1539 00bb 03        		.byte	3
+ 1540 00bc 5A        		.byte	90
+ 1541 00bd 5E        		.byte	94
+ 1542 00be 05        		.byte	5
+ 1543 00bf 60        		.byte	96
+ 1544 00c0 60        		.byte	96
+ 1545 00c1 04        		.byte	4
+ 1546 00c2 5E        		.byte	94
+ 1547 00c3 60        		.byte	96
+ 1548 00c4 02        		.byte	2
+ 1549 00c5 61        		.byte	97
+ 1550 00c6 60        		.byte	96
+ 1551 00c7 03        		.byte	3
+ 1552 00c8 5A        		.byte	90
+ 1553 00c9 60        		.byte	96
+ 1554 00ca 05        		.byte	5
+ 1555 00cb 62        		.byte	98
+ 1556 00cc 62        		.byte	98
+ 1557 00cd 04        		.byte	4
+ 1558 00ce 60        		.byte	96
+ 1559 00cf 62        		.byte	98
+ 1560 00d0 02        		.byte	2
+ 1561 00d1 63        		.byte	99
+ 1562 00d2 62        		.byte	98
+ 1563 00d3 03        		.byte	3
+ 1564 00d4 5A        		.byte	90
+ 1565 00d5 62        		.byte	98
+ 1566 00d6 05        		.byte	5
+ 1567 00d7 64        		.byte	100
+ 1568 00d8 64        		.byte	100
+ 1569 00d9 04        		.byte	4
+ 1570 00da 62        		.byte	98
+ 1571 00db 64        		.byte	100
+ 1572 00dc 02        		.byte	2
+ 1573 00dd 65        		.byte	101
+ 1574 00de 64        		.byte	100
+ 1575 00df 03        		.byte	3
+ 1576 00e0 5A        		.byte	90
+ 1577 00e1 64        		.byte	100
+ 1578 00e2 05        		.byte	5
+ 1579 00e3 5B        		.byte	91
+ 1580 00e4 00        		.byte	0
+ 1581 00e5 00        		.byte	0
+ 1582 00e6 00        		.byte	0
+ 1583               	.global	MT_OPTIONS_KEYCLICK
+ 1584               		.section	.progmem.data.MT_OPTIONS_KEYCLICK,"a",@progbits
+ 1587               	MT_OPTIONS_KEYCLICK:
+ 1588 0000 4B65 7920 		.string	"Key Click"
+ 1588      436C 6963 
+ 1588      6B00 
+ 1589               	.global	MT_OPTIONS_AUTO_POWER_SAVE
+ 1590               		.section	.progmem.data.MT_OPTIONS_AUTO_POWER_SAVE,"a",@progbits
+ 1593               	MT_OPTIONS_AUTO_POWER_SAVE:
+ 1594 0000 4175 746F 		.string	"Auto Power Save"
+ 1594      2050 6F77 
+ 1594      6572 2053 
+ 1594      6176 6500 
+ 1595               	.global	MT_OPTIONS_POWER_SAVE
+ 1596               		.section	.progmem.data.MT_OPTIONS_POWER_SAVE,"a",@progbits
+ 1599               	MT_OPTIONS_POWER_SAVE:
+ 1600 0000 506F 7765 		.string	"Power Save Mode"
+ 1600      7220 5361 
+ 1600      7665 204D 
+ 1600      6F64 6500 
+ 1601               	.global	MT_OPTIONS_BOOT
+ 1602               		.section	.progmem.data.MT_OPTIONS_BOOT,"a",@progbits
+ 1605               	MT_OPTIONS_BOOT:
+ 1606 0000 426F 6F74 		.string	"Bootloader"
+ 1606      6C6F 6164 
+ 1606      6572 00
+ 1607               	.global	MT_OPTIONS_DISPLAY_CONTRAST
+ 1608               		.section	.progmem.data.MT_OPTIONS_DISPLAY_CONTRAST,"a",@progbits
+ 1611               	MT_OPTIONS_DISPLAY_CONTRAST:
+ 1612 0000 4164 6A75 		.string	"Adjust contrast"
+ 1612      7374 2063 
+ 1612      6F6E 7472 
+ 1612      6173 7400 
+ 1613               	.global	MT_OPTIONS_DISPLAY
+ 1614               		.section	.progmem.data.MT_OPTIONS_DISPLAY,"a",@progbits
+ 1617               	MT_OPTIONS_DISPLAY:
+ 1618 0000 4469 7370 		.string	"Display"
+ 1618      6C61 7900 
+ 1619               	.global	MT_OPTIONS
+ 1620               		.section	.progmem.data.MT_OPTIONS,"a",@progbits
+ 1623               	MT_OPTIONS:
+ 1624 0000 4F70 7469 		.string	"Options"
+ 1624      6F6E 7300 
+ 1625               	.global	MT_LIGHT
+ 1626               		.section	.progmem.data.MT_LIGHT,"a",@progbits
+ 1629               	MT_LIGHT:
+ 1630 0000 4C69 6768 		.string	"Light"
+ 1630      7400 
+ 1631               	.global	MT_VOLTAGE
+ 1632               		.section	.progmem.data.MT_VOLTAGE,"a",@progbits
+ 1635               	MT_VOLTAGE:
+ 1636 0000 566F 6C74 		.string	"Voltage"
+ 1636      6167 6500 
+ 1637               	.global	MT_TEMPERATURE
+ 1638               		.section	.progmem.data.MT_TEMPERATURE,"a",@progbits
+ 1641               	MT_TEMPERATURE:
+ 1642 0000 5465 6D70 		.string	"Temperature"
+ 1642      6572 6174 
+ 1642      7572 6500 
+ 1643               	.global	MT_MUSIC
+ 1644               		.section	.progmem.data.MT_MUSIC,"a",@progbits
+ 1647               	MT_MUSIC:
+ 1648 0000 4D75 7369 		.string	"Music"
+ 1648      6300 
+ 1649               	.global	MT_TIME_DATEFORMAT_ADJUST
+ 1650               		.section	.progmem.data.MT_TIME_DATEFORMAT_ADJUST,"a",@progbits
+ 1653               	MT_TIME_DATEFORMAT_ADJUST:
+ 1654 0000 4368 616E 		.string	"Change Date Format"
+ 1654      6765 2044 
+ 1654      6174 6520 
+ 1654      466F 726D 
+ 1654      6174 00
+ 1655               	.global	MT_TIME_DATE_ADJUST
+ 1656               		.section	.progmem.data.MT_TIME_DATE_ADJUST,"a",@progbits
+ 1659               	MT_TIME_DATE_ADJUST:
+ 1660 0000 4164 6A75 		.string	"Adjust Date"
+ 1660      7374 2044 
+ 1660      6174 6500 
+ 1661               	.global	MT_TIME_DATE
+ 1662               		.section	.progmem.data.MT_TIME_DATE,"a",@progbits
+ 1665               	MT_TIME_DATE:
+ 1666 0000 4461 7465 		.string	"Date"
+ 1666      00
+ 1667               	.global	MT_TIME_CLOCKFORMAT_ADJUST
+ 1668               		.section	.progmem.data.MT_TIME_CLOCKFORMAT_ADJUST,"a",@progbits
+ 1671               	MT_TIME_CLOCKFORMAT_ADJUST:
+ 1672 0000 4368 616E 		.string	"Change Clock Format"
+ 1672      6765 2043 
+ 1672      6C6F 636B 
+ 1672      2046 6F72 
+ 1672      6D61 7400 
+ 1673               	.global	MT_TIME_CLOCK_ADJUST
+ 1674               		.section	.progmem.data.MT_TIME_CLOCK_ADJUST,"a",@progbits
+ 1677               	MT_TIME_CLOCK_ADJUST:
+ 1678 0000 4164 6A75 		.string	"Adjust Clock"
+ 1678      7374 2043 
+ 1678      6C6F 636B 
+ 1678      00
+ 1679               	.global	MT_TIME_CLOCK
+ 1680               		.section	.progmem.data.MT_TIME_CLOCK,"a",@progbits
+ 1683               	MT_TIME_CLOCK:
+ 1684 0000 436C 6F63 		.string	"Clock"
+ 1684      6B00 
+ 1685               	.global	MT_TIME
+ 1686               		.section	.progmem.data.MT_TIME,"a",@progbits
+ 1689               	MT_TIME:
+ 1690 0000 5469 6D65 		.string	"Time"
+ 1690      00
+ 1691               	.global	MT_AVRBF
+ 1692               		.section	.progmem.data.MT_AVRBF,"a",@progbits
+ 1695               	MT_AVRBF:
+ 1696 0000 41        		.byte	65
+ 1697 0001 56        		.byte	86
+ 1698 0002 52        		.byte	82
+ 1699 0003 20        		.byte	32
+ 1700 0004 42        		.byte	66
+ 1701 0005 55        		.byte	85
+ 1702 0006 54        		.byte	84
+ 1703 0007 54        		.byte	84
+ 1704 0008 45        		.byte	69
+ 1705 0009 52        		.byte	82
+ 1706 000a 46        		.byte	70
+ 1707 000b 4C        		.byte	76
+ 1708 000c 59        		.byte	89
+ 1709 000d 20        		.byte	32
+ 1710 000e C7        		.byte	-57
+ 1711 000f C3        		.byte	-61
+ 1712 0010 C3        		.byte	-61
+ 1713 0011 00        		.byte	0
+ 1714               		.text
+ 1715               	.Letext0:
+ 1716               		.file 2 "/usr/lib/avr/include/stdint.h"
+ 1717               		.file 3 "inc/menu.h"
+ 1718               		.file 4 "inc/LCD_driver.h"
+ 1719               		.file 5 "inc/RTC.h"
+ 1720               		.file 6 "inc/sound.h"
+ 1721               		.file 7 "inc/LCD_functions.h"
+ 1722               		.file 8 "inc/button.h"
+ 1723               		.file 9 "inc/timer0.h"
+ 1724               		.file 10 "inc/usart.h"
+ 1725               		.file 11 "inc/dataflash.h"
+ 1726               		.file 12 "inc/test.h"
+ 1727               		.file 13 "inc/BCD.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 main.c
+     /tmp/ccLYN6fY.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/ccLYN6fY.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/ccLYN6fY.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/ccLYN6fY.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/ccLYN6fY.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/ccLYN6fY.s:13     .text.BootFunc:0000000000000000 BootFunc
+     /tmp/ccLYN6fY.s:1204   .data.enter.1942:0000000000000000 enter.1942
+     /tmp/ccLYN6fY.s:1199   .progmem.data.__c.1943:0000000000000000 __c.1943
+     /tmp/ccLYN6fY.s:72     .text.PowerSaveFunc:0000000000000000 PowerSaveFunc
+     /tmp/ccLYN6fY.s:1194   .data.enter.1949:0000000000000000 enter.1949
+     /tmp/ccLYN6fY.s:1189   .progmem.data.__c.1950:0000000000000000 __c.1950
+     /tmp/ccLYN6fY.s:1211   .bss.PowerSave:0000000000000000 PowerSave
+     /tmp/ccLYN6fY.s:130    .text.AutoPowerShowMin:0000000000000000 AutoPowerShowMin
+     /tmp/ccLYN6fY.s:1229   .data.PowerSaveTimeout:0000000000000000 PowerSaveTimeout
+     /tmp/ccLYN6fY.s:218    .text.AutoPower:0000000000000000 AutoPower
+     /tmp/ccLYN6fY.s:1184   .data.enter.1960:0000000000000000 enter.1960
+     /tmp/ccLYN6fY.s:1223   .data.AutoPowerSave:0000000000000000 AutoPowerSave
+     /tmp/ccLYN6fY.s:1179   .progmem.data.__c.1961:0000000000000000 __c.1961
+     /tmp/ccLYN6fY.s:1174   .progmem.data.__c.1963:0000000000000000 __c.1963
+     /tmp/ccLYN6fY.s:322    .text.KeyClick:0000000000000000 KeyClick
+     /tmp/ccLYN6fY.s:1169   .data.enter.1968:0000000000000000 enter.1968
+     /tmp/ccLYN6fY.s:1217   .bss.gKeyClickStatus:0000000000000000 gKeyClickStatus
+     /tmp/ccLYN6fY.s:1164   .progmem.data.__c.1970:0000000000000000 __c.1970
+     /tmp/ccLYN6fY.s:1159   .progmem.data.__c.1972:0000000000000000 __c.1972
+     /tmp/ccLYN6fY.s:411    .text.Revision:0000000000000000 Revision
+     /tmp/ccLYN6fY.s:1154   .data.enter.1987:0000000000000000 enter.1987
+     /tmp/ccLYN6fY.s:491    .text.StateMachine:0000000000000000 StateMachine
+     /tmp/ccLYN6fY.s:1351   .progmem.data.menu_nextstate:0000000000000000 menu_nextstate
+     /tmp/ccLYN6fY.s:580    .text.Delay:0000000000000000 Delay
+     /tmp/ccLYN6fY.s:620    .text.OSCCAL_calibration:0000000000000000 OSCCAL_calibration
+     /tmp/ccLYN6fY.s:761    .text.Initialization:0000000000000000 Initialization
+     /tmp/ccLYN6fY.s:826    .text.startup.main:0000000000000000 main
+                            *COM*:0000000000000001 state
+     /tmp/ccLYN6fY.s:1695   .progmem.data.MT_AVRBF:0000000000000000 MT_AVRBF
+     /tmp/ccLYN6fY.s:1235   .progmem.data.menu_state:0000000000000000 menu_state
+     /tmp/ccLYN6fY.s:1689   .progmem.data.MT_TIME:0000000000000000 MT_TIME
+     /tmp/ccLYN6fY.s:1683   .progmem.data.MT_TIME_CLOCK:0000000000000000 MT_TIME_CLOCK
+     /tmp/ccLYN6fY.s:1677   .progmem.data.MT_TIME_CLOCK_ADJUST:0000000000000000 MT_TIME_CLOCK_ADJUST
+     /tmp/ccLYN6fY.s:1671   .progmem.data.MT_TIME_CLOCKFORMAT_ADJUST:0000000000000000 MT_TIME_CLOCKFORMAT_ADJUST
+     /tmp/ccLYN6fY.s:1665   .progmem.data.MT_TIME_DATE:0000000000000000 MT_TIME_DATE
+     /tmp/ccLYN6fY.s:1659   .progmem.data.MT_TIME_DATE_ADJUST:0000000000000000 MT_TIME_DATE_ADJUST
+     /tmp/ccLYN6fY.s:1653   .progmem.data.MT_TIME_DATEFORMAT_ADJUST:0000000000000000 MT_TIME_DATEFORMAT_ADJUST
+     /tmp/ccLYN6fY.s:1647   .progmem.data.MT_MUSIC:0000000000000000 MT_MUSIC
+     /tmp/ccLYN6fY.s:1641   .progmem.data.MT_TEMPERATURE:0000000000000000 MT_TEMPERATURE
+     /tmp/ccLYN6fY.s:1635   .progmem.data.MT_VOLTAGE:0000000000000000 MT_VOLTAGE
+     /tmp/ccLYN6fY.s:1629   .progmem.data.MT_LIGHT:0000000000000000 MT_LIGHT
+     /tmp/ccLYN6fY.s:1623   .progmem.data.MT_OPTIONS:0000000000000000 MT_OPTIONS
+     /tmp/ccLYN6fY.s:1617   .progmem.data.MT_OPTIONS_DISPLAY:0000000000000000 MT_OPTIONS_DISPLAY
+     /tmp/ccLYN6fY.s:1611   .progmem.data.MT_OPTIONS_DISPLAY_CONTRAST:0000000000000000 MT_OPTIONS_DISPLAY_CONTRAST
+     /tmp/ccLYN6fY.s:1605   .progmem.data.MT_OPTIONS_BOOT:0000000000000000 MT_OPTIONS_BOOT
+     /tmp/ccLYN6fY.s:1599   .progmem.data.MT_OPTIONS_POWER_SAVE:0000000000000000 MT_OPTIONS_POWER_SAVE
+     /tmp/ccLYN6fY.s:1593   .progmem.data.MT_OPTIONS_AUTO_POWER_SAVE:0000000000000000 MT_OPTIONS_AUTO_POWER_SAVE
+     /tmp/ccLYN6fY.s:1587   .progmem.data.MT_OPTIONS_KEYCLICK:0000000000000000 MT_OPTIONS_KEYCLICK
+
+UNDEFINED SYMBOLS
+LCD_puts_f
+CHAR2BCD2
+LCD_putc
+LCD_UpdateRequired
+Button_Init
+RTC_init
+Timer0_Init
+USART_Init
+DF_SPI_init
+Read_DF_status
+LCD_Init
+LCD_Colon
+getkey
+gPowerSaveTimer
+Test
+gAutoPressJoystick
+PinChangeInterrupt
+gPlaying
+ShowClock
+SetClock
+SetClockFormat
+ShowDate
+SetDate
+SetDateFormat
+SelectSound
+Sound
+TemperatureFunc
+VoltageFunc
+LightFunc
+SetContrast
+__do_copy_data
+__do_clear_bss

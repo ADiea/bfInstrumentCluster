@@ -1,0 +1,721 @@
+   1               		.file	"timer0.c"
+   2               	__SP_H__ = 0x3e
+   3               	__SP_L__ = 0x3d
+   4               	__SREG__ = 0x3f
+   5               	__tmp_reg__ = 0
+   6               	__zero_reg__ = 1
+   7               		.text
+   8               	.Ltext0:
+   9               		.cfi_sections	.debug_frame
+  10               		.section	.text.Timer0_Init,"ax",@progbits
+  11               	.global	Timer0_Init
+  13               	Timer0_Init:
+  14               	.LFB0:
+  15               		.file 1 "src/drv/timer0.c"
+   1:src/drv/timer0.c **** //***************************************************************************
+   2:src/drv/timer0.c **** //
+   3:src/drv/timer0.c **** //  File........: timer0.c
+   4:src/drv/timer0.c **** //
+   5:src/drv/timer0.c **** //  Author(s)...: ATMEL Norway
+   6:src/drv/timer0.c **** //
+   7:src/drv/timer0.c **** //  Target(s)...: ATmega169
+   8:src/drv/timer0.c **** //
+   9:src/drv/timer0.c **** //  Compiler....: AVR-GCC 4.1.1; avr-libc 1.4.5
+  10:src/drv/timer0.c **** //
+  11:src/drv/timer0.c **** //  Description.: AVR Butterfly Timer0 routines
+  12:src/drv/timer0.c **** //
+  13:src/drv/timer0.c **** //  Revisions...: 1.0
+  14:src/drv/timer0.c **** //
+  15:src/drv/timer0.c **** //  YYYYMMDD - VER. - COMMENT                                       - SIGN.
+  16:src/drv/timer0.c **** //
+  17:src/drv/timer0.c **** //  20030116 - 1.0  - Created                                       - KS
+  18:src/drv/timer0.c **** //  20031009          port to avr-gcc/avr-libc                      - M.Thomas
+  19:src/drv/timer0.c **** //  20070129          SIGNAL->ISR                                   - mt
+  20:src/drv/timer0.c **** //
+  21:src/drv/timer0.c **** //***************************************************************************
+  22:src/drv/timer0.c **** 
+  23:src/drv/timer0.c **** //mtA
+  24:src/drv/timer0.c **** //#include <inavr.h>
+  25:src/drv/timer0.c **** //#include "iom169.h"
+  26:src/drv/timer0.c **** #include <stdint.h>
+  27:src/drv/timer0.c **** #include <avr/io.h>
+  28:src/drv/timer0.c **** #include <avr/interrupt.h>
+  29:src/drv/timer0.c **** //mtE
+  30:src/drv/timer0.c **** #include "main.h"
+  31:src/drv/timer0.c **** #include "timer0.h"
+  32:src/drv/timer0.c **** 
+  33:src/drv/timer0.c **** TIMER_CALLBACK_FUNC CallbackFunc[TIMER0_NUM_CALLBACKS];
+  34:src/drv/timer0.c **** 
+  35:src/drv/timer0.c **** // Value definition:
+  36:src/drv/timer0.c **** // 0      The timer has expired
+  37:src/drv/timer0.c **** // 1-254  The timer is counting down
+  38:src/drv/timer0.c **** // 255    Free timer
+  39:src/drv/timer0.c **** 
+  40:src/drv/timer0.c **** // mt char CountDownTimers[TIMER0_NUM_COUNTDOWNTIMERS];
+  41:src/drv/timer0.c **** uint8_t CountDownTimers[TIMER0_NUM_COUNTDOWNTIMERS];
+  42:src/drv/timer0.c **** 
+  43:src/drv/timer0.c **** /*****************************************************************************
+  44:src/drv/timer0.c **** *
+  45:src/drv/timer0.c **** *   Function name : Timer0_Init
+  46:src/drv/timer0.c **** *
+  47:src/drv/timer0.c **** *   Returns :       None
+  48:src/drv/timer0.c **** *
+  49:src/drv/timer0.c **** *   Parameters :    None
+  50:src/drv/timer0.c **** *
+  51:src/drv/timer0.c **** *   Purpose :       Initialize Timer/Counter 0
+  52:src/drv/timer0.c **** *
+  53:src/drv/timer0.c **** *****************************************************************************/
+  54:src/drv/timer0.c **** void Timer0_Init(void)
+  55:src/drv/timer0.c **** {
+  16               		.loc 1 55 0
+  17               		.cfi_startproc
+  18               	/* prologue: function */
+  19               	/* frame size = 0 */
+  20               	/* stack size = 0 */
+  21               	.L__stack_usage = 0
+  22               	.LVL0:
+  56:src/drv/timer0.c ****     //mt char i;
+  57:src/drv/timer0.c ****     uint8_t i;
+  58:src/drv/timer0.c **** 
+  59:src/drv/timer0.c ****     // Initialize array of callback functions
+  60:src/drv/timer0.c ****     for (i=0; i<TIMER0_NUM_CALLBACKS; i++)
+  61:src/drv/timer0.c ****         CallbackFunc[i] = NULL;
+  23               		.loc 1 61 0
+  24 0000 E0E0      		ldi r30,lo8(CallbackFunc)
+  25 0002 F0E0      		ldi r31,hi8(CallbackFunc)
+  26 0004 1182      		std Z+1,__zero_reg__
+  27 0006 1082      		st Z,__zero_reg__
+  28               	.LVL1:
+  29 0008 1382      		std Z+3,__zero_reg__
+  30 000a 1282      		std Z+2,__zero_reg__
+  31               	.LVL2:
+  32 000c 1582      		std Z+5,__zero_reg__
+  33 000e 1482      		std Z+4,__zero_reg__
+  34               	.LVL3:
+  35 0010 1782      		std Z+7,__zero_reg__
+  36 0012 1682      		std Z+6,__zero_reg__
+  37               	.LVL4:
+  62:src/drv/timer0.c **** 
+  63:src/drv/timer0.c ****     // Initialize countdown timers
+  64:src/drv/timer0.c ****     for (i=0; i<TIMER0_NUM_COUNTDOWNTIMERS; i++)
+  65:src/drv/timer0.c ****         CountDownTimers[i] = 255;
+  38               		.loc 1 65 0
+  39 0014 E0E0      		ldi r30,lo8(CountDownTimers)
+  40 0016 F0E0      		ldi r31,hi8(CountDownTimers)
+  41 0018 8FEF      		ldi r24,lo8(-1)
+  42 001a 8083      		st Z,r24
+  43               	.LVL5:
+  44 001c 8183      		std Z+1,r24
+  45               	.LVL6:
+  46 001e 8283      		std Z+2,r24
+  47               	.LVL7:
+  48 0020 8383      		std Z+3,r24
+  49               	.LVL8:
+  66:src/drv/timer0.c **** 
+  67:src/drv/timer0.c **** 
+  68:src/drv/timer0.c ****     // Initialize Timer0.
+  69:src/drv/timer0.c ****     // Used to give the correct time-delays in the song
+  70:src/drv/timer0.c **** 
+  71:src/drv/timer0.c ****     // Enable timer0 compare interrupt
+  72:src/drv/timer0.c ****     TIMSK0 = (1<<OCIE0A);
+  50               		.loc 1 72 0
+  51 0022 82E0      		ldi r24,lo8(2)
+  52 0024 8093 6E00 		sts 110,r24
+  73:src/drv/timer0.c **** 
+  74:src/drv/timer0.c ****     // Sets the compare value
+  75:src/drv/timer0.c ****     OCR0A = 38;
+  53               		.loc 1 75 0
+  54 0028 86E2      		ldi r24,lo8(38)
+  55 002a 87BD      		out 0x27,r24
+  76:src/drv/timer0.c **** 
+  77:src/drv/timer0.c ****     // Set Clear on Timer Compare (CTC) mode, CLK/256 prescaler
+  78:src/drv/timer0.c ****     TCCR0A = (1<<WGM01)|(0<<WGM00)|(4<<CS00);
+  56               		.loc 1 78 0
+  57 002c 8CE0      		ldi r24,lo8(12)
+  58 002e 84BD      		out 0x24,r24
+  59 0030 0895      		ret
+  60               		.cfi_endproc
+  61               	.LFE0:
+  63               		.section	.text.__vector_10,"ax",@progbits
+  64               	.global	__vector_10
+  66               	__vector_10:
+  67               	.LFB1:
+  79:src/drv/timer0.c **** }
+  80:src/drv/timer0.c **** 
+  81:src/drv/timer0.c **** 
+  82:src/drv/timer0.c **** 
+  83:src/drv/timer0.c **** /*****************************************************************************
+  84:src/drv/timer0.c **** *
+  85:src/drv/timer0.c **** *   Function name : TIMER0_COMP_interrupt
+  86:src/drv/timer0.c **** *
+  87:src/drv/timer0.c **** *   Returns :       None
+  88:src/drv/timer0.c **** *
+  89:src/drv/timer0.c **** *   Parameters :    None
+  90:src/drv/timer0.c **** *
+  91:src/drv/timer0.c **** *   Purpose :       Check if any functions are to be called
+  92:src/drv/timer0.c **** *
+  93:src/drv/timer0.c **** *****************************************************************************/
+  94:src/drv/timer0.c **** // mtA
+  95:src/drv/timer0.c **** // #pragma vector = TIMER0_COMP_vect
+  96:src/drv/timer0.c **** // __interrupt void TIMER0_COMP_interrupt(void)
+  97:src/drv/timer0.c **** // SIGNAL(SIG_OUTPUT_COMPARE0)
+  98:src/drv/timer0.c **** ISR(TIMER0_COMP_vect)
+  99:src/drv/timer0.c **** // mtE
+ 100:src/drv/timer0.c **** {
+  68               		.loc 1 100 0
+  69               		.cfi_startproc
+  70 0000 1F92      		push r1
+  71               	.LCFI0:
+  72               		.cfi_def_cfa_offset 3
+  73               		.cfi_offset 1, -2
+  74 0002 0F92      		push r0
+  75               	.LCFI1:
+  76               		.cfi_def_cfa_offset 4
+  77               		.cfi_offset 0, -3
+  78 0004 0FB6      		in r0,__SREG__
+  79 0006 0F92      		push r0
+  80 0008 1124      		clr __zero_reg__
+  81 000a 2F93      		push r18
+  82               	.LCFI2:
+  83               		.cfi_def_cfa_offset 5
+  84               		.cfi_offset 18, -4
+  85 000c 3F93      		push r19
+  86               	.LCFI3:
+  87               		.cfi_def_cfa_offset 6
+  88               		.cfi_offset 19, -5
+  89 000e 4F93      		push r20
+  90               	.LCFI4:
+  91               		.cfi_def_cfa_offset 7
+  92               		.cfi_offset 20, -6
+  93 0010 5F93      		push r21
+  94               	.LCFI5:
+  95               		.cfi_def_cfa_offset 8
+  96               		.cfi_offset 21, -7
+  97 0012 6F93      		push r22
+  98               	.LCFI6:
+  99               		.cfi_def_cfa_offset 9
+ 100               		.cfi_offset 22, -8
+ 101 0014 7F93      		push r23
+ 102               	.LCFI7:
+ 103               		.cfi_def_cfa_offset 10
+ 104               		.cfi_offset 23, -9
+ 105 0016 8F93      		push r24
+ 106               	.LCFI8:
+ 107               		.cfi_def_cfa_offset 11
+ 108               		.cfi_offset 24, -10
+ 109 0018 9F93      		push r25
+ 110               	.LCFI9:
+ 111               		.cfi_def_cfa_offset 12
+ 112               		.cfi_offset 25, -11
+ 113 001a AF93      		push r26
+ 114               	.LCFI10:
+ 115               		.cfi_def_cfa_offset 13
+ 116               		.cfi_offset 26, -12
+ 117 001c BF93      		push r27
+ 118               	.LCFI11:
+ 119               		.cfi_def_cfa_offset 14
+ 120               		.cfi_offset 27, -13
+ 121 001e CF93      		push r28
+ 122               	.LCFI12:
+ 123               		.cfi_def_cfa_offset 15
+ 124               		.cfi_offset 28, -14
+ 125 0020 DF93      		push r29
+ 126               	.LCFI13:
+ 127               		.cfi_def_cfa_offset 16
+ 128               		.cfi_offset 29, -15
+ 129 0022 EF93      		push r30
+ 130               	.LCFI14:
+ 131               		.cfi_def_cfa_offset 17
+ 132               		.cfi_offset 30, -16
+ 133 0024 FF93      		push r31
+ 134               	.LCFI15:
+ 135               		.cfi_def_cfa_offset 18
+ 136               		.cfi_offset 31, -17
+ 137               	/* prologue: Signal */
+ 138               	/* frame size = 0 */
+ 139               	/* stack size = 17 */
+ 140               	.L__stack_usage = 17
+ 141               	.LVL9:
+ 142 0026 C0E0      		ldi r28,lo8(CallbackFunc)
+ 143 0028 D0E0      		ldi r29,hi8(CallbackFunc)
+ 144               	.LVL10:
+ 145               	.L4:
+ 101:src/drv/timer0.c ****     // mt char i;
+ 102:src/drv/timer0.c ****     uint8_t i;
+ 103:src/drv/timer0.c ****     
+ 104:src/drv/timer0.c ****     for (i=0; i<TIMER0_NUM_CALLBACKS; i++)
+ 105:src/drv/timer0.c ****         if (CallbackFunc[i] != NULL)
+ 146               		.loc 1 105 0
+ 147 002a E991      		ld r30,Y+
+ 148 002c F991      		ld r31,Y+
+ 149 002e 3097      		sbiw r30,0
+ 150 0030 01F0      		breq .L3
+ 106:src/drv/timer0.c ****             CallbackFunc[i]();
+ 151               		.loc 1 106 0
+ 152 0032 0995      		icall
+ 153               	.LVL11:
+ 154               	.L3:
+ 104:src/drv/timer0.c ****         if (CallbackFunc[i] != NULL)
+ 155               		.loc 1 104 0 discriminator 2
+ 156 0034 80E0      		ldi r24,hi8(CallbackFunc+8)
+ 157 0036 C030      		cpi r28,lo8(CallbackFunc+8)
+ 158 0038 D807      		cpc r29,r24
+ 159 003a 01F4      		brne .L4
+ 104:src/drv/timer0.c ****         if (CallbackFunc[i] != NULL)
+ 160               		.loc 1 104 0 is_stmt 0
+ 161 003c E0E0      		ldi r30,lo8(CountDownTimers)
+ 162 003e F0E0      		ldi r31,hi8(CountDownTimers)
+ 163 0040 94E0      		ldi r25,lo8(4)
+ 164 0042 9E0F      		add r25,r30
+ 165               	.L6:
+ 166               	.LVL12:
+ 107:src/drv/timer0.c ****     
+ 108:src/drv/timer0.c ****     // Count down timers
+ 109:src/drv/timer0.c ****     for (i=0; i<TIMER0_NUM_COUNTDOWNTIMERS; i++)
+ 110:src/drv/timer0.c ****         if (CountDownTimers[i] != 255 && CountDownTimers[i] != 0)
+ 167               		.loc 1 110 0 is_stmt 1
+ 168 0044 8081      		ld r24,Z
+ 169 0046 8150      		subi r24,lo8(-(-1))
+ 170 0048 8E3F      		cpi r24,lo8(-2)
+ 171 004a 00F4      		brsh .L5
+ 111:src/drv/timer0.c ****             CountDownTimers[i]--;
+ 172               		.loc 1 111 0
+ 173 004c 8083      		st Z,r24
+ 174               	.L5:
+ 175               	.LVL13:
+ 176 004e 3196      		adiw r30,1
+ 177               	.LVL14:
+ 109:src/drv/timer0.c ****         if (CountDownTimers[i] != 255 && CountDownTimers[i] != 0)
+ 178               		.loc 1 109 0 discriminator 2
+ 179 0050 9E13      		cpse r25,r30
+ 180 0052 00C0      		rjmp .L6
+ 181               	/* epilogue start */
+ 112:src/drv/timer0.c **** 
+ 113:src/drv/timer0.c **** }
+ 182               		.loc 1 113 0
+ 183 0054 FF91      		pop r31
+ 184 0056 EF91      		pop r30
+ 185               	.LVL15:
+ 186 0058 DF91      		pop r29
+ 187 005a CF91      		pop r28
+ 188 005c BF91      		pop r27
+ 189 005e AF91      		pop r26
+ 190 0060 9F91      		pop r25
+ 191 0062 8F91      		pop r24
+ 192 0064 7F91      		pop r23
+ 193 0066 6F91      		pop r22
+ 194 0068 5F91      		pop r21
+ 195 006a 4F91      		pop r20
+ 196 006c 3F91      		pop r19
+ 197 006e 2F91      		pop r18
+ 198 0070 0F90      		pop r0
+ 199 0072 0FBE      		out __SREG__,r0
+ 200 0074 0F90      		pop r0
+ 201 0076 1F90      		pop r1
+ 202 0078 1895      		reti
+ 203               		.cfi_endproc
+ 204               	.LFE1:
+ 206               		.section	.text.Timer0_RegisterCallbackFunction,"ax",@progbits
+ 207               	.global	Timer0_RegisterCallbackFunction
+ 209               	Timer0_RegisterCallbackFunction:
+ 210               	.LFB2:
+ 114:src/drv/timer0.c **** 
+ 115:src/drv/timer0.c **** 
+ 116:src/drv/timer0.c **** /*****************************************************************************
+ 117:src/drv/timer0.c **** *
+ 118:src/drv/timer0.c **** *   Function name : Timer0_RegisterCallbackFunction
+ 119:src/drv/timer0.c **** *
+ 120:src/drv/timer0.c **** *   Returns :       None
+ 121:src/drv/timer0.c **** *
+ 122:src/drv/timer0.c **** *   Parameters :    pFunc
+ 123:src/drv/timer0.c **** *
+ 124:src/drv/timer0.c **** *   Purpose :       Set up functions to be called from the 
+ 125:src/drv/timer0.c **** *                   TIMER0_COMP_interrupt
+ 126:src/drv/timer0.c **** *
+ 127:src/drv/timer0.c **** *****************************************************************************/
+ 128:src/drv/timer0.c **** BOOL Timer0_RegisterCallbackFunction(TIMER_CALLBACK_FUNC pFunc)
+ 129:src/drv/timer0.c **** {
+ 211               		.loc 1 129 0
+ 212               		.cfi_startproc
+ 213               	.LVL16:
+ 214               	/* prologue: function */
+ 215               	/* frame size = 0 */
+ 216               	/* stack size = 0 */
+ 217               	.L__stack_usage = 0
+ 218 0000 A0E0      		ldi r26,lo8(CallbackFunc)
+ 219 0002 B0E0      		ldi r27,hi8(CallbackFunc)
+ 220               		.loc 1 129 0
+ 221 0004 FD01      		movw r30,r26
+ 222               	.LVL17:
+ 223               	.L15:
+ 130:src/drv/timer0.c ****     // mt char i;
+ 131:src/drv/timer0.c ****     uint8_t i;
+ 132:src/drv/timer0.c ****     
+ 133:src/drv/timer0.c ****     for (i=0; i<TIMER0_NUM_CALLBACKS; i++)
+ 134:src/drv/timer0.c ****     {
+ 135:src/drv/timer0.c ****         if (CallbackFunc[i] == pFunc)
+ 224               		.loc 1 135 0
+ 225 0006 2191      		ld r18,Z+
+ 226 0008 3191      		ld r19,Z+
+ 227 000a 2817      		cp r18,r24
+ 228 000c 3907      		cpc r19,r25
+ 229 000e 01F0      		breq .L18
+ 133:src/drv/timer0.c ****     {
+ 230               		.loc 1 133 0 discriminator 2
+ 231 0010 20E0      		ldi r18,hi8(CallbackFunc+8)
+ 232 0012 E030      		cpi r30,lo8(CallbackFunc+8)
+ 233 0014 F207      		cpc r31,r18
+ 234 0016 01F4      		brne .L15
+ 235 0018 20E0      		ldi r18,0
+ 236 001a 30E0      		ldi r19,0
+ 237               	.L17:
+ 238               	.LVL18:
+ 136:src/drv/timer0.c ****             return TRUE;
+ 137:src/drv/timer0.c ****     }
+ 138:src/drv/timer0.c ****     
+ 139:src/drv/timer0.c ****     for (i=0; i<TIMER0_NUM_CALLBACKS; i++)
+ 140:src/drv/timer0.c ****     {
+ 141:src/drv/timer0.c ****         if (CallbackFunc[i] == NULL)
+ 239               		.loc 1 141 0
+ 240 001c 4D91      		ld r20,X+
+ 241 001e 5D91      		ld r21,X+
+ 242 0020 452B      		or r20,r21
+ 243 0022 01F4      		brne .L16
+ 142:src/drv/timer0.c ****         {
+ 143:src/drv/timer0.c ****             CallbackFunc[i] = pFunc;
+ 244               		.loc 1 143 0
+ 245 0024 220F      		lsl r18
+ 246 0026 331F      		rol r19
+ 247               	.LVL19:
+ 248 0028 F901      		movw r30,r18
+ 249 002a E050      		subi r30,lo8(-(CallbackFunc))
+ 250 002c F040      		sbci r31,hi8(-(CallbackFunc))
+ 251 002e 9183      		std Z+1,r25
+ 252 0030 8083      		st Z,r24
+ 253 0032 00C0      		rjmp .L18
+ 254               	.LVL20:
+ 255               	.L16:
+ 256 0034 2F5F      		subi r18,-1
+ 257 0036 3F4F      		sbci r19,-1
+ 258               	.LVL21:
+ 139:src/drv/timer0.c ****     {
+ 259               		.loc 1 139 0 discriminator 2
+ 260 0038 2430      		cpi r18,4
+ 261 003a 3105      		cpc r19,__zero_reg__
+ 262 003c 01F4      		brne .L17
+ 144:src/drv/timer0.c ****             return TRUE;
+ 145:src/drv/timer0.c ****         }   
+ 146:src/drv/timer0.c ****     }
+ 147:src/drv/timer0.c ****     
+ 148:src/drv/timer0.c ****     return FALSE;
+ 263               		.loc 1 148 0
+ 264 003e 80E0      		ldi r24,0
+ 265               	.LVL22:
+ 266 0040 0895      		ret
+ 267               	.LVL23:
+ 268               	.L18:
+ 136:src/drv/timer0.c ****     }
+ 269               		.loc 1 136 0
+ 270 0042 81E0      		ldi r24,lo8(1)
+ 271               	.LVL24:
+ 149:src/drv/timer0.c **** }
+ 272               		.loc 1 149 0
+ 273 0044 0895      		ret
+ 274               		.cfi_endproc
+ 275               	.LFE2:
+ 277               		.section	.text.Timer0_RemoveCallbackFunction,"ax",@progbits
+ 278               	.global	Timer0_RemoveCallbackFunction
+ 280               	Timer0_RemoveCallbackFunction:
+ 281               	.LFB3:
+ 150:src/drv/timer0.c **** 
+ 151:src/drv/timer0.c **** 
+ 152:src/drv/timer0.c **** /*****************************************************************************
+ 153:src/drv/timer0.c **** *
+ 154:src/drv/timer0.c **** *   Function name : Timer0_RemoveCallbackFunction
+ 155:src/drv/timer0.c **** *
+ 156:src/drv/timer0.c **** *   Returns :       None
+ 157:src/drv/timer0.c **** *
+ 158:src/drv/timer0.c **** *   Parameters :    pFunc
+ 159:src/drv/timer0.c **** *
+ 160:src/drv/timer0.c **** *   Purpose :       Remove functions from the list which is called int the
+ 161:src/drv/timer0.c **** *                   TIMER0_COMP_interrupt
+ 162:src/drv/timer0.c **** *
+ 163:src/drv/timer0.c **** *****************************************************************************/
+ 164:src/drv/timer0.c **** BOOL Timer0_RemoveCallbackFunction(TIMER_CALLBACK_FUNC pFunc)
+ 165:src/drv/timer0.c **** {
+ 282               		.loc 1 165 0
+ 283               		.cfi_startproc
+ 284               	.LVL25:
+ 285               	/* prologue: function */
+ 286               	/* frame size = 0 */
+ 287               	/* stack size = 0 */
+ 288               	.L__stack_usage = 0
+ 289 0000 E0E0      		ldi r30,lo8(CallbackFunc)
+ 290 0002 F0E0      		ldi r31,hi8(CallbackFunc)
+ 291               		.loc 1 165 0
+ 292 0004 20E0      		ldi r18,0
+ 293 0006 30E0      		ldi r19,0
+ 294               	.LVL26:
+ 295               	.L24:
+ 166:src/drv/timer0.c ****     // mt char i;
+ 167:src/drv/timer0.c ****     uint8_t i;
+ 168:src/drv/timer0.c ****     
+ 169:src/drv/timer0.c ****     for (i=0; i<TIMER0_NUM_CALLBACKS; i++)
+ 170:src/drv/timer0.c ****     {
+ 171:src/drv/timer0.c ****         if (CallbackFunc[i] == pFunc)
+ 296               		.loc 1 171 0
+ 297 0008 4191      		ld r20,Z+
+ 298 000a 5191      		ld r21,Z+
+ 299 000c 4817      		cp r20,r24
+ 300 000e 5907      		cpc r21,r25
+ 301 0010 01F4      		brne .L22
+ 172:src/drv/timer0.c ****         {
+ 173:src/drv/timer0.c ****             CallbackFunc[i] = NULL;
+ 302               		.loc 1 173 0
+ 303 0012 220F      		lsl r18
+ 304 0014 331F      		rol r19
+ 305               	.LVL27:
+ 306 0016 F901      		movw r30,r18
+ 307 0018 E050      		subi r30,lo8(-(CallbackFunc))
+ 308 001a F040      		sbci r31,hi8(-(CallbackFunc))
+ 309 001c 1182      		std Z+1,__zero_reg__
+ 310 001e 1082      		st Z,__zero_reg__
+ 174:src/drv/timer0.c ****             return TRUE;
+ 311               		.loc 1 174 0
+ 312 0020 81E0      		ldi r24,lo8(1)
+ 313 0022 0895      		ret
+ 314               	.LVL28:
+ 315               	.L22:
+ 316 0024 2F5F      		subi r18,-1
+ 317 0026 3F4F      		sbci r19,-1
+ 318               	.LVL29:
+ 169:src/drv/timer0.c ****     {
+ 319               		.loc 1 169 0 discriminator 2
+ 320 0028 2430      		cpi r18,4
+ 321 002a 3105      		cpc r19,__zero_reg__
+ 322 002c 01F4      		brne .L24
+ 175:src/drv/timer0.c ****         }
+ 176:src/drv/timer0.c ****     }
+ 177:src/drv/timer0.c ****         
+ 178:src/drv/timer0.c ****     return FALSE;
+ 323               		.loc 1 178 0
+ 324 002e 80E0      		ldi r24,0
+ 325               	.LVL30:
+ 179:src/drv/timer0.c **** }
+ 326               		.loc 1 179 0
+ 327 0030 0895      		ret
+ 328               		.cfi_endproc
+ 329               	.LFE3:
+ 331               		.section	.text.Timer0_AllocateCountdownTimer,"ax",@progbits
+ 332               	.global	Timer0_AllocateCountdownTimer
+ 334               	Timer0_AllocateCountdownTimer:
+ 335               	.LFB4:
+ 180:src/drv/timer0.c **** 
+ 181:src/drv/timer0.c **** 
+ 182:src/drv/timer0.c **** char Timer0_AllocateCountdownTimer()
+ 183:src/drv/timer0.c **** {
+ 336               		.loc 1 183 0
+ 337               		.cfi_startproc
+ 338               	/* prologue: function */
+ 339               	/* frame size = 0 */
+ 340               	/* stack size = 0 */
+ 341               	.L__stack_usage = 0
+ 342               	.LVL31:
+ 343 0000 E0E0      		ldi r30,lo8(CountDownTimers)
+ 344 0002 F0E0      		ldi r31,hi8(CountDownTimers)
+ 345               		.loc 1 183 0
+ 346 0004 20E0      		ldi r18,0
+ 347 0006 30E0      		ldi r19,0
+ 348               	.LVL32:
+ 349               	.L29:
+ 350 0008 822F      		mov r24,r18
+ 351               	.LVL33:
+ 184:src/drv/timer0.c ****     // mt char i;
+ 185:src/drv/timer0.c ****     uint8_t i;
+ 186:src/drv/timer0.c **** 
+ 187:src/drv/timer0.c ****     for (i=0; i<TIMER0_NUM_COUNTDOWNTIMERS; i++)
+ 188:src/drv/timer0.c ****         if (CountDownTimers[i] == 255)
+ 352               		.loc 1 188 0
+ 353 000a 9191      		ld r25,Z+
+ 354 000c 9F3F      		cpi r25,lo8(-1)
+ 355 000e 01F4      		brne .L27
+ 189:src/drv/timer0.c ****         {
+ 190:src/drv/timer0.c ****             CountDownTimers[i] = 0;
+ 356               		.loc 1 190 0
+ 357 0010 F901      		movw r30,r18
+ 358 0012 E050      		subi r30,lo8(-(CountDownTimers))
+ 359 0014 F040      		sbci r31,hi8(-(CountDownTimers))
+ 360 0016 1082      		st Z,__zero_reg__
+ 191:src/drv/timer0.c ****             return i+1;
+ 361               		.loc 1 191 0
+ 362 0018 8F5F      		subi r24,lo8(-(1))
+ 363 001a 0895      		ret
+ 364               	.L27:
+ 365               	.LVL34:
+ 366 001c 2F5F      		subi r18,-1
+ 367 001e 3F4F      		sbci r19,-1
+ 368               	.LVL35:
+ 187:src/drv/timer0.c ****         if (CountDownTimers[i] == 255)
+ 369               		.loc 1 187 0 discriminator 2
+ 370 0020 2430      		cpi r18,4
+ 371 0022 3105      		cpc r19,__zero_reg__
+ 372 0024 01F4      		brne .L29
+ 192:src/drv/timer0.c ****         }
+ 193:src/drv/timer0.c **** 
+ 194:src/drv/timer0.c ****     return 0;
+ 373               		.loc 1 194 0
+ 374 0026 80E0      		ldi r24,0
+ 195:src/drv/timer0.c **** }
+ 375               		.loc 1 195 0
+ 376 0028 0895      		ret
+ 377               		.cfi_endproc
+ 378               	.LFE4:
+ 380               		.section	.text.Timer0_SetCountdownTimer,"ax",@progbits
+ 381               	.global	Timer0_SetCountdownTimer
+ 383               	Timer0_SetCountdownTimer:
+ 384               	.LFB5:
+ 196:src/drv/timer0.c **** 
+ 197:src/drv/timer0.c **** void Timer0_SetCountdownTimer(char timer, char value)
+ 198:src/drv/timer0.c **** {
+ 385               		.loc 1 198 0
+ 386               		.cfi_startproc
+ 387               	.LVL36:
+ 388               	/* prologue: function */
+ 389               	/* frame size = 0 */
+ 390               	/* stack size = 0 */
+ 391               	.L__stack_usage = 0
+ 199:src/drv/timer0.c ****     cli(); // mt __disable_interrupt();
+ 392               		.loc 1 199 0
+ 393               	/* #APP */
+ 394               	 ;  199 "src/drv/timer0.c" 1
+ 395 0000 F894      		cli
+ 396               	 ;  0 "" 2
+ 200:src/drv/timer0.c ****     CountDownTimers[timer-1] = value;
+ 397               		.loc 1 200 0
+ 398               	/* #NOAPP */
+ 399 0002 E82F      		mov r30,r24
+ 400 0004 F0E0      		ldi r31,0
+ 401 0006 E050      		subi r30,lo8(-(CountDownTimers-1))
+ 402 0008 F040      		sbci r31,hi8(-(CountDownTimers-1))
+ 403 000a 6083      		st Z,r22
+ 201:src/drv/timer0.c ****     sei(); // mt __enable_interrupt();
+ 404               		.loc 1 201 0
+ 405               	/* #APP */
+ 406               	 ;  201 "src/drv/timer0.c" 1
+ 407 000c 7894      		sei
+ 408               	 ;  0 "" 2
+ 409               	/* #NOAPP */
+ 410 000e 0895      		ret
+ 411               		.cfi_endproc
+ 412               	.LFE5:
+ 414               		.section	.text.Timer0_GetCountdownTimer,"ax",@progbits
+ 415               	.global	Timer0_GetCountdownTimer
+ 417               	Timer0_GetCountdownTimer:
+ 418               	.LFB6:
+ 202:src/drv/timer0.c **** }
+ 203:src/drv/timer0.c **** 
+ 204:src/drv/timer0.c **** char Timer0_GetCountdownTimer(char timer)
+ 205:src/drv/timer0.c **** {
+ 419               		.loc 1 205 0
+ 420               		.cfi_startproc
+ 421               	.LVL37:
+ 422               	/* prologue: function */
+ 423               	/* frame size = 0 */
+ 424               	/* stack size = 0 */
+ 425               	.L__stack_usage = 0
+ 206:src/drv/timer0.c ****     char t;
+ 207:src/drv/timer0.c ****     cli(); // mt __disable_interrupt();
+ 426               		.loc 1 207 0
+ 427               	/* #APP */
+ 428               	 ;  207 "src/drv/timer0.c" 1
+ 429 0000 F894      		cli
+ 430               	 ;  0 "" 2
+ 208:src/drv/timer0.c ****     t = CountDownTimers[timer-1];
+ 431               		.loc 1 208 0
+ 432               	/* #NOAPP */
+ 433 0002 E82F      		mov r30,r24
+ 434 0004 F0E0      		ldi r31,0
+ 435 0006 E050      		subi r30,lo8(-(CountDownTimers-1))
+ 436 0008 F040      		sbci r31,hi8(-(CountDownTimers-1))
+ 437 000a 8081      		ld r24,Z
+ 438               	.LVL38:
+ 209:src/drv/timer0.c ****     sei(); // mt __enable_interrupt();
+ 439               		.loc 1 209 0
+ 440               	/* #APP */
+ 441               	 ;  209 "src/drv/timer0.c" 1
+ 442 000c 7894      		sei
+ 443               	 ;  0 "" 2
+ 210:src/drv/timer0.c ****     
+ 211:src/drv/timer0.c ****     return t;
+ 212:src/drv/timer0.c **** }
+ 444               		.loc 1 212 0
+ 445               	/* #NOAPP */
+ 446 000e 0895      		ret
+ 447               		.cfi_endproc
+ 448               	.LFE6:
+ 450               		.section	.text.Timer0_ReleaseCountdownTimer,"ax",@progbits
+ 451               	.global	Timer0_ReleaseCountdownTimer
+ 453               	Timer0_ReleaseCountdownTimer:
+ 454               	.LFB7:
+ 213:src/drv/timer0.c **** 
+ 214:src/drv/timer0.c **** void Timer0_ReleaseCountdownTimer(char timer)
+ 215:src/drv/timer0.c **** {
+ 455               		.loc 1 215 0
+ 456               		.cfi_startproc
+ 457               	.LVL39:
+ 458               	/* prologue: function */
+ 459               	/* frame size = 0 */
+ 460               	/* stack size = 0 */
+ 461               	.L__stack_usage = 0
+ 216:src/drv/timer0.c ****     cli(); // mt __disable_interrupt();
+ 462               		.loc 1 216 0
+ 463               	/* #APP */
+ 464               	 ;  216 "src/drv/timer0.c" 1
+ 465 0000 F894      		cli
+ 466               	 ;  0 "" 2
+ 217:src/drv/timer0.c ****     CountDownTimers[timer-1] = 255;
+ 467               		.loc 1 217 0
+ 468               	/* #NOAPP */
+ 469 0002 E82F      		mov r30,r24
+ 470 0004 F0E0      		ldi r31,0
+ 471 0006 E050      		subi r30,lo8(-(CountDownTimers-1))
+ 472 0008 F040      		sbci r31,hi8(-(CountDownTimers-1))
+ 473 000a 8FEF      		ldi r24,lo8(-1)
+ 474               	.LVL40:
+ 475 000c 8083      		st Z,r24
+ 218:src/drv/timer0.c ****     sei(); // mt __enable_interrupt();
+ 476               		.loc 1 218 0
+ 477               	/* #APP */
+ 478               	 ;  218 "src/drv/timer0.c" 1
+ 479 000e 7894      		sei
+ 480               	 ;  0 "" 2
+ 481               	/* #NOAPP */
+ 482 0010 0895      		ret
+ 483               		.cfi_endproc
+ 484               	.LFE7:
+ 486               		.comm	CountDownTimers,4,1
+ 487               		.comm	CallbackFunc,8,1
+ 488               		.text
+ 489               	.Letext0:
+ 490               		.file 2 "/usr/lib/avr/include/stdint.h"
+ 491               		.file 3 "inc/timer0.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 timer0.c
+     /tmp/cc9kvo45.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/cc9kvo45.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/cc9kvo45.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/cc9kvo45.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/cc9kvo45.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/cc9kvo45.s:13     .text.Timer0_Init:0000000000000000 Timer0_Init
+                            *COM*:0000000000000008 CallbackFunc
+                            *COM*:0000000000000004 CountDownTimers
+     /tmp/cc9kvo45.s:66     .text.__vector_10:0000000000000000 __vector_10
+     /tmp/cc9kvo45.s:209    .text.Timer0_RegisterCallbackFunction:0000000000000000 Timer0_RegisterCallbackFunction
+     /tmp/cc9kvo45.s:280    .text.Timer0_RemoveCallbackFunction:0000000000000000 Timer0_RemoveCallbackFunction
+     /tmp/cc9kvo45.s:334    .text.Timer0_AllocateCountdownTimer:0000000000000000 Timer0_AllocateCountdownTimer
+     /tmp/cc9kvo45.s:383    .text.Timer0_SetCountdownTimer:0000000000000000 Timer0_SetCountdownTimer
+     /tmp/cc9kvo45.s:417    .text.Timer0_GetCountdownTimer:0000000000000000 Timer0_GetCountdownTimer
+     /tmp/cc9kvo45.s:453    .text.Timer0_ReleaseCountdownTimer:0000000000000000 Timer0_ReleaseCountdownTimer
+
+UNDEFINED SYMBOLS
+__do_clear_bss

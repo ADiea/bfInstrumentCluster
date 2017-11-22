@@ -60,13 +60,6 @@ void OSCCAL_calibration(void);
 #define ST_SOUND_MUSIC                  41
 #define ST_MUSIC_SELECT                 42
 #define ST_MUSIC_PLAY                   43
-#define ST_VCARD                        50
-#define ST_VCARD_FUNC                   51
-#define ST_VCARD_NAME                   52
-#define ST_VCARD_ENTER_NAME             53
-#define ST_VCARD_ENTER_NAME_FUNC        54
-#define ST_VCARD_DOWNLOAD_NAME          55
-#define ST_VCARD_DOWNLOAD_NAME_FUNC     56
 #define ST_TEMPERATURE                  60
 #define ST_TEMPERATURE_FUNC             61
 #define ST_VOLTAGE                      70

@@ -1,0 +1,653 @@
+   1               		.file	"button.c"
+   2               	__SP_H__ = 0x3e
+   3               	__SP_L__ = 0x3d
+   4               	__SREG__ = 0x3f
+   5               	__tmp_reg__ = 0
+   6               	__zero_reg__ = 1
+   7               		.text
+   8               	.Ltext0:
+   9               		.cfi_sections	.debug_frame
+  10               		.section	.text.Button_Init,"ax",@progbits
+  11               	.global	Button_Init
+  13               	Button_Init:
+  14               	.LFB0:
+  15               		.file 1 "src/drv/button.c"
+   1:src/drv/button.c **** //***************************************************************************
+   2:src/drv/button.c **** //
+   3:src/drv/button.c **** //  File........: button.c
+   4:src/drv/button.c **** //
+   5:src/drv/button.c **** //  Author(s)...: ATMEL Norway
+   6:src/drv/button.c **** //
+   7:src/drv/button.c **** //  Target(s)...: ATmega169
+   8:src/drv/button.c **** //
+   9:src/drv/button.c **** //  Compiler....: AVR-GCC 4.1.1; avr-libc 1.4.5
+  10:src/drv/button.c **** //
+  11:src/drv/button.c **** //  Description.: AVR Butterfly button handling routines
+  12:src/drv/button.c **** //
+  13:src/drv/button.c **** //  Revisions...: 1.0
+  14:src/drv/button.c **** //
+  15:src/drv/button.c **** //  YYYYMMDD - VER. - COMMENT                                       - SIGN.
+  16:src/drv/button.c **** //
+  17:src/drv/button.c **** //  20030116 - 1.0  - Created                                       - KS
+  18:src/drv/button.c **** //  20031009          port to avr-gcc/avr-libc                      - M.Thomas
+  19:src/drv/button.c **** //  20070129          SIGNAL->ISR                                   - mt
+  20:src/drv/button.c **** //
+  21:src/drv/button.c **** //***************************************************************************
+  22:src/drv/button.c **** 
+  23:src/drv/button.c **** //mtA
+  24:src/drv/button.c **** //#include <inavr.h>
+  25:src/drv/button.c **** //#include "iom169.h"
+  26:src/drv/button.c **** #include <stdint.h>
+  27:src/drv/button.c **** #include <avr/io.h>
+  28:src/drv/button.c **** #include <avr/interrupt.h>
+  29:src/drv/button.c **** //mtE
+  30:src/drv/button.c **** #include "main.h"
+  31:src/drv/button.c **** #include "button.h"
+  32:src/drv/button.c **** #include "timer0.h"
+  33:src/drv/button.c **** // for keyclick:
+  34:src/drv/button.c **** #include "sound.h"
+  35:src/drv/button.c **** 
+  36:src/drv/button.c **** // mt/v6 - keyclick (see main.c)
+  37:src/drv/button.c **** extern volatile BOOL gKeyClickStatus;
+  38:src/drv/button.c **** 
+  39:src/drv/button.c **** // extern char gPowerSaveTimer;
+  40:src/drv/button.c **** extern volatile uint8_t gPowerSaveTimer;
+  41:src/drv/button.c **** 
+  42:src/drv/button.c **** // mt  unsigned char gButtonTimeout = FALSE;
+  43:src/drv/button.c **** volatile unsigned char gButtonTimeout = FALSE;
+  44:src/drv/button.c **** 
+  45:src/drv/button.c **** //mtA
+  46:src/drv/button.c **** //char KEY = NULL;
+  47:src/drv/button.c **** //char KEY_VALID = FALSE;
+  48:src/drv/button.c **** //volatile char KEY = NULL;
+  49:src/drv/button.c **** volatile char KEY = 0;
+  50:src/drv/button.c **** volatile char KEY_VALID = FALSE;
+  51:src/drv/button.c **** //mtE
+  52:src/drv/button.c **** 
+  53:src/drv/button.c **** char CountdownTimerHandle;
+  54:src/drv/button.c **** 
+  55:src/drv/button.c **** /*****************************************************************************
+  56:src/drv/button.c **** *
+  57:src/drv/button.c **** *   Function name : Button_Init
+  58:src/drv/button.c **** *
+  59:src/drv/button.c **** *   Returns :       None
+  60:src/drv/button.c **** *
+  61:src/drv/button.c **** *   Parameters :    None
+  62:src/drv/button.c **** *
+  63:src/drv/button.c **** *   Purpose :       Initializes the five button pin
+  64:src/drv/button.c **** *
+  65:src/drv/button.c **** *****************************************************************************/
+  66:src/drv/button.c **** void Button_Init(void)
+  67:src/drv/button.c **** {
+  16               		.loc 1 67 0
+  17               		.cfi_startproc
+  18               	/* prologue: function */
+  19               	/* frame size = 0 */
+  20               	/* stack size = 0 */
+  21               	.L__stack_usage = 0
+  68:src/drv/button.c ****     // Init port pins
+  69:src/drv/button.c ****     cbiBF(DDRB,7);
+  22               		.loc 1 69 0
+  23 0000 2798      		cbi 0x4,7
+  70:src/drv/button.c ****     cbiBF(DDRB,6);
+  24               		.loc 1 70 0
+  25 0002 2698      		cbi 0x4,6
+  71:src/drv/button.c ****     cbiBF(DDRB,4);
+  26               		.loc 1 71 0
+  27 0004 2498      		cbi 0x4,4
+  72:src/drv/button.c ****     PORTB |= PINB_MASK;
+  28               		.loc 1 72 0
+  29 0006 85B1      		in r24,0x5
+  30 0008 806D      		ori r24,lo8(-48)
+  31 000a 85B9      		out 0x5,r24
+  73:src/drv/button.c ****     DDRE = 0x00;
+  32               		.loc 1 73 0
+  33 000c 1DB8      		out 0xd,__zero_reg__
+  74:src/drv/button.c ****     PORTE |= PINE_MASK;
+  34               		.loc 1 74 0
+  35 000e 8EB1      		in r24,0xe
+  36 0010 8C60      		ori r24,lo8(12)
+  37 0012 8EB9      		out 0xe,r24
+  75:src/drv/button.c **** 
+  76:src/drv/button.c ****     // Enable pin change interrupt on PORTB and PORTE
+  77:src/drv/button.c ****     PCMSK0 = PINE_MASK;
+  38               		.loc 1 77 0
+  39 0014 8CE0      		ldi r24,lo8(12)
+  40 0016 8093 6B00 		sts 107,r24
+  78:src/drv/button.c ****     PCMSK1 = PINB_MASK;
+  41               		.loc 1 78 0
+  42 001a 80ED      		ldi r24,lo8(-48)
+  43 001c 8093 6C00 		sts 108,r24
+  79:src/drv/button.c ****     EIFR = (1<<PCIF0)|(1<<PCIF1);
+  44               		.loc 1 79 0
+  45 0020 80EC      		ldi r24,lo8(-64)
+  46 0022 8CBB      		out 0x1c,r24
+  80:src/drv/button.c ****     EIMSK = (1<<PCIE0)|(1<<PCIE1);
+  47               		.loc 1 80 0
+  48 0024 8DBB      		out 0x1d,r24
+  81:src/drv/button.c **** 
+  82:src/drv/button.c ****     CountdownTimerHandle = Timer0_AllocateCountdownTimer();
+  49               		.loc 1 82 0
+  50 0026 0E94 0000 		call Timer0_AllocateCountdownTimer
+  51               	.LVL0:
+  52 002a 8093 0000 		sts CountdownTimerHandle,r24
+  53 002e 0895      		ret
+  54               		.cfi_endproc
+  55               	.LFE0:
+  57               		.section	.text.PinChangeInterrupt,"ax",@progbits
+  58               	.global	PinChangeInterrupt
+  60               	PinChangeInterrupt:
+  61               	.LFB3:
+  83:src/drv/button.c **** }
+  84:src/drv/button.c **** 
+  85:src/drv/button.c **** // #pragma vector = PCINT0_vect
+  86:src/drv/button.c **** // __interrupt void PCINT0_interrupt(void)
+  87:src/drv/button.c **** ISR(PCINT0_vect)
+  88:src/drv/button.c **** // mtE
+  89:src/drv/button.c **** {
+  90:src/drv/button.c ****     PinChangeInterrupt();
+  91:src/drv/button.c **** }
+  92:src/drv/button.c **** 
+  93:src/drv/button.c **** // mtA
+  94:src/drv/button.c **** // #pragma vector = PCINT1_vect
+  95:src/drv/button.c **** // __interrupt void PCINT1_interrupt(void)
+  96:src/drv/button.c **** // mtE
+  97:src/drv/button.c **** ISR(PCINT1_vect)
+  98:src/drv/button.c **** {
+  99:src/drv/button.c ****     PinChangeInterrupt();
+ 100:src/drv/button.c **** }
+ 101:src/drv/button.c **** 
+ 102:src/drv/button.c **** 
+ 103:src/drv/button.c **** /*****************************************************************************
+ 104:src/drv/button.c **** *
+ 105:src/drv/button.c **** *   Function name : PinChangeInterrupt
+ 106:src/drv/button.c **** *
+ 107:src/drv/button.c **** *   Returns :       None
+ 108:src/drv/button.c **** *
+ 109:src/drv/button.c **** *   Parameters :    None
+ 110:src/drv/button.c **** *
+ 111:src/drv/button.c **** *   Purpose :       Check status on the joystick
+ 112:src/drv/button.c **** *
+ 113:src/drv/button.c **** *****************************************************************************/
+ 114:src/drv/button.c **** void PinChangeInterrupt(void)
+ 115:src/drv/button.c **** {
+  62               		.loc 1 115 0
+  63               		.cfi_startproc
+  64               	/* prologue: function */
+  65               	/* frame size = 0 */
+  66               	/* stack size = 0 */
+  67               	.L__stack_usage = 0
+ 116:src/drv/button.c ****     char buttons;
+ 117:src/drv/button.c **** 
+ 118:src/drv/button.c ****     char key;
+ 119:src/drv/button.c **** 
+ 120:src/drv/button.c **** /*
+ 121:src/drv/button.c ****     Read the buttons:
+ 122:src/drv/button.c **** 
+ 123:src/drv/button.c ****     Bit             7   6   5   4   3   2   1   0
+ 124:src/drv/button.c ****     ---------------------------------------------
+ 125:src/drv/button.c ****     PORTB           B   A       O
+ 126:src/drv/button.c ****     PORTE                           D   C
+ 127:src/drv/button.c ****     ---------------------------------------------
+ 128:src/drv/button.c ****     PORTB | PORTE   B   A       O   D   C
+ 129:src/drv/button.c ****     =============================================
+ 130:src/drv/button.c **** */
+ 131:src/drv/button.c **** 
+ 132:src/drv/button.c **** 
+ 133:src/drv/button.c ****     buttons = (~PINB) & PINB_MASK;
+  68               		.loc 1 133 0
+  69 0000 23B1      		in r18,0x3
+  70               	.LVL1:
+ 134:src/drv/button.c ****     buttons |= (~PINE) & PINE_MASK;
+  71               		.loc 1 134 0
+  72 0002 8CB1      		in r24,0xc
+  73 0004 90E0      		ldi r25,0
+  74 0006 8095      		com r24
+  75 0008 9095      		com r25
+  76 000a 8C70      		andi r24,12
+  77 000c 9927      		clr r25
+ 133:src/drv/button.c ****     buttons |= (~PINE) & PINE_MASK;
+  78               		.loc 1 133 0
+  79 000e 922F      		mov r25,r18
+  80 0010 9095      		com r25
+  81 0012 907D      		andi r25,lo8(-48)
+  82               	.LVL2:
+  83               		.loc 1 134 0
+  84 0014 892B      		or r24,r25
+  85               	.LVL3:
+ 135:src/drv/button.c **** 
+ 136:src/drv/button.c ****     // Output virtual keys
+ 137:src/drv/button.c ****     if (buttons & (1<<BUTTON_A))
+  86               		.loc 1 137 0
+  87 0016 86FD      		sbrc r24,6
+  88 0018 00C0      		rjmp .L9
+ 138:src/drv/button.c ****         key = KEY_PLUS;
+ 139:src/drv/button.c ****     else if (buttons & (1<<BUTTON_B))
+  89               		.loc 1 139 0
+  90 001a 87FD      		sbrc r24,7
+  91 001c 00C0      		rjmp .L10
+ 140:src/drv/button.c ****         key = KEY_MINUS;
+ 141:src/drv/button.c ****     else if (buttons & (1<<BUTTON_C))
+  92               		.loc 1 141 0
+  93 001e 82FD      		sbrc r24,2
+  94 0020 00C0      		rjmp .L11
+ 142:src/drv/button.c ****         key = KEY_PREV;
+ 143:src/drv/button.c ****     else if (buttons & (1<<BUTTON_D))
+  95               		.loc 1 143 0
+  96 0022 83FD      		sbrc r24,3
+  97 0024 00C0      		rjmp .L12
+ 144:src/drv/button.c ****         key = KEY_NEXT;
+ 145:src/drv/button.c ****     else if (buttons & (1<<BUTTON_O))
+  98               		.loc 1 145 0
+  99 0026 84FD      		sbrc r24,4
+ 100 0028 00C0      		rjmp .L13
+ 101 002a 00C0      		rjmp .L4
+ 102               	.L9:
+ 138:src/drv/button.c ****     else if (buttons & (1<<BUTTON_B))
+ 103               		.loc 1 138 0
+ 104 002c 84E0      		ldi r24,lo8(4)
+ 105               	.LVL4:
+ 106               	.L3:
+ 146:src/drv/button.c ****         key = KEY_ENTER;
+ 147:src/drv/button.c ****     else
+ 148:src/drv/button.c ****         key = KEY_NULL;
+ 149:src/drv/button.c **** 
+ 150:src/drv/button.c ****     
+ 151:src/drv/button.c ****     if(key != KEY_NULL)
+ 152:src/drv/button.c ****     {
+ 153:src/drv/button.c ****         if(gButtonTimeout)  // gButtonTimeout is set in the LCD_SOF_interrupt in LCD_driver.c
+ 107               		.loc 1 153 0
+ 108 002e 9091 0000 		lds r25,gButtonTimeout
+ 109 0032 9923      		tst r25
+ 110 0034 01F0      		breq .L4
+ 154:src/drv/button.c ****         {
+ 155:src/drv/button.c ****             if (!KEY_VALID)
+ 111               		.loc 1 155 0
+ 112 0036 9091 0000 		lds r25,KEY_VALID
+ 113 003a 9923      		tst r25
+ 114 003c 01F0      		breq .L19
+ 115               	.LVL5:
+ 116               	.L6:
+ 156:src/drv/button.c ****             {
+ 157:src/drv/button.c ****                 KEY = key;          // Store key in global key buffer
+ 158:src/drv/button.c ****                 KEY_VALID = TRUE;
+ 159:src/drv/button.c ****                 if (gKeyClickStatus)
+ 160:src/drv/button.c ****                   PlayClick();
+ 161:src/drv/button.c ****             }
+ 162:src/drv/button.c **** 
+ 163:src/drv/button.c ****          gButtonTimeout = FALSE;
+ 117               		.loc 1 163 0
+ 118 003e 1092 0000 		sts gButtonTimeout,__zero_reg__
+ 119               	.L4:
+ 164:src/drv/button.c ****     
+ 165:src/drv/button.c ****         }
+ 166:src/drv/button.c ****     }
+ 167:src/drv/button.c ****     
+ 168:src/drv/button.c ****     EIFR = (1<<PCIF1) | (1<<PCIF0);     // Delete pin change interrupt flags
+ 120               		.loc 1 168 0
+ 121 0042 80EC      		ldi r24,lo8(-64)
+ 122 0044 8CBB      		out 0x1c,r24
+ 169:src/drv/button.c **** 
+ 170:src/drv/button.c ****     gPowerSaveTimer = 0;                // Reset the Auto Power Down timer
+ 123               		.loc 1 170 0
+ 124 0046 1092 0000 		sts gPowerSaveTimer,__zero_reg__
+ 125 004a 0895      		ret
+ 126               	.LVL6:
+ 127               	.L10:
+ 140:src/drv/button.c ****     else if (buttons & (1<<BUTTON_C))
+ 128               		.loc 1 140 0
+ 129 004c 85E0      		ldi r24,lo8(5)
+ 130               	.LVL7:
+ 131 004e 00C0      		rjmp .L3
+ 132               	.LVL8:
+ 133               	.L11:
+ 142:src/drv/button.c ****     else if (buttons & (1<<BUTTON_D))
+ 134               		.loc 1 142 0
+ 135 0050 83E0      		ldi r24,lo8(3)
+ 136               	.LVL9:
+ 137 0052 00C0      		rjmp .L3
+ 138               	.LVL10:
+ 139               	.L12:
+ 144:src/drv/button.c ****     else if (buttons & (1<<BUTTON_O))
+ 140               		.loc 1 144 0
+ 141 0054 82E0      		ldi r24,lo8(2)
+ 142               	.LVL11:
+ 143 0056 00C0      		rjmp .L3
+ 144               	.LVL12:
+ 145               	.L13:
+ 146:src/drv/button.c ****     else
+ 146               		.loc 1 146 0
+ 147 0058 81E0      		ldi r24,lo8(1)
+ 148               	.LVL13:
+ 149 005a 00C0      		rjmp .L3
+ 150               	.LVL14:
+ 151               	.L19:
+ 157:src/drv/button.c ****                 KEY_VALID = TRUE;
+ 152               		.loc 1 157 0
+ 153 005c 8093 0000 		sts KEY,r24
+ 158:src/drv/button.c ****                 if (gKeyClickStatus)
+ 154               		.loc 1 158 0
+ 155 0060 81E0      		ldi r24,lo8(1)
+ 156               	.LVL15:
+ 157 0062 8093 0000 		sts KEY_VALID,r24
+ 158               	.LVL16:
+ 159:src/drv/button.c ****                   PlayClick();
+ 159               		.loc 1 159 0
+ 160 0066 8091 0000 		lds r24,gKeyClickStatus
+ 161 006a 8823      		tst r24
+ 162 006c 01F0      		breq .L6
+ 160:src/drv/button.c ****             }
+ 163               		.loc 1 160 0
+ 164 006e 0E94 0000 		call PlayClick
+ 165               	.LVL17:
+ 166 0072 00C0      		rjmp .L6
+ 167               		.cfi_endproc
+ 168               	.LFE3:
+ 170               		.section	.text.__vector_2,"ax",@progbits
+ 171               	.global	__vector_2
+ 173               	__vector_2:
+ 174               	.LFB1:
+  89:src/drv/button.c ****     PinChangeInterrupt();
+ 175               		.loc 1 89 0
+ 176               		.cfi_startproc
+ 177 0000 1F92      		push r1
+ 178               	.LCFI0:
+ 179               		.cfi_def_cfa_offset 3
+ 180               		.cfi_offset 1, -2
+ 181 0002 0F92      		push r0
+ 182               	.LCFI1:
+ 183               		.cfi_def_cfa_offset 4
+ 184               		.cfi_offset 0, -3
+ 185 0004 0FB6      		in r0,__SREG__
+ 186 0006 0F92      		push r0
+ 187 0008 1124      		clr __zero_reg__
+ 188 000a 2F93      		push r18
+ 189               	.LCFI2:
+ 190               		.cfi_def_cfa_offset 5
+ 191               		.cfi_offset 18, -4
+ 192 000c 3F93      		push r19
+ 193               	.LCFI3:
+ 194               		.cfi_def_cfa_offset 6
+ 195               		.cfi_offset 19, -5
+ 196 000e 4F93      		push r20
+ 197               	.LCFI4:
+ 198               		.cfi_def_cfa_offset 7
+ 199               		.cfi_offset 20, -6
+ 200 0010 5F93      		push r21
+ 201               	.LCFI5:
+ 202               		.cfi_def_cfa_offset 8
+ 203               		.cfi_offset 21, -7
+ 204 0012 6F93      		push r22
+ 205               	.LCFI6:
+ 206               		.cfi_def_cfa_offset 9
+ 207               		.cfi_offset 22, -8
+ 208 0014 7F93      		push r23
+ 209               	.LCFI7:
+ 210               		.cfi_def_cfa_offset 10
+ 211               		.cfi_offset 23, -9
+ 212 0016 8F93      		push r24
+ 213               	.LCFI8:
+ 214               		.cfi_def_cfa_offset 11
+ 215               		.cfi_offset 24, -10
+ 216 0018 9F93      		push r25
+ 217               	.LCFI9:
+ 218               		.cfi_def_cfa_offset 12
+ 219               		.cfi_offset 25, -11
+ 220 001a AF93      		push r26
+ 221               	.LCFI10:
+ 222               		.cfi_def_cfa_offset 13
+ 223               		.cfi_offset 26, -12
+ 224 001c BF93      		push r27
+ 225               	.LCFI11:
+ 226               		.cfi_def_cfa_offset 14
+ 227               		.cfi_offset 27, -13
+ 228 001e EF93      		push r30
+ 229               	.LCFI12:
+ 230               		.cfi_def_cfa_offset 15
+ 231               		.cfi_offset 30, -14
+ 232 0020 FF93      		push r31
+ 233               	.LCFI13:
+ 234               		.cfi_def_cfa_offset 16
+ 235               		.cfi_offset 31, -15
+ 236               	/* prologue: Signal */
+ 237               	/* frame size = 0 */
+ 238               	/* stack size = 15 */
+ 239               	.L__stack_usage = 15
+  90:src/drv/button.c **** }
+ 240               		.loc 1 90 0
+ 241 0022 0E94 0000 		call PinChangeInterrupt
+ 242               	.LVL18:
+ 243               	/* epilogue start */
+  91:src/drv/button.c **** 
+ 244               		.loc 1 91 0
+ 245 0026 FF91      		pop r31
+ 246 0028 EF91      		pop r30
+ 247 002a BF91      		pop r27
+ 248 002c AF91      		pop r26
+ 249 002e 9F91      		pop r25
+ 250 0030 8F91      		pop r24
+ 251 0032 7F91      		pop r23
+ 252 0034 6F91      		pop r22
+ 253 0036 5F91      		pop r21
+ 254 0038 4F91      		pop r20
+ 255 003a 3F91      		pop r19
+ 256 003c 2F91      		pop r18
+ 257 003e 0F90      		pop r0
+ 258 0040 0FBE      		out __SREG__,r0
+ 259 0042 0F90      		pop r0
+ 260 0044 1F90      		pop r1
+ 261 0046 1895      		reti
+ 262               		.cfi_endproc
+ 263               	.LFE1:
+ 265               		.section	.text.__vector_3,"ax",@progbits
+ 266               	.global	__vector_3
+ 268               	__vector_3:
+ 269               	.LFB2:
+  98:src/drv/button.c ****     PinChangeInterrupt();
+ 270               		.loc 1 98 0
+ 271               		.cfi_startproc
+ 272 0000 1F92      		push r1
+ 273               	.LCFI14:
+ 274               		.cfi_def_cfa_offset 3
+ 275               		.cfi_offset 1, -2
+ 276 0002 0F92      		push r0
+ 277               	.LCFI15:
+ 278               		.cfi_def_cfa_offset 4
+ 279               		.cfi_offset 0, -3
+ 280 0004 0FB6      		in r0,__SREG__
+ 281 0006 0F92      		push r0
+ 282 0008 1124      		clr __zero_reg__
+ 283 000a 2F93      		push r18
+ 284               	.LCFI16:
+ 285               		.cfi_def_cfa_offset 5
+ 286               		.cfi_offset 18, -4
+ 287 000c 3F93      		push r19
+ 288               	.LCFI17:
+ 289               		.cfi_def_cfa_offset 6
+ 290               		.cfi_offset 19, -5
+ 291 000e 4F93      		push r20
+ 292               	.LCFI18:
+ 293               		.cfi_def_cfa_offset 7
+ 294               		.cfi_offset 20, -6
+ 295 0010 5F93      		push r21
+ 296               	.LCFI19:
+ 297               		.cfi_def_cfa_offset 8
+ 298               		.cfi_offset 21, -7
+ 299 0012 6F93      		push r22
+ 300               	.LCFI20:
+ 301               		.cfi_def_cfa_offset 9
+ 302               		.cfi_offset 22, -8
+ 303 0014 7F93      		push r23
+ 304               	.LCFI21:
+ 305               		.cfi_def_cfa_offset 10
+ 306               		.cfi_offset 23, -9
+ 307 0016 8F93      		push r24
+ 308               	.LCFI22:
+ 309               		.cfi_def_cfa_offset 11
+ 310               		.cfi_offset 24, -10
+ 311 0018 9F93      		push r25
+ 312               	.LCFI23:
+ 313               		.cfi_def_cfa_offset 12
+ 314               		.cfi_offset 25, -11
+ 315 001a AF93      		push r26
+ 316               	.LCFI24:
+ 317               		.cfi_def_cfa_offset 13
+ 318               		.cfi_offset 26, -12
+ 319 001c BF93      		push r27
+ 320               	.LCFI25:
+ 321               		.cfi_def_cfa_offset 14
+ 322               		.cfi_offset 27, -13
+ 323 001e EF93      		push r30
+ 324               	.LCFI26:
+ 325               		.cfi_def_cfa_offset 15
+ 326               		.cfi_offset 30, -14
+ 327 0020 FF93      		push r31
+ 328               	.LCFI27:
+ 329               		.cfi_def_cfa_offset 16
+ 330               		.cfi_offset 31, -15
+ 331               	/* prologue: Signal */
+ 332               	/* frame size = 0 */
+ 333               	/* stack size = 15 */
+ 334               	.L__stack_usage = 15
+  99:src/drv/button.c **** }
+ 335               		.loc 1 99 0
+ 336 0022 0E94 0000 		call PinChangeInterrupt
+ 337               	.LVL19:
+ 338               	/* epilogue start */
+ 100:src/drv/button.c **** 
+ 339               		.loc 1 100 0
+ 340 0026 FF91      		pop r31
+ 341 0028 EF91      		pop r30
+ 342 002a BF91      		pop r27
+ 343 002c AF91      		pop r26
+ 344 002e 9F91      		pop r25
+ 345 0030 8F91      		pop r24
+ 346 0032 7F91      		pop r23
+ 347 0034 6F91      		pop r22
+ 348 0036 5F91      		pop r21
+ 349 0038 4F91      		pop r20
+ 350 003a 3F91      		pop r19
+ 351 003c 2F91      		pop r18
+ 352 003e 0F90      		pop r0
+ 353 0040 0FBE      		out __SREG__,r0
+ 354 0042 0F90      		pop r0
+ 355 0044 1F90      		pop r1
+ 356 0046 1895      		reti
+ 357               		.cfi_endproc
+ 358               	.LFE2:
+ 360               		.section	.text.getkey,"ax",@progbits
+ 361               	.global	getkey
+ 363               	getkey:
+ 364               	.LFB4:
+ 171:src/drv/button.c ****     
+ 172:src/drv/button.c **** }
+ 173:src/drv/button.c **** 
+ 174:src/drv/button.c **** 
+ 175:src/drv/button.c **** /*****************************************************************************
+ 176:src/drv/button.c **** *
+ 177:src/drv/button.c **** *   Function name : getkey
+ 178:src/drv/button.c **** *
+ 179:src/drv/button.c **** *   Returns :       The valid key
+ 180:src/drv/button.c **** *
+ 181:src/drv/button.c **** *   Parameters :    None
+ 182:src/drv/button.c **** *
+ 183:src/drv/button.c **** *   Purpose :       Get the valid key 
+ 184:src/drv/button.c **** *
+ 185:src/drv/button.c **** *****************************************************************************/
+ 186:src/drv/button.c **** char getkey(void)
+ 187:src/drv/button.c **** {
+ 365               		.loc 1 187 0
+ 366               		.cfi_startproc
+ 367               	/* prologue: function */
+ 368               	/* frame size = 0 */
+ 369               	/* stack size = 0 */
+ 370               	.L__stack_usage = 0
+ 188:src/drv/button.c ****     char k;
+ 189:src/drv/button.c **** 
+ 190:src/drv/button.c ****     cli(); // mt: __disable_interrupt();
+ 371               		.loc 1 190 0
+ 372               	/* #APP */
+ 373               	 ;  190 "src/drv/button.c" 1
+ 374 0000 F894      		cli
+ 375               	 ;  0 "" 2
+ 191:src/drv/button.c **** 
+ 192:src/drv/button.c ****     if (KEY_VALID)              // Check for unread key in buffer
+ 376               		.loc 1 192 0
+ 377               	/* #NOAPP */
+ 378 0002 8091 0000 		lds r24,KEY_VALID
+ 379 0006 8823      		tst r24
+ 380 0008 01F0      		breq .L24
+ 193:src/drv/button.c ****     {
+ 194:src/drv/button.c ****         k = KEY;
+ 381               		.loc 1 194 0
+ 382 000a 8091 0000 		lds r24,KEY
+ 383               	.LVL20:
+ 195:src/drv/button.c ****         KEY_VALID = FALSE;
+ 384               		.loc 1 195 0
+ 385 000e 1092 0000 		sts KEY_VALID,__zero_reg__
+ 386 0012 00C0      		rjmp .L23
+ 387               	.LVL21:
+ 388               	.L24:
+ 196:src/drv/button.c ****     }
+ 197:src/drv/button.c ****     else
+ 198:src/drv/button.c ****         k = KEY_NULL;           // No key stroke available
+ 389               		.loc 1 198 0
+ 390 0014 80E0      		ldi r24,0
+ 391               	.L23:
+ 392               	.LVL22:
+ 199:src/drv/button.c **** 
+ 200:src/drv/button.c ****     sei(); // mt: __enable_interrupt();
+ 393               		.loc 1 200 0
+ 394               	/* #APP */
+ 395               	 ;  200 "src/drv/button.c" 1
+ 396 0016 7894      		sei
+ 397               	 ;  0 "" 2
+ 201:src/drv/button.c **** 
+ 202:src/drv/button.c ****     return k;
+ 203:src/drv/button.c **** }
+ 398               		.loc 1 203 0
+ 399               	/* #NOAPP */
+ 400 0018 0895      		ret
+ 401               		.cfi_endproc
+ 402               	.LFE4:
+ 404               		.comm	CountdownTimerHandle,1,1
+ 405               	.global	KEY_VALID
+ 406               		.section	.bss.KEY_VALID,"aw",@nobits
+ 409               	KEY_VALID:
+ 410 0000 00        		.zero	1
+ 411               	.global	KEY
+ 412               		.section	.bss.KEY,"aw",@nobits
+ 415               	KEY:
+ 416 0000 00        		.zero	1
+ 417               	.global	gButtonTimeout
+ 418               		.section	.bss.gButtonTimeout,"aw",@nobits
+ 421               	gButtonTimeout:
+ 422 0000 00        		.zero	1
+ 423               		.text
+ 424               	.Letext0:
+ 425               		.file 2 "/usr/lib/avr/include/stdint.h"
+ 426               		.file 3 "inc/timer0.h"
+ 427               		.file 4 "inc/sound.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 button.c
+     /tmp/ccVngACh.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/ccVngACh.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/ccVngACh.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/ccVngACh.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/ccVngACh.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/ccVngACh.s:13     .text.Button_Init:0000000000000000 Button_Init
+                            *COM*:0000000000000001 CountdownTimerHandle
+     /tmp/ccVngACh.s:60     .text.PinChangeInterrupt:0000000000000000 PinChangeInterrupt
+     /tmp/ccVngACh.s:421    .bss.gButtonTimeout:0000000000000000 gButtonTimeout
+     /tmp/ccVngACh.s:409    .bss.KEY_VALID:0000000000000000 KEY_VALID
+     /tmp/ccVngACh.s:415    .bss.KEY:0000000000000000 KEY
+     /tmp/ccVngACh.s:173    .text.__vector_2:0000000000000000 __vector_2
+     /tmp/ccVngACh.s:268    .text.__vector_3:0000000000000000 __vector_3
+     /tmp/ccVngACh.s:363    .text.getkey:0000000000000000 getkey
+
+UNDEFINED SYMBOLS
+Timer0_AllocateCountdownTimer
+gPowerSaveTimer
+gKeyClickStatus
+PlayClick
+__do_clear_bss

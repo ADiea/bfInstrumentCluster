@@ -72,6 +72,8 @@ FORMAT = ihex
 # Target file name (without extension).
 TARGET = main
 
+#Include dir
+INC_DIR = inc
 
 # Object files directory
 #     To put object files in current directory, use a dot (.), do NOT make
@@ -79,12 +81,12 @@ TARGET = main
 OBJDIR = .
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = $(TARGET).c
-SRC += timer0.c BCD.c usart.c ADC.c RTC.c 
-SRC += bfeeprom.c dataflash.c button.c
-SRC += LCD_functions.c LCD_driver.c 
-SRC += vcard.c sound.c 
-SRC += test.c
+SRC = src/$(TARGET).c
+SRC += src/drv/timer0.c src/util/BCD.c src/drv/usart.c src/drv/ADC.c src/drv/RTC.c 
+SRC += src/drv/bfeeprom.c src/drv/dataflash.c src/drv/button.c
+SRC += src/drv/LCD_functions.c src/drv/LCD_driver.c 
+SRC += src/drv/sound.c 
+SRC += src/util/test.c
 
 # List C++ source files here. (C dependencies are automatically generated.)
 CPPSRC = 
@@ -117,7 +119,7 @@ DEBUG = dwarf-2
 #     Each directory must be seperated by a space.
 #     Use forward slashes for directory separators.
 #     For a directory that has spaces, enclose it in quotes.
-EXTRAINCDIRS = 
+EXTRAINCDIRS = src/inc
 
 
 # Compiler flag to set the C Standard level.
@@ -282,10 +284,10 @@ LDFLAGS += $(PRINTF_LIB) $(SCANF_LIB) $(MATH_LIB)
 # to get a full listing.
 #
 # AVRDUDE_PROGRAMMER = stk500
-AVRDUDE_PROGRAMMER = butterfly
+AVRDUDE_PROGRAMMER = usbasp
 
 # com1 = serial port. Use lpt1 to connect to parallel port.
-AVRDUDE_PORT = com2    # programmer connected to serial device
+AVRDUDE_PORT = usb
 
 AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 #AVRDUDE_WRITE_EEPROM = -U eeprom:w:$(TARGET).eep
@@ -303,9 +305,9 @@ AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 # Increase verbosity level.  Please use this when submitting bug
 # reports about avrdude. See <http://savannah.nongnu.org/projects/avrdude> 
 # to submit bug reports.
-#AVRDUDE_VERBOSE = -v -v
+AVRDUDE_VERBOSE = -v -v
 
-AVRDUDE_FLAGS = -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER)
+AVRDUDE_FLAGS = -p $(MCU) -i 500 -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER)
 AVRDUDE_FLAGS += $(AVRDUDE_NO_VERIFY)
 AVRDUDE_FLAGS += $(AVRDUDE_VERBOSE)
 AVRDUDE_FLAGS += $(AVRDUDE_ERASE_COUNTER)
@@ -395,9 +397,9 @@ GENDEPFLAGS = -MMD -MP -MF .dep/$(@F).d
 
 # Combine all necessary flags and optional flags.
 # Add target processor to flags.
-ALL_CFLAGS = -mmcu=$(MCU) -I. $(CFLAGS) $(GENDEPFLAGS)
-ALL_CPPFLAGS = -mmcu=$(MCU) -I. -x c++ $(CPPFLAGS) $(GENDEPFLAGS)
-ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS)
+ALL_CFLAGS = -mmcu=$(MCU) -I$(INC_DIR) $(CFLAGS) $(GENDEPFLAGS)
+ALL_CPPFLAGS = -mmcu=$(MCU) -I$(INC_DIR) -x c++ $(CPPFLAGS) $(GENDEPFLAGS)
+ALL_ASFLAGS = -mmcu=$(MCU) -I$(INC_DIR) -x assembler-with-cpp $(ASFLAGS)
 
 
 
@@ -585,7 +587,7 @@ $(OBJDIR)/%.o : %.S
 
 # Create preprocessed source for use in sending a bug report.
 %.i : %.c
-	$(CC) -E -mmcu=$(MCU) -I. $(CFLAGS) $< -o $@ 
+	$(CC) -E -mmcu=$(MCU) -I$(INC_DIR) $(CFLAGS) $< -o $@ 
 
 
 # Target: clean project.

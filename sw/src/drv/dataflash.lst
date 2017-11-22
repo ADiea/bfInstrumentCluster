@@ -1,0 +1,1395 @@
+   1               		.file	"dataflash.c"
+   2               	__SP_H__ = 0x3e
+   3               	__SP_L__ = 0x3d
+   4               	__SREG__ = 0x3f
+   5               	__tmp_reg__ = 0
+   6               	__zero_reg__ = 1
+   7               		.text
+   8               	.Ltext0:
+   9               		.cfi_sections	.debug_frame
+  10               		.section	.text.DF_SPI_init,"ax",@progbits
+  11               	.global	DF_SPI_init
+  13               	DF_SPI_init:
+  14               	.LFB1:
+  15               		.file 1 "src/drv/dataflash.c"
+   1:src/drv/dataflash.c **** //*****************************************************************************
+   2:src/drv/dataflash.c **** //
+   3:src/drv/dataflash.c **** //      COPYRIGHT (c) ATMEL Norway, 1996-2001
+   4:src/drv/dataflash.c **** //
+   5:src/drv/dataflash.c **** //      The copyright to the document(s) herein is the property of
+   6:src/drv/dataflash.c **** //      ATMEL Norway, Norway.
+   7:src/drv/dataflash.c **** //
+   8:src/drv/dataflash.c **** //      The document(s) may be used  and/or copied only with the written
+   9:src/drv/dataflash.c **** //      permission from ATMEL Norway or in accordance with the terms and
+  10:src/drv/dataflash.c **** //      conditions stipulated in the agreement/contract under which the
+  11:src/drv/dataflash.c **** //      document(s) have been supplied.
+  12:src/drv/dataflash.c **** //
+  13:src/drv/dataflash.c **** //*****************************************************************************
+  14:src/drv/dataflash.c **** //
+  15:src/drv/dataflash.c **** //  File........: DATAFLASH.C
+  16:src/drv/dataflash.c **** //
+  17:src/drv/dataflash.c **** //  Author(s)...: ATMEL Norway
+  18:src/drv/dataflash.c **** //
+  19:src/drv/dataflash.c **** //  Target(s)...: All AVRs with built-in HW SPI
+  20:src/drv/dataflash.c **** //
+  21:src/drv/dataflash.c **** //  Description.: Functions to access the Atmel AT45Dxxx dataflash series
+  22:src/drv/dataflash.c **** //                Supports 512Kbit - 64Mbit
+  23:src/drv/dataflash.c **** //
+  24:src/drv/dataflash.c **** //  Revisions...:
+  25:src/drv/dataflash.c **** //
+  26:src/drv/dataflash.c **** //  YYYYMMDD - VER. - COMMENT                                       - SIGN.
+  27:src/drv/dataflash.c **** //
+  28:src/drv/dataflash.c **** //  20011017 - 1.00 - Beta release                                  -  RM
+  29:src/drv/dataflash.c **** //  20011017 - 0.10 - Generated file                                -  RM
+  30:src/drv/dataflash.c **** //  20031009          port to avr-gcc/avr-libc                      - M.Thomas
+  31:src/drv/dataflash.c **** //  20040121          added compare and erase function              - M.Thomas
+  32:src/drv/dataflash.c **** //
+  33:src/drv/dataflash.c **** //*****************************************************************************
+  34:src/drv/dataflash.c **** 
+  35:src/drv/dataflash.c **** /* 
+  36:src/drv/dataflash.c ****    remark mthomas: If you plan to use the dataflash functions in own code
+  37:src/drv/dataflash.c ****    for (battery powered) devices: disable the "chip select" after accessing
+  38:src/drv/dataflash.c ****    the Dataflash. The current draw with cs enabled is "very" high. You can
+  39:src/drv/dataflash.c ****    simply use the macro DF_CS_inactive already defined by Atmel after every
+  40:src/drv/dataflash.c ****    DF access.
+  41:src/drv/dataflash.c **** 
+  42:src/drv/dataflash.c ****    The coin-cell battery on the Butterfly is not a reliable power-source if data
+  43:src/drv/dataflash.c ****    in the flash-array should be changed (write/erase).
+  44:src/drv/dataflash.c ****    See the Dataflash datasheet for the current needed during write-accesses.
+  45:src/drv/dataflash.c **** */
+  46:src/drv/dataflash.c **** 
+  47:src/drv/dataflash.c **** // Includes
+  48:src/drv/dataflash.c **** //mtA
+  49:src/drv/dataflash.c **** //#include <INA90.H>
+  50:src/drv/dataflash.c **** //#include "iom169.h"
+  51:src/drv/dataflash.c **** #include <stdint.h>
+  52:src/drv/dataflash.c **** #include <avr/io.h>
+  53:src/drv/dataflash.c **** #include <avr/pgmspace.h>
+  54:src/drv/dataflash.c **** //mtE
+  55:src/drv/dataflash.c **** 
+  56:src/drv/dataflash.c **** #include "dataflash.h"
+  57:src/drv/dataflash.c **** 
+  58:src/drv/dataflash.c **** // Constants
+  59:src/drv/dataflash.c **** //Look-up table for these sizes ->  512k, 1M, 2M, 4M, 8M, 16M, 32M, 64M
+  60:src/drv/dataflash.c **** // mt flash unsigned char DF_pagebits[]  ={  9,  9,  9,  9,  9,  10,  10,  11};	    //index of inte
+  61:src/drv/dataflash.c **** const uint8_t DF_pagebits[] PROGMEM ={  9,  9,  9,  9,  9,  10,  10,  11};	    //index of internal 
+  62:src/drv/dataflash.c **** //Look-up table for these sizes ->  512k, 1M,  2M,  4M,  8M, 16M, 32M, 64M
+  63:src/drv/dataflash.c **** // mt flash unsigned int  DF_pagesize[]  ={264,264, 264, 264, 264, 528, 528,1056};	//index of pages
+  64:src/drv/dataflash.c **** const uint16_t DF_pagesize[] PROGMEM ={264,264, 264, 264, 264, 528, 528,1056};	//index of pagesizes
+  65:src/drv/dataflash.c **** 
+  66:src/drv/dataflash.c **** 
+  67:src/drv/dataflash.c **** // Globals
+  68:src/drv/dataflash.c **** unsigned char PageBits = 0;
+  69:src/drv/dataflash.c **** unsigned int  PageSize = 0;
+  70:src/drv/dataflash.c **** // Functions
+  71:src/drv/dataflash.c **** 
+  72:src/drv/dataflash.c **** /*****************************************************************************
+  73:src/drv/dataflash.c **** *
+  74:src/drv/dataflash.c **** *	Function name : DF_SPI_init
+  75:src/drv/dataflash.c **** *
+  76:src/drv/dataflash.c **** *	Returns :		None
+  77:src/drv/dataflash.c **** *
+  78:src/drv/dataflash.c **** *	Parameters :	None
+  79:src/drv/dataflash.c **** *
+  80:src/drv/dataflash.c **** *	Purpose :		Sets up the HW SPI in Master mode, Mode 3
+  81:src/drv/dataflash.c **** *					Note -> Uses the SS line to control the DF CS-line.
+  82:src/drv/dataflash.c **** *
+  83:src/drv/dataflash.c **** ******************************************************************************/
+  84:src/drv/dataflash.c **** void DF_SPI_init (void)
+  85:src/drv/dataflash.c **** {
+  16               		.loc 1 85 0
+  17               		.cfi_startproc
+  18               	/* prologue: function */
+  19               	/* frame size = 0 */
+  20               	/* stack size = 0 */
+  21               	.L__stack_usage = 0
+  86:src/drv/dataflash.c **** 	// mtA
+  87:src/drv/dataflash.c **** 	// PORTB |= (1<<PORTB3) | (1<<PORTB2) | (1<<PORTB1) | (1<<PORTB0);
+  88:src/drv/dataflash.c **** 	// DDRB |= (1<<PORTB2) | (1<<PORTB1) | (1<<PORTB0);		//Set MOSI, SCK AND SS as outputs
+  89:src/drv/dataflash.c **** 	PORTB |= (1<<PB3) | (1<<PB2) | (1<<PB1) | (1<<PB0);
+  22               		.loc 1 89 0
+  23 0000 85B1      		in r24,0x5
+  24 0002 8F60      		ori r24,lo8(15)
+  25 0004 85B9      		out 0x5,r24
+  90:src/drv/dataflash.c **** 	DDRB |= (1<<DDB2) | (1<<DDB1) | (1<<DDB0);		//Set MOSI, SCK AND SS as outputs
+  26               		.loc 1 90 0
+  27 0006 84B1      		in r24,0x4
+  28 0008 8760      		ori r24,lo8(7)
+  29 000a 84B9      		out 0x4,r24
+  91:src/drv/dataflash.c **** 	// mtE
+  92:src/drv/dataflash.c **** 	SPSR = (1<<SPI2X);                                      //SPI double speed settings
+  30               		.loc 1 92 0
+  31 000c 81E0      		ldi r24,lo8(1)
+  32 000e 8DBD      		out 0x2d,r24
+  93:src/drv/dataflash.c **** 	SPCR = (1<<SPE) | (1<<MSTR) | (1<<CPHA) | (1<<CPOL);	//Enable SPI in Master mode, mode 3, Fosc/4
+  33               		.loc 1 93 0
+  34 0010 8CE5      		ldi r24,lo8(92)
+  35 0012 8CBD      		out 0x2c,r24
+  36 0014 0895      		ret
+  37               		.cfi_endproc
+  38               	.LFE1:
+  40               		.section	.text.DF_SPI_RW,"ax",@progbits
+  41               	.global	DF_SPI_RW
+  43               	DF_SPI_RW:
+  44               	.LFB2:
+  94:src/drv/dataflash.c **** // mt: the following line was already commented out in the original code
+  95:src/drv/dataflash.c **** //	SPCR = (1<<SPE) | (1<<MSTR) | (1<<CPHA) | (1<<CPOL) | (1<<SPR1) | (1<<SPR0);	//Enable SPI in Mas
+  96:src/drv/dataflash.c **** }
+  97:src/drv/dataflash.c **** 
+  98:src/drv/dataflash.c **** /*****************************************************************************
+  99:src/drv/dataflash.c **** *
+ 100:src/drv/dataflash.c **** *	Function name : DF_SPI_RW
+ 101:src/drv/dataflash.c **** *
+ 102:src/drv/dataflash.c **** *	Returns :		Byte read from SPI data register (any value)
+ 103:src/drv/dataflash.c **** *
+ 104:src/drv/dataflash.c **** *	Parameters :	Byte to be written to SPI data register (any value)
+ 105:src/drv/dataflash.c **** *
+ 106:src/drv/dataflash.c **** *	Purpose :		Read and writes one byte from/to SPI master
+ 107:src/drv/dataflash.c **** *
+ 108:src/drv/dataflash.c **** ******************************************************************************/
+ 109:src/drv/dataflash.c **** unsigned char DF_SPI_RW (unsigned char output)
+ 110:src/drv/dataflash.c **** {
+  45               		.loc 1 110 0
+  46               		.cfi_startproc
+  47               	.LVL0:
+  48               	/* prologue: function */
+  49               	/* frame size = 0 */
+  50               	/* stack size = 0 */
+  51               	.L__stack_usage = 0
+ 111:src/drv/dataflash.c **** 	unsigned char input;
+ 112:src/drv/dataflash.c **** 	
+ 113:src/drv/dataflash.c **** 	SPDR = output;							//put byte 'output' in SPI data register
+  52               		.loc 1 113 0
+  53 0000 8EBD      		out 0x2e,r24
+  54               	.L3:
+ 114:src/drv/dataflash.c **** 	while(!(SPSR & 0x80));					//wait for transfer complete, poll SPIF-flag
+  55               		.loc 1 114 0 discriminator 1
+  56 0002 0DB4      		in __tmp_reg__,0x2d
+  57 0004 07FE      		sbrs __tmp_reg__,7
+  58 0006 00C0      		rjmp .L3
+ 115:src/drv/dataflash.c **** 	input = SPDR;							//read value in SPI data reg.
+  59               		.loc 1 115 0
+  60 0008 8EB5      		in r24,0x2e
+  61               	.LVL1:
+ 116:src/drv/dataflash.c **** 	
+ 117:src/drv/dataflash.c **** 	return input;							//return the byte clocked in from SPI slave
+ 118:src/drv/dataflash.c **** }
+  62               		.loc 1 118 0
+  63 000a 0895      		ret
+  64               		.cfi_endproc
+  65               	.LFE2:
+  67               		.section	.text.Read_DF_status,"ax",@progbits
+  68               	.global	Read_DF_status
+  70               	Read_DF_status:
+  71               	.LFB3:
+ 119:src/drv/dataflash.c **** 
+ 120:src/drv/dataflash.c **** 
+ 121:src/drv/dataflash.c **** /*****************************************************************************
+ 122:src/drv/dataflash.c **** *
+ 123:src/drv/dataflash.c **** *	Function name : Read_DF_status
+ 124:src/drv/dataflash.c **** *
+ 125:src/drv/dataflash.c **** *	Returns :		One status byte. Consult Dataflash datasheet for further
+ 126:src/drv/dataflash.c **** *					decoding info
+ 127:src/drv/dataflash.c **** *
+ 128:src/drv/dataflash.c **** *	Parameters :	None
+ 129:src/drv/dataflash.c **** *
+ 130:src/drv/dataflash.c **** *	Purpose :		Status info concerning the Dataflash is busy or not.
+ 131:src/drv/dataflash.c **** *					Status info concerning compare between buffer and flash page
+ 132:src/drv/dataflash.c **** *					Status info concerning size of actual device
+ 133:src/drv/dataflash.c **** *
+ 134:src/drv/dataflash.c **** *   mt: the 'if' marked with 'mt 200401' is a possible optimisation
+ 135:src/drv/dataflash.c **** *   if only one type of Dataflash is used (like on the Butterfly).
+ 136:src/drv/dataflash.c **** *   If the uC controls different types of dataflash keep the PageBits
+ 137:src/drv/dataflash.c **** *   and PageSize decoding in this function to avoid problems.
+ 138:src/drv/dataflash.c **** ******************************************************************************/
+ 139:src/drv/dataflash.c **** unsigned char Read_DF_status (void)
+ 140:src/drv/dataflash.c **** {
+  72               		.loc 1 140 0
+  73               		.cfi_startproc
+  74               	/* prologue: function */
+  75               	/* frame size = 0 */
+  76               	/* stack size = 0 */
+  77               	.L__stack_usage = 0
+ 141:src/drv/dataflash.c **** 	unsigned char result,index_copy;
+ 142:src/drv/dataflash.c **** 	
+ 143:src/drv/dataflash.c **** 	DF_CS_inactive;							//make sure to toggle CS signal in order
+  78               		.loc 1 143 0
+  79 0000 289A      		sbi 0x5,0
+ 144:src/drv/dataflash.c **** 	DF_CS_active;							//to reset dataflash command decoder
+  80               		.loc 1 144 0
+  81 0002 2898      		cbi 0x5,0
+ 145:src/drv/dataflash.c **** 	result = DF_SPI_RW(StatusReg);			//send status register read op-code
+  82               		.loc 1 145 0
+  83 0004 87E5      		ldi r24,lo8(87)
+  84 0006 0E94 0000 		call DF_SPI_RW
+  85               	.LVL2:
+ 146:src/drv/dataflash.c **** 	result = DF_SPI_RW(0x00);				//dummy write to get result
+  86               		.loc 1 146 0
+  87 000a 80E0      		ldi r24,0
+  88 000c 0E94 0000 		call DF_SPI_RW
+  89               	.LVL3:
+ 147:src/drv/dataflash.c **** 	
+ 148:src/drv/dataflash.c **** 	index_copy = ((result & 0x38) >> 3);	//get the size info from status register
+  90               		.loc 1 148 0
+  91 0010 282F      		mov r18,r24
+  92 0012 2873      		andi r18,lo8(56)
+  93 0014 30E0      		ldi r19,0
+  94 0016 93E0      		ldi r25,3
+  95               		1:
+  96 0018 3595      		asr r19
+  97 001a 2795      		ror r18
+  98 001c 9A95      		dec r25
+  99 001e 01F4      		brne 1b
+ 100               	.LVL4:
+ 101               	.LBB2:
+ 149:src/drv/dataflash.c **** 	// mtA
+ 150:src/drv/dataflash.c **** 	/// if (!PageBits) { // mt 200401
+ 151:src/drv/dataflash.c **** 		// PageBits   = DF_pagebits[index_copy];	//get number of internal page address bits from look-up 
+ 152:src/drv/dataflash.c **** 		// PageSize   = DF_pagesize[index_copy];   //get the size of the page (in bytes)
+ 153:src/drv/dataflash.c **** 		PageBits   = pgm_read_byte(&DF_pagebits[index_copy]);	//get number of internal page address bits 
+ 102               		.loc 1 153 0
+ 103 0020 F901      		movw r30,r18
+ 104 0022 E050      		subi r30,lo8(-(DF_pagebits))
+ 105 0024 F040      		sbci r31,hi8(-(DF_pagebits))
+ 106               	.LVL5:
+ 107               	/* #APP */
+ 108               	 ;  153 "src/drv/dataflash.c" 1
+ 109 0026 E491      		lpm r30, Z
+ 110               		
+ 111               	 ;  0 "" 2
+ 112               	.LVL6:
+ 113               	/* #NOAPP */
+ 114               	.LBE2:
+ 115 0028 E093 0000 		sts PageBits,r30
+ 116               	.LBB3:
+ 154:src/drv/dataflash.c **** 		PageSize   = pgm_read_word(&DF_pagesize[index_copy]);   //get the size of the page (in bytes)
+ 117               		.loc 1 154 0
+ 118 002c F901      		movw r30,r18
+ 119               	.LVL7:
+ 120 002e EE0F      		lsl r30
+ 121 0030 FF1F      		rol r31
+ 122               	.LVL8:
+ 123 0032 E050      		subi r30,lo8(-(DF_pagesize))
+ 124 0034 F040      		sbci r31,hi8(-(DF_pagesize))
+ 125               	.LVL9:
+ 126               	/* #APP */
+ 127               	 ;  154 "src/drv/dataflash.c" 1
+ 128 0036 2591      		lpm r18, Z+
+ 129 0038 3491      		lpm r19, Z
+ 130               		
+ 131               	 ;  0 "" 2
+ 132               	.LVL10:
+ 133               	/* #NOAPP */
+ 134               	.LBE3:
+ 135 003a 3093 0000 		sts PageSize+1,r19
+ 136 003e 2093 0000 		sts PageSize,r18
+ 155:src/drv/dataflash.c **** 	/// }
+ 156:src/drv/dataflash.c **** 	// mtE
+ 157:src/drv/dataflash.c **** 	return result;							//return the read status register value
+ 158:src/drv/dataflash.c **** }
+ 137               		.loc 1 158 0
+ 138 0042 0895      		ret
+ 139               		.cfi_endproc
+ 140               	.LFE3:
+ 142               		.section	.text.Page_To_Buffer,"ax",@progbits
+ 143               	.global	Page_To_Buffer
+ 145               	Page_To_Buffer:
+ 146               	.LFB4:
+ 159:src/drv/dataflash.c **** 
+ 160:src/drv/dataflash.c **** 
+ 161:src/drv/dataflash.c **** /*****************************************************************************
+ 162:src/drv/dataflash.c **** *
+ 163:src/drv/dataflash.c **** *	Function name : Page_To_Buffer
+ 164:src/drv/dataflash.c **** *
+ 165:src/drv/dataflash.c **** *	Returns :		None
+ 166:src/drv/dataflash.c **** *
+ 167:src/drv/dataflash.c **** *	Parameters :	BufferNo	->	Decides usage of either buffer 1 or 2
+ 168:src/drv/dataflash.c **** *					PageAdr		->	Address of page to be transferred to buffer
+ 169:src/drv/dataflash.c **** *
+ 170:src/drv/dataflash.c **** *	Purpose :		Transfers a page from flash to dataflash SRAM buffer
+ 171:src/drv/dataflash.c **** *					
+ 172:src/drv/dataflash.c **** ******************************************************************************/
+ 173:src/drv/dataflash.c **** void Page_To_Buffer (unsigned int PageAdr, unsigned char BufferNo)
+ 174:src/drv/dataflash.c **** {
+ 147               		.loc 1 174 0
+ 148               		.cfi_startproc
+ 149               	.LVL11:
+ 150 0000 CF93      		push r28
+ 151               	.LCFI0:
+ 152               		.cfi_def_cfa_offset 3
+ 153               		.cfi_offset 28, -2
+ 154 0002 DF93      		push r29
+ 155               	.LCFI1:
+ 156               		.cfi_def_cfa_offset 4
+ 157               		.cfi_offset 29, -3
+ 158               	/* prologue: function */
+ 159               	/* frame size = 0 */
+ 160               	/* stack size = 2 */
+ 161               	.L__stack_usage = 2
+ 162 0004 EC01      		movw r28,r24
+ 175:src/drv/dataflash.c **** 	DF_CS_inactive;												//make sure to toggle CS signal in order
+ 163               		.loc 1 175 0
+ 164 0006 289A      		sbi 0x5,0
+ 176:src/drv/dataflash.c **** 	DF_CS_active;												//to reset dataflash command decoder
+ 165               		.loc 1 176 0
+ 166 0008 2898      		cbi 0x5,0
+ 177:src/drv/dataflash.c **** 	
+ 178:src/drv/dataflash.c **** 	if (1 == BufferNo)											//transfer flash page to buffer 1
+ 167               		.loc 1 178 0
+ 168 000a 6130      		cpi r22,lo8(1)
+ 169 000c 01F4      		brne .L8
+ 179:src/drv/dataflash.c **** 	{
+ 180:src/drv/dataflash.c **** 		DF_SPI_RW(FlashToBuf1Transfer);							//transfer to buffer 1 op-code
+ 170               		.loc 1 180 0
+ 171 000e 83E5      		ldi r24,lo8(83)
+ 172               	.LVL12:
+ 173 0010 0E94 0000 		call DF_SPI_RW
+ 174               	.LVL13:
+ 181:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(PageAdr >> (16 - PageBits)));	//upper part of page address
+ 175               		.loc 1 181 0
+ 176 0014 2091 0000 		lds r18,PageBits
+ 177 0018 80E1      		ldi r24,lo8(16)
+ 178 001a 90E0      		ldi r25,0
+ 179 001c 821B      		sub r24,r18
+ 180 001e 9109      		sbc r25,__zero_reg__
+ 181 0020 9E01      		movw r18,r28
+ 182 0022 00C0      		rjmp 2f
+ 183               		1:
+ 184 0024 3695      		lsr r19
+ 185 0026 2795      		ror r18
+ 186               		2:
+ 187 0028 8A95      		dec r24
+ 188 002a 02F4      		brpl 1b
+ 189 002c C901      		movw r24,r18
+ 190 002e 0E94 0000 		call DF_SPI_RW
+ 191               	.LVL14:
+ 182:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(PageAdr << (PageBits - 8)));	//lower part of page address
+ 192               		.loc 1 182 0
+ 193 0032 8091 0000 		lds r24,PageBits
+ 194 0036 8850      		subi r24,lo8(-(-8))
+ 195 0038 3C2F      		mov r19,r28
+ 196 003a 00C0      		rjmp 2f
+ 197               		1:
+ 198 003c 330F      		lsl r19
+ 199               		2:
+ 200 003e 8A95      		dec r24
+ 201 0040 02F4      		brpl 1b
+ 202 0042 832F      		mov r24,r19
+ 203 0044 0E94 0000 		call DF_SPI_RW
+ 204               	.LVL15:
+ 183:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);										//don't cares
+ 205               		.loc 1 183 0
+ 206 0048 80E0      		ldi r24,0
+ 207 004a 0E94 0000 		call DF_SPI_RW
+ 208               	.LVL16:
+ 209               	.L8:
+ 184:src/drv/dataflash.c **** 	}
+ 185:src/drv/dataflash.c **** #ifdef USE_BUFFER2
+ 186:src/drv/dataflash.c **** 	else	
+ 187:src/drv/dataflash.c **** 	if (2 == BufferNo)											//transfer flash page to buffer 2
+ 188:src/drv/dataflash.c **** 	{
+ 189:src/drv/dataflash.c **** 		DF_SPI_RW(FlashToBuf2Transfer);							//transfer to buffer 2 op-code
+ 190:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(PageAdr >> (16 - PageBits)));	//upper part of page address
+ 191:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(PageAdr << (PageBits - 8)));	//lower part of page address
+ 192:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);										//don't cares
+ 193:src/drv/dataflash.c **** 	}
+ 194:src/drv/dataflash.c **** #endif
+ 195:src/drv/dataflash.c **** 	
+ 196:src/drv/dataflash.c **** 	DF_CS_inactive;												//initiate the transfer
+ 210               		.loc 1 196 0
+ 211 004e 289A      		sbi 0x5,0
+ 197:src/drv/dataflash.c **** 	DF_CS_active;
+ 212               		.loc 1 197 0
+ 213 0050 2898      		cbi 0x5,0
+ 214               	.L9:
+ 198:src/drv/dataflash.c **** 	
+ 199:src/drv/dataflash.c **** 	while(!(Read_DF_status() & 0x80));							//monitor the status register, wait until busy-flag is hi
+ 215               		.loc 1 199 0 discriminator 1
+ 216 0052 0E94 0000 		call Read_DF_status
+ 217               	.LVL17:
+ 218 0056 87FF      		sbrs r24,7
+ 219 0058 00C0      		rjmp .L9
+ 220               	/* epilogue start */
+ 200:src/drv/dataflash.c **** }
+ 221               		.loc 1 200 0
+ 222 005a DF91      		pop r29
+ 223 005c CF91      		pop r28
+ 224               	.LVL18:
+ 225 005e 0895      		ret
+ 226               		.cfi_endproc
+ 227               	.LFE4:
+ 229               		.section	.text.Buffer_Read_Byte,"ax",@progbits
+ 230               	.global	Buffer_Read_Byte
+ 232               	Buffer_Read_Byte:
+ 233               	.LFB5:
+ 201:src/drv/dataflash.c **** 
+ 202:src/drv/dataflash.c **** 
+ 203:src/drv/dataflash.c **** 
+ 204:src/drv/dataflash.c **** /*****************************************************************************
+ 205:src/drv/dataflash.c **** *
+ 206:src/drv/dataflash.c **** *	Function name : Buffer_Read_Byte
+ 207:src/drv/dataflash.c **** *
+ 208:src/drv/dataflash.c **** *	Returns :		One read byte (any value)
+ 209:src/drv/dataflash.c **** *
+ 210:src/drv/dataflash.c **** *	Parameters :	BufferNo	->	Decides usage of either buffer 1 or 2
+ 211:src/drv/dataflash.c **** *					IntPageAdr	->	Internal page address
+ 212:src/drv/dataflash.c **** *
+ 213:src/drv/dataflash.c **** *	Purpose :		Reads one byte from one of the dataflash
+ 214:src/drv/dataflash.c **** *					internal SRAM buffers
+ 215:src/drv/dataflash.c **** *
+ 216:src/drv/dataflash.c **** ******************************************************************************/
+ 217:src/drv/dataflash.c **** unsigned char Buffer_Read_Byte (unsigned char BufferNo, unsigned int IntPageAdr)
+ 218:src/drv/dataflash.c **** {
+ 234               		.loc 1 218 0
+ 235               		.cfi_startproc
+ 236               	.LVL19:
+ 237 0000 CF93      		push r28
+ 238               	.LCFI2:
+ 239               		.cfi_def_cfa_offset 3
+ 240               		.cfi_offset 28, -2
+ 241 0002 DF93      		push r29
+ 242               	.LCFI3:
+ 243               		.cfi_def_cfa_offset 4
+ 244               		.cfi_offset 29, -3
+ 245               	/* prologue: function */
+ 246               	/* frame size = 0 */
+ 247               	/* stack size = 2 */
+ 248               	.L__stack_usage = 2
+ 249 0004 EB01      		movw r28,r22
+ 250               	.LVL20:
+ 219:src/drv/dataflash.c **** 	unsigned char data;
+ 220:src/drv/dataflash.c **** 	
+ 221:src/drv/dataflash.c **** 	data='0'; // mt 
+ 222:src/drv/dataflash.c **** 	
+ 223:src/drv/dataflash.c **** 	DF_CS_inactive;								//make sure to toggle CS signal in order
+ 251               		.loc 1 223 0
+ 252 0006 289A      		sbi 0x5,0
+ 224:src/drv/dataflash.c **** 	DF_CS_active;								//to reset dataflash command decoder
+ 253               		.loc 1 224 0
+ 254 0008 2898      		cbi 0x5,0
+ 225:src/drv/dataflash.c **** 	
+ 226:src/drv/dataflash.c **** 	if (1 == BufferNo)							//read byte from buffer 1
+ 255               		.loc 1 226 0
+ 256 000a 8130      		cpi r24,lo8(1)
+ 257 000c 01F4      		brne .L12
+ 227:src/drv/dataflash.c **** 	{
+ 228:src/drv/dataflash.c **** 		DF_SPI_RW(Buf1Read);					//buffer 1 read op-code
+ 258               		.loc 1 228 0
+ 259 000e 84E5      		ldi r24,lo8(84)
+ 260               	.LVL21:
+ 261 0010 0E94 0000 		call DF_SPI_RW
+ 262               	.LVL22:
+ 229:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 263               		.loc 1 229 0
+ 264 0014 80E0      		ldi r24,0
+ 265 0016 0E94 0000 		call DF_SPI_RW
+ 266               	.LVL23:
+ 230:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 267               		.loc 1 230 0
+ 268 001a 8D2F      		mov r24,r29
+ 269 001c 0E94 0000 		call DF_SPI_RW
+ 270               	.LVL24:
+ 231:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 271               		.loc 1 231 0
+ 272 0020 8C2F      		mov r24,r28
+ 273 0022 0E94 0000 		call DF_SPI_RW
+ 274               	.LVL25:
+ 232:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 275               		.loc 1 232 0
+ 276 0026 80E0      		ldi r24,0
+ 277 0028 0E94 0000 		call DF_SPI_RW
+ 278               	.LVL26:
+ 233:src/drv/dataflash.c **** 		data = DF_SPI_RW(0x00);					//read byte
+ 279               		.loc 1 233 0
+ 280 002c 80E0      		ldi r24,0
+ 281               	/* epilogue start */
+ 234:src/drv/dataflash.c **** 	}
+ 235:src/drv/dataflash.c **** 
+ 236:src/drv/dataflash.c **** #ifdef USE_BUFFER2
+ 237:src/drv/dataflash.c **** 	else
+ 238:src/drv/dataflash.c **** 	if (2 == BufferNo)							//read byte from buffer 2
+ 239:src/drv/dataflash.c **** 	{
+ 240:src/drv/dataflash.c **** 		DF_SPI_RW(Buf2Read);					//buffer 2 read op-code
+ 241:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 242:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 243:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 244:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 245:src/drv/dataflash.c **** 		data = DF_SPI_RW(0x00);					//read byte
+ 246:src/drv/dataflash.c **** 	}
+ 247:src/drv/dataflash.c **** #endif
+ 248:src/drv/dataflash.c **** 	
+ 249:src/drv/dataflash.c **** 	return data;								//return the read data byte
+ 250:src/drv/dataflash.c **** }
+ 282               		.loc 1 250 0
+ 283 002e DF91      		pop r29
+ 284 0030 CF91      		pop r28
+ 285               	.LVL27:
+ 233:src/drv/dataflash.c **** 		data = DF_SPI_RW(0x00);					//read byte
+ 286               		.loc 1 233 0
+ 287 0032 0C94 0000 		jmp DF_SPI_RW
+ 288               	.LVL28:
+ 289               	.L12:
+ 290               		.loc 1 250 0
+ 291 0036 80E3      		ldi r24,lo8(48)
+ 292               	.LVL29:
+ 293               	/* epilogue start */
+ 294 0038 DF91      		pop r29
+ 295 003a CF91      		pop r28
+ 296 003c 0895      		ret
+ 297               		.cfi_endproc
+ 298               	.LFE5:
+ 300               		.section	.text.Buffer_Read_Str,"ax",@progbits
+ 301               	.global	Buffer_Read_Str
+ 303               	Buffer_Read_Str:
+ 304               	.LFB6:
+ 251:src/drv/dataflash.c **** 
+ 252:src/drv/dataflash.c **** 
+ 253:src/drv/dataflash.c **** 
+ 254:src/drv/dataflash.c **** /*****************************************************************************
+ 255:src/drv/dataflash.c **** *
+ 256:src/drv/dataflash.c **** *	Function name : Buffer_Read_Str
+ 257:src/drv/dataflash.c **** *
+ 258:src/drv/dataflash.c **** *	Returns :		None
+ 259:src/drv/dataflash.c **** *
+ 260:src/drv/dataflash.c **** *	Parameters :	BufferNo	->	Decides usage of either buffer 1 or 2
+ 261:src/drv/dataflash.c **** *					IntPageAdr	->	Internal page address
+ 262:src/drv/dataflash.c **** *					No_of_bytes	->	Number of bytes to be read
+ 263:src/drv/dataflash.c **** *					*BufferPtr	->	address of buffer to be used for read bytes
+ 264:src/drv/dataflash.c **** *
+ 265:src/drv/dataflash.c **** *	Purpose :		Reads one or more bytes from one of the dataflash
+ 266:src/drv/dataflash.c **** *					internal SRAM buffers, and puts read bytes into
+ 267:src/drv/dataflash.c **** *					buffer pointed to by *BufferPtr
+ 268:src/drv/dataflash.c **** *
+ 269:src/drv/dataflash.c **** ******************************************************************************/
+ 270:src/drv/dataflash.c **** void Buffer_Read_Str (unsigned char BufferNo, unsigned int IntPageAdr, unsigned int No_of_bytes, un
+ 271:src/drv/dataflash.c **** {
+ 305               		.loc 1 271 0
+ 306               		.cfi_startproc
+ 307               	.LVL30:
+ 308 0000 EF92      		push r14
+ 309               	.LCFI4:
+ 310               		.cfi_def_cfa_offset 3
+ 311               		.cfi_offset 14, -2
+ 312 0002 FF92      		push r15
+ 313               	.LCFI5:
+ 314               		.cfi_def_cfa_offset 4
+ 315               		.cfi_offset 15, -3
+ 316 0004 0F93      		push r16
+ 317               	.LCFI6:
+ 318               		.cfi_def_cfa_offset 5
+ 319               		.cfi_offset 16, -4
+ 320 0006 1F93      		push r17
+ 321               	.LCFI7:
+ 322               		.cfi_def_cfa_offset 6
+ 323               		.cfi_offset 17, -5
+ 324 0008 CF93      		push r28
+ 325               	.LCFI8:
+ 326               		.cfi_def_cfa_offset 7
+ 327               		.cfi_offset 28, -6
+ 328 000a DF93      		push r29
+ 329               	.LCFI9:
+ 330               		.cfi_def_cfa_offset 8
+ 331               		.cfi_offset 29, -7
+ 332               	/* prologue: function */
+ 333               	/* frame size = 0 */
+ 334               	/* stack size = 6 */
+ 335               	.L__stack_usage = 6
+ 336 000c 7B01      		movw r14,r22
+ 337 000e 8A01      		movw r16,r20
+ 338 0010 E901      		movw r28,r18
+ 272:src/drv/dataflash.c **** 	unsigned int i;
+ 273:src/drv/dataflash.c **** 
+ 274:src/drv/dataflash.c **** 	DF_CS_inactive;								//make sure to toggle CS signal in order
+ 339               		.loc 1 274 0
+ 340 0012 289A      		sbi 0x5,0
+ 275:src/drv/dataflash.c **** 	DF_CS_active;								//to reset dataflash command decoder
+ 341               		.loc 1 275 0
+ 342 0014 2898      		cbi 0x5,0
+ 276:src/drv/dataflash.c **** 	
+ 277:src/drv/dataflash.c **** 	if (1 == BufferNo)							//read byte(s) from buffer 1
+ 343               		.loc 1 277 0
+ 344 0016 8130      		cpi r24,lo8(1)
+ 345 0018 01F4      		brne .L13
+ 278:src/drv/dataflash.c **** 	{
+ 279:src/drv/dataflash.c **** 		DF_SPI_RW(Buf1Read);					//buffer 1 read op-code
+ 346               		.loc 1 279 0
+ 347 001a 84E5      		ldi r24,lo8(84)
+ 348               	.LVL31:
+ 349 001c 0E94 0000 		call DF_SPI_RW
+ 350               	.LVL32:
+ 280:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 351               		.loc 1 280 0
+ 352 0020 80E0      		ldi r24,0
+ 353 0022 0E94 0000 		call DF_SPI_RW
+ 354               	.LVL33:
+ 281:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 355               		.loc 1 281 0
+ 356 0026 8F2D      		mov r24,r15
+ 357 0028 0E94 0000 		call DF_SPI_RW
+ 358               	.LVL34:
+ 282:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 359               		.loc 1 282 0
+ 360 002c 8E2D      		mov r24,r14
+ 361 002e 0E94 0000 		call DF_SPI_RW
+ 362               	.LVL35:
+ 283:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 363               		.loc 1 283 0
+ 364 0032 80E0      		ldi r24,0
+ 365 0034 0E94 0000 		call DF_SPI_RW
+ 366               	.LVL36:
+ 367 0038 0C0F      		add r16,r28
+ 368 003a 1D1F      		adc r17,r29
+ 369               	.LVL37:
+ 370               	.L15:
+ 284:src/drv/dataflash.c **** 		for( i=0; i<No_of_bytes; i++)
+ 371               		.loc 1 284 0 discriminator 1
+ 372 003c C017      		cp r28,r16
+ 373 003e D107      		cpc r29,r17
+ 374 0040 01F0      		breq .L13
+ 285:src/drv/dataflash.c **** 		{
+ 286:src/drv/dataflash.c **** 			*(BufferPtr) = DF_SPI_RW(0x00);		//read byte and put it in AVR buffer pointed to by *BufferPtr
+ 375               		.loc 1 286 0 discriminator 3
+ 376 0042 80E0      		ldi r24,0
+ 377 0044 0E94 0000 		call DF_SPI_RW
+ 378               	.LVL38:
+ 379 0048 8993      		st Y+,r24
+ 380               	.LVL39:
+ 381 004a 00C0      		rjmp .L15
+ 382               	.LVL40:
+ 383               	.L13:
+ 384               	/* epilogue start */
+ 287:src/drv/dataflash.c **** 			BufferPtr++;						//point to next element in AVR buffer
+ 288:src/drv/dataflash.c **** 		}
+ 289:src/drv/dataflash.c **** 	}
+ 290:src/drv/dataflash.c **** 	
+ 291:src/drv/dataflash.c **** #ifdef USE_BUFFER2
+ 292:src/drv/dataflash.c **** 	else
+ 293:src/drv/dataflash.c **** 	if (2 == BufferNo)							//read byte(s) from buffer 2
+ 294:src/drv/dataflash.c **** 	{
+ 295:src/drv/dataflash.c **** 		DF_SPI_RW(Buf2Read);					//buffer 2 read op-code
+ 296:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 297:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 298:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 299:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 300:src/drv/dataflash.c **** 		for( i=0; i<No_of_bytes; i++)
+ 301:src/drv/dataflash.c **** 		{
+ 302:src/drv/dataflash.c **** 			*(BufferPtr) = DF_SPI_RW(0x00);		//read byte and put it in AVR buffer pointed to by *BufferPtr
+ 303:src/drv/dataflash.c **** 			BufferPtr++;						//point to next element in AVR buffer
+ 304:src/drv/dataflash.c **** 		}
+ 305:src/drv/dataflash.c **** 	}
+ 306:src/drv/dataflash.c **** #endif
+ 307:src/drv/dataflash.c **** }
+ 385               		.loc 1 307 0
+ 386 004c DF91      		pop r29
+ 387 004e CF91      		pop r28
+ 388               	.LVL41:
+ 389 0050 1F91      		pop r17
+ 390 0052 0F91      		pop r16
+ 391 0054 FF90      		pop r15
+ 392 0056 EF90      		pop r14
+ 393               	.LVL42:
+ 394 0058 0895      		ret
+ 395               		.cfi_endproc
+ 396               	.LFE6:
+ 398               		.section	.text.Buffer_Write_Enable,"ax",@progbits
+ 399               	.global	Buffer_Write_Enable
+ 401               	Buffer_Write_Enable:
+ 402               	.LFB7:
+ 308:src/drv/dataflash.c **** //NB : Sjekk at (IntAdr + No_of_bytes) < buffersize, hvis ikke blir det bare ball..
+ 309:src/drv/dataflash.c **** //mtA 
+ 310:src/drv/dataflash.c **** // translation of the Norwegian comments (thanks to Eirik Tveiten):
+ 311:src/drv/dataflash.c **** // NB : Check that (IntAdr + No_of_bytes) < buffersize, if not there will be problems
+ 312:src/drv/dataflash.c **** //mtE
+ 313:src/drv/dataflash.c **** 
+ 314:src/drv/dataflash.c **** 
+ 315:src/drv/dataflash.c **** /*****************************************************************************
+ 316:src/drv/dataflash.c **** *
+ 317:src/drv/dataflash.c **** *	Function name : Buffer_Write_Enable
+ 318:src/drv/dataflash.c **** *
+ 319:src/drv/dataflash.c **** *	Returns :		None
+ 320:src/drv/dataflash.c **** *
+ 321:src/drv/dataflash.c **** *	Parameters :	IntPageAdr	->	Internal page address to start writing from
+ 322:src/drv/dataflash.c **** *					BufferAdr	->	Decides usage of either buffer 1 or 2
+ 323:src/drv/dataflash.c **** *					
+ 324:src/drv/dataflash.c **** *	Purpose :		Enables continous write functionality to one of the dataflash buffers
+ 325:src/drv/dataflash.c **** *					buffers. NOTE : User must ensure that CS goes high to terminate
+ 326:src/drv/dataflash.c **** *					this mode before accessing other dataflash functionalities 
+ 327:src/drv/dataflash.c **** *
+ 328:src/drv/dataflash.c **** ******************************************************************************/
+ 329:src/drv/dataflash.c **** void Buffer_Write_Enable (unsigned char BufferNo, unsigned int IntPageAdr)
+ 330:src/drv/dataflash.c **** {
+ 403               		.loc 1 330 0
+ 404               		.cfi_startproc
+ 405               	.LVL43:
+ 406 0000 CF93      		push r28
+ 407               	.LCFI10:
+ 408               		.cfi_def_cfa_offset 3
+ 409               		.cfi_offset 28, -2
+ 410 0002 DF93      		push r29
+ 411               	.LCFI11:
+ 412               		.cfi_def_cfa_offset 4
+ 413               		.cfi_offset 29, -3
+ 414               	/* prologue: function */
+ 415               	/* frame size = 0 */
+ 416               	/* stack size = 2 */
+ 417               	.L__stack_usage = 2
+ 418 0004 EB01      		movw r28,r22
+ 331:src/drv/dataflash.c **** 	DF_CS_inactive;								//make sure to toggle CS signal in order
+ 419               		.loc 1 331 0
+ 420 0006 289A      		sbi 0x5,0
+ 332:src/drv/dataflash.c **** 	DF_CS_active;								//to reset dataflash command decoder
+ 421               		.loc 1 332 0
+ 422 0008 2898      		cbi 0x5,0
+ 333:src/drv/dataflash.c **** 	
+ 334:src/drv/dataflash.c **** 	if (1 == BufferNo)							//write enable to buffer 1
+ 423               		.loc 1 334 0
+ 424 000a 8130      		cpi r24,lo8(1)
+ 425 000c 01F4      		brne .L18
+ 335:src/drv/dataflash.c **** 	{
+ 336:src/drv/dataflash.c **** 		DF_SPI_RW(Buf1Write);					//buffer 1 write op-code
+ 426               		.loc 1 336 0
+ 427 000e 84E8      		ldi r24,lo8(-124)
+ 428               	.LVL44:
+ 429 0010 0E94 0000 		call DF_SPI_RW
+ 430               	.LVL45:
+ 337:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 431               		.loc 1 337 0
+ 432 0014 80E0      		ldi r24,0
+ 433 0016 0E94 0000 		call DF_SPI_RW
+ 434               	.LVL46:
+ 338:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 435               		.loc 1 338 0
+ 436 001a 8D2F      		mov r24,r29
+ 437 001c 0E94 0000 		call DF_SPI_RW
+ 438               	.LVL47:
+ 339:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 439               		.loc 1 339 0
+ 440 0020 8C2F      		mov r24,r28
+ 441               	/* epilogue start */
+ 340:src/drv/dataflash.c **** 	}
+ 341:src/drv/dataflash.c **** 	
+ 342:src/drv/dataflash.c **** #ifdef USE_BUFFER2
+ 343:src/drv/dataflash.c **** 	else
+ 344:src/drv/dataflash.c **** 	if (2 == BufferNo)							//write enable to buffer 2
+ 345:src/drv/dataflash.c **** 	{
+ 346:src/drv/dataflash.c **** 		DF_SPI_RW(Buf2Write);					//buffer 2 write op-code
+ 347:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 348:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 349:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 350:src/drv/dataflash.c **** 	}
+ 351:src/drv/dataflash.c **** #endif
+ 352:src/drv/dataflash.c **** }
+ 442               		.loc 1 352 0
+ 443 0022 DF91      		pop r29
+ 444 0024 CF91      		pop r28
+ 445               	.LVL48:
+ 339:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 446               		.loc 1 339 0
+ 447 0026 0C94 0000 		jmp DF_SPI_RW
+ 448               	.LVL49:
+ 449               	.L18:
+ 450               	/* epilogue start */
+ 451               		.loc 1 352 0
+ 452 002a DF91      		pop r29
+ 453 002c CF91      		pop r28
+ 454 002e 0895      		ret
+ 455               		.cfi_endproc
+ 456               	.LFE7:
+ 458               		.section	.text.Buffer_Write_Byte,"ax",@progbits
+ 459               	.global	Buffer_Write_Byte
+ 461               	Buffer_Write_Byte:
+ 462               	.LFB8:
+ 353:src/drv/dataflash.c **** 
+ 354:src/drv/dataflash.c **** 
+ 355:src/drv/dataflash.c **** 
+ 356:src/drv/dataflash.c **** /*****************************************************************************
+ 357:src/drv/dataflash.c **** *
+ 358:src/drv/dataflash.c **** *	Function name : Buffer_Write_Byte
+ 359:src/drv/dataflash.c **** *
+ 360:src/drv/dataflash.c **** *	Returns :		None
+ 361:src/drv/dataflash.c **** *
+ 362:src/drv/dataflash.c **** *	Parameters :	IntPageAdr	->	Internal page address to write byte to
+ 363:src/drv/dataflash.c **** *					BufferAdr	->	Decides usage of either buffer 1 or 2
+ 364:src/drv/dataflash.c **** *					Data		->	Data byte to be written
+ 365:src/drv/dataflash.c **** *
+ 366:src/drv/dataflash.c **** *	Purpose :		Writes one byte to one of the dataflash
+ 367:src/drv/dataflash.c **** *					internal SRAM buffers
+ 368:src/drv/dataflash.c **** *
+ 369:src/drv/dataflash.c **** ******************************************************************************/
+ 370:src/drv/dataflash.c **** void Buffer_Write_Byte (unsigned char BufferNo, unsigned int IntPageAdr, unsigned char Data)
+ 371:src/drv/dataflash.c **** {
+ 463               		.loc 1 371 0
+ 464               		.cfi_startproc
+ 465               	.LVL50:
+ 466 0000 0F93      		push r16
+ 467               	.LCFI12:
+ 468               		.cfi_def_cfa_offset 3
+ 469               		.cfi_offset 16, -2
+ 470 0002 1F93      		push r17
+ 471               	.LCFI13:
+ 472               		.cfi_def_cfa_offset 4
+ 473               		.cfi_offset 17, -3
+ 474 0004 CF93      		push r28
+ 475               	.LCFI14:
+ 476               		.cfi_def_cfa_offset 5
+ 477               		.cfi_offset 28, -4
+ 478 0006 DF93      		push r29
+ 479               	.LCFI15:
+ 480               		.cfi_def_cfa_offset 6
+ 481               		.cfi_offset 29, -5
+ 482 0008 1F92      		push __zero_reg__
+ 483               	.LCFI16:
+ 484               		.cfi_def_cfa_offset 7
+ 485 000a CDB7      		in r28,__SP_L__
+ 486 000c DEB7      		in r29,__SP_H__
+ 487               	.LCFI17:
+ 488               		.cfi_def_cfa_register 28
+ 489               	/* prologue: function */
+ 490               	/* frame size = 1 */
+ 491               	/* stack size = 5 */
+ 492               	.L__stack_usage = 5
+ 493 000e 8B01      		movw r16,r22
+ 372:src/drv/dataflash.c **** 	
+ 373:src/drv/dataflash.c **** 	DF_CS_inactive;								//make sure to toggle CS signal in order
+ 494               		.loc 1 373 0
+ 495 0010 289A      		sbi 0x5,0
+ 374:src/drv/dataflash.c **** 	DF_CS_active;								//to reset dataflash command decoder
+ 496               		.loc 1 374 0
+ 497 0012 2898      		cbi 0x5,0
+ 375:src/drv/dataflash.c **** 	
+ 376:src/drv/dataflash.c **** 	if (1 == BufferNo)							//write byte to buffer 1
+ 498               		.loc 1 376 0
+ 499 0014 8130      		cpi r24,lo8(1)
+ 500 0016 01F4      		brne .L20
+ 377:src/drv/dataflash.c **** 	{
+ 378:src/drv/dataflash.c **** 		DF_SPI_RW(Buf1Write);					//buffer 1 write op-code
+ 501               		.loc 1 378 0
+ 502 0018 84E8      		ldi r24,lo8(-124)
+ 503               	.LVL51:
+ 504 001a 4983      		std Y+1,r20
+ 505 001c 0E94 0000 		call DF_SPI_RW
+ 506               	.LVL52:
+ 379:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 507               		.loc 1 379 0
+ 508 0020 80E0      		ldi r24,0
+ 509 0022 0E94 0000 		call DF_SPI_RW
+ 510               	.LVL53:
+ 380:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 511               		.loc 1 380 0
+ 512 0026 812F      		mov r24,r17
+ 513 0028 0E94 0000 		call DF_SPI_RW
+ 514               	.LVL54:
+ 381:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 515               		.loc 1 381 0
+ 516 002c 802F      		mov r24,r16
+ 517 002e 0E94 0000 		call DF_SPI_RW
+ 518               	.LVL55:
+ 382:src/drv/dataflash.c **** 		DF_SPI_RW(Data);						//write data byte
+ 519               		.loc 1 382 0
+ 520 0032 4981      		ldd r20,Y+1
+ 521 0034 842F      		mov r24,r20
+ 522               	/* epilogue start */
+ 383:src/drv/dataflash.c **** 	}
+ 384:src/drv/dataflash.c **** 
+ 385:src/drv/dataflash.c **** #ifdef USE_BUFFER2
+ 386:src/drv/dataflash.c **** 	else
+ 387:src/drv/dataflash.c **** 	if (2 == BufferNo)							//write byte to buffer 2
+ 388:src/drv/dataflash.c **** 	{
+ 389:src/drv/dataflash.c **** 		DF_SPI_RW(Buf2Write);					//buffer 2 write op-code
+ 390:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 391:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 392:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 393:src/drv/dataflash.c **** 		DF_SPI_RW(Data);						//write data byte
+ 394:src/drv/dataflash.c **** 	}		
+ 395:src/drv/dataflash.c **** #endif
+ 396:src/drv/dataflash.c **** }
+ 523               		.loc 1 396 0
+ 524 0036 0F90      		pop __tmp_reg__
+ 525 0038 DF91      		pop r29
+ 526 003a CF91      		pop r28
+ 527 003c 1F91      		pop r17
+ 528 003e 0F91      		pop r16
+ 529               	.LVL56:
+ 382:src/drv/dataflash.c **** 		DF_SPI_RW(Data);						//write data byte
+ 530               		.loc 1 382 0
+ 531 0040 0C94 0000 		jmp DF_SPI_RW
+ 532               	.LVL57:
+ 533               	.L20:
+ 534               	/* epilogue start */
+ 535               		.loc 1 396 0
+ 536 0044 0F90      		pop __tmp_reg__
+ 537 0046 DF91      		pop r29
+ 538 0048 CF91      		pop r28
+ 539 004a 1F91      		pop r17
+ 540 004c 0F91      		pop r16
+ 541               	.LVL58:
+ 542 004e 0895      		ret
+ 543               		.cfi_endproc
+ 544               	.LFE8:
+ 546               		.section	.text.Buffer_Write_Str,"ax",@progbits
+ 547               	.global	Buffer_Write_Str
+ 549               	Buffer_Write_Str:
+ 550               	.LFB9:
+ 397:src/drv/dataflash.c **** 
+ 398:src/drv/dataflash.c **** 
+ 399:src/drv/dataflash.c **** /*****************************************************************************
+ 400:src/drv/dataflash.c **** *
+ 401:src/drv/dataflash.c **** *	Function name : Buffer_Write_Str
+ 402:src/drv/dataflash.c **** *
+ 403:src/drv/dataflash.c **** *	Returns :		None
+ 404:src/drv/dataflash.c **** *
+ 405:src/drv/dataflash.c **** *	Parameters :	BufferNo	->	Decides usage of either buffer 1 or 2
+ 406:src/drv/dataflash.c **** *					IntPageAdr	->	Internal page address
+ 407:src/drv/dataflash.c **** *					No_of_bytes	->	Number of bytes to be written
+ 408:src/drv/dataflash.c **** *					*BufferPtr	->	address of buffer to be used for copy of bytes
+ 409:src/drv/dataflash.c **** *									from AVR buffer to dataflash buffer 1 (or 2)
+ 410:src/drv/dataflash.c **** *
+ 411:src/drv/dataflash.c **** *	Purpose :		Copies one or more bytes to one of the dataflash
+ 412:src/drv/dataflash.c **** *					internal SRAM buffers from AVR SRAM buffer
+ 413:src/drv/dataflash.c **** *					pointed to by *BufferPtr
+ 414:src/drv/dataflash.c **** *
+ 415:src/drv/dataflash.c **** ******************************************************************************/
+ 416:src/drv/dataflash.c **** void Buffer_Write_Str (unsigned char BufferNo, unsigned int IntPageAdr, unsigned int No_of_bytes, u
+ 417:src/drv/dataflash.c **** {
+ 551               		.loc 1 417 0
+ 552               		.cfi_startproc
+ 553               	.LVL59:
+ 554 0000 EF92      		push r14
+ 555               	.LCFI18:
+ 556               		.cfi_def_cfa_offset 3
+ 557               		.cfi_offset 14, -2
+ 558 0002 FF92      		push r15
+ 559               	.LCFI19:
+ 560               		.cfi_def_cfa_offset 4
+ 561               		.cfi_offset 15, -3
+ 562 0004 0F93      		push r16
+ 563               	.LCFI20:
+ 564               		.cfi_def_cfa_offset 5
+ 565               		.cfi_offset 16, -4
+ 566 0006 1F93      		push r17
+ 567               	.LCFI21:
+ 568               		.cfi_def_cfa_offset 6
+ 569               		.cfi_offset 17, -5
+ 570 0008 CF93      		push r28
+ 571               	.LCFI22:
+ 572               		.cfi_def_cfa_offset 7
+ 573               		.cfi_offset 28, -6
+ 574 000a DF93      		push r29
+ 575               	.LCFI23:
+ 576               		.cfi_def_cfa_offset 8
+ 577               		.cfi_offset 29, -7
+ 578               	/* prologue: function */
+ 579               	/* frame size = 0 */
+ 580               	/* stack size = 6 */
+ 581               	.L__stack_usage = 6
+ 582 000c 7B01      		movw r14,r22
+ 583 000e 8A01      		movw r16,r20
+ 584 0010 E901      		movw r28,r18
+ 418:src/drv/dataflash.c **** 	unsigned int i;
+ 419:src/drv/dataflash.c **** 
+ 420:src/drv/dataflash.c **** 	DF_CS_inactive;								//make sure to toggle CS signal in order
+ 585               		.loc 1 420 0
+ 586 0012 289A      		sbi 0x5,0
+ 421:src/drv/dataflash.c **** 	DF_CS_active;								//to reset dataflash command decoder
+ 587               		.loc 1 421 0
+ 588 0014 2898      		cbi 0x5,0
+ 422:src/drv/dataflash.c **** 	
+ 423:src/drv/dataflash.c **** 	if (1 == BufferNo)							//write byte(s) to buffer 1
+ 589               		.loc 1 423 0
+ 590 0016 8130      		cpi r24,lo8(1)
+ 591 0018 01F4      		brne .L22
+ 424:src/drv/dataflash.c **** 	{
+ 425:src/drv/dataflash.c **** 		DF_SPI_RW(Buf1Write);					//buffer 1 write op-code
+ 592               		.loc 1 425 0
+ 593 001a 84E8      		ldi r24,lo8(-124)
+ 594               	.LVL60:
+ 595 001c 0E94 0000 		call DF_SPI_RW
+ 596               	.LVL61:
+ 426:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 597               		.loc 1 426 0
+ 598 0020 80E0      		ldi r24,0
+ 599 0022 0E94 0000 		call DF_SPI_RW
+ 600               	.LVL62:
+ 427:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 601               		.loc 1 427 0
+ 602 0026 8F2D      		mov r24,r15
+ 603 0028 0E94 0000 		call DF_SPI_RW
+ 604               	.LVL63:
+ 428:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 605               		.loc 1 428 0
+ 606 002c 8E2D      		mov r24,r14
+ 607 002e 0E94 0000 		call DF_SPI_RW
+ 608               	.LVL64:
+ 609 0032 0C0F      		add r16,r28
+ 610 0034 1D1F      		adc r17,r29
+ 611               	.LVL65:
+ 612               	.L24:
+ 429:src/drv/dataflash.c **** 		for( i=0; i<No_of_bytes; i++)
+ 613               		.loc 1 429 0 discriminator 1
+ 614 0036 C017      		cp r28,r16
+ 615 0038 D107      		cpc r29,r17
+ 616 003a 01F0      		breq .L22
+ 430:src/drv/dataflash.c **** 		{
+ 431:src/drv/dataflash.c **** 			DF_SPI_RW(*(BufferPtr));			//write byte pointed at by *BufferPtr to dataflash buffer 1 location
+ 617               		.loc 1 431 0 discriminator 3
+ 618 003c 8991      		ld r24,Y+
+ 619               	.LVL66:
+ 620 003e 0E94 0000 		call DF_SPI_RW
+ 621               	.LVL67:
+ 622 0042 00C0      		rjmp .L24
+ 623               	.LVL68:
+ 624               	.L22:
+ 625               	/* epilogue start */
+ 432:src/drv/dataflash.c **** 			BufferPtr++;						//point to next element in AVR buffer
+ 433:src/drv/dataflash.c **** 		}
+ 434:src/drv/dataflash.c **** 	}
+ 435:src/drv/dataflash.c **** 
+ 436:src/drv/dataflash.c **** #ifdef USE_BUFFER2
+ 437:src/drv/dataflash.c **** 	else
+ 438:src/drv/dataflash.c **** 	if (2 == BufferNo)							//write byte(s) to buffer 2
+ 439:src/drv/dataflash.c **** 	{
+ 440:src/drv/dataflash.c **** 		DF_SPI_RW(Buf2Write);					//buffer 2 write op-code
+ 441:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);						//don't cares
+ 442:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr>>8));//upper part of internal buffer address
+ 443:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(IntPageAdr));	//lower part of internal buffer address
+ 444:src/drv/dataflash.c **** 		for( i=0; i<No_of_bytes; i++)
+ 445:src/drv/dataflash.c **** 		{
+ 446:src/drv/dataflash.c **** 			DF_SPI_RW(*(BufferPtr));			//write byte pointed at by *BufferPtr to dataflash buffer 2 location
+ 447:src/drv/dataflash.c **** 			BufferPtr++;						//point to next element in AVR buffer
+ 448:src/drv/dataflash.c **** 		}
+ 449:src/drv/dataflash.c **** 	}
+ 450:src/drv/dataflash.c **** #endif
+ 451:src/drv/dataflash.c **** }
+ 626               		.loc 1 451 0
+ 627 0044 DF91      		pop r29
+ 628 0046 CF91      		pop r28
+ 629               	.LVL69:
+ 630 0048 1F91      		pop r17
+ 631 004a 0F91      		pop r16
+ 632 004c FF90      		pop r15
+ 633 004e EF90      		pop r14
+ 634               	.LVL70:
+ 635 0050 0895      		ret
+ 636               		.cfi_endproc
+ 637               	.LFE9:
+ 639               		.section	.text.Buffer_To_Page,"ax",@progbits
+ 640               	.global	Buffer_To_Page
+ 642               	Buffer_To_Page:
+ 643               	.LFB10:
+ 452:src/drv/dataflash.c **** //NB : Monitorer busy-flag i status-reg.
+ 453:src/drv/dataflash.c **** //NB : Sjekk at (IntAdr + No_of_bytes) < buffersize, hvis ikke blir det bare ball..
+ 454:src/drv/dataflash.c **** //mtA 
+ 455:src/drv/dataflash.c **** // translation of the Norwegian comments (thanks to Eirik Tveiten):
+ 456:src/drv/dataflash.c **** // NB : Monitors busy-flag in status-reg
+ 457:src/drv/dataflash.c **** // NB : Check that (IntAdr + No_of_bytes) < buffersize, if not there will be problems
+ 458:src/drv/dataflash.c **** //mtE
+ 459:src/drv/dataflash.c **** 
+ 460:src/drv/dataflash.c **** /*****************************************************************************
+ 461:src/drv/dataflash.c **** *
+ 462:src/drv/dataflash.c **** *	Function name : Buffer_To_Page
+ 463:src/drv/dataflash.c **** *
+ 464:src/drv/dataflash.c **** *	Returns :		None
+ 465:src/drv/dataflash.c **** *
+ 466:src/drv/dataflash.c **** *	Parameters :	BufferAdr	->	Decides usage of either buffer 1 or 2
+ 467:src/drv/dataflash.c **** *					PageAdr		->	Address of flash page to be programmed
+ 468:src/drv/dataflash.c **** *
+ 469:src/drv/dataflash.c **** *	Purpose :		Transfers a page from dataflash SRAM buffer to flash
+ 470:src/drv/dataflash.c **** *					
+ 471:src/drv/dataflash.c **** ******************************************************************************/
+ 472:src/drv/dataflash.c **** void Buffer_To_Page (unsigned char BufferNo, unsigned int PageAdr)
+ 473:src/drv/dataflash.c **** {
+ 644               		.loc 1 473 0
+ 645               		.cfi_startproc
+ 646               	.LVL71:
+ 647 0000 CF93      		push r28
+ 648               	.LCFI24:
+ 649               		.cfi_def_cfa_offset 3
+ 650               		.cfi_offset 28, -2
+ 651 0002 DF93      		push r29
+ 652               	.LCFI25:
+ 653               		.cfi_def_cfa_offset 4
+ 654               		.cfi_offset 29, -3
+ 655               	/* prologue: function */
+ 656               	/* frame size = 0 */
+ 657               	/* stack size = 2 */
+ 658               	.L__stack_usage = 2
+ 659 0004 EB01      		movw r28,r22
+ 474:src/drv/dataflash.c **** 	DF_CS_inactive;												//make sure to toggle CS signal in order
+ 660               		.loc 1 474 0
+ 661 0006 289A      		sbi 0x5,0
+ 475:src/drv/dataflash.c **** 	DF_CS_active;												//to reset dataflash command decoder
+ 662               		.loc 1 475 0
+ 663 0008 2898      		cbi 0x5,0
+ 476:src/drv/dataflash.c **** 		
+ 477:src/drv/dataflash.c **** 	if (1 == BufferNo)											//program flash page from buffer 1
+ 664               		.loc 1 477 0
+ 665 000a 8130      		cpi r24,lo8(1)
+ 666 000c 01F4      		brne .L28
+ 478:src/drv/dataflash.c **** 	{
+ 479:src/drv/dataflash.c **** 		DF_SPI_RW(Buf1ToFlashWE);								//buffer 1 to flash with erase op-code
+ 667               		.loc 1 479 0
+ 668 000e 83E8      		ldi r24,lo8(-125)
+ 669               	.LVL72:
+ 670 0010 0E94 0000 		call DF_SPI_RW
+ 671               	.LVL73:
+ 480:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(PageAdr >> (16 - PageBits)));	//upper part of page address
+ 672               		.loc 1 480 0
+ 673 0014 2091 0000 		lds r18,PageBits
+ 674 0018 80E1      		ldi r24,lo8(16)
+ 675 001a 90E0      		ldi r25,0
+ 676 001c 821B      		sub r24,r18
+ 677 001e 9109      		sbc r25,__zero_reg__
+ 678 0020 9E01      		movw r18,r28
+ 679 0022 00C0      		rjmp 2f
+ 680               		1:
+ 681 0024 3695      		lsr r19
+ 682 0026 2795      		ror r18
+ 683               		2:
+ 684 0028 8A95      		dec r24
+ 685 002a 02F4      		brpl 1b
+ 686 002c C901      		movw r24,r18
+ 687 002e 0E94 0000 		call DF_SPI_RW
+ 688               	.LVL74:
+ 481:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(PageAdr << (PageBits - 8)));	//lower part of page address
+ 689               		.loc 1 481 0
+ 690 0032 8091 0000 		lds r24,PageBits
+ 691 0036 8850      		subi r24,lo8(-(-8))
+ 692 0038 3C2F      		mov r19,r28
+ 693 003a 00C0      		rjmp 2f
+ 694               		1:
+ 695 003c 330F      		lsl r19
+ 696               		2:
+ 697 003e 8A95      		dec r24
+ 698 0040 02F4      		brpl 1b
+ 699 0042 832F      		mov r24,r19
+ 700 0044 0E94 0000 		call DF_SPI_RW
+ 701               	.LVL75:
+ 482:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);										//don't cares
+ 702               		.loc 1 482 0
+ 703 0048 80E0      		ldi r24,0
+ 704 004a 0E94 0000 		call DF_SPI_RW
+ 705               	.LVL76:
+ 706               	.L28:
+ 483:src/drv/dataflash.c **** 	}
+ 484:src/drv/dataflash.c **** 
+ 485:src/drv/dataflash.c **** #ifdef USE_BUFFER2
+ 486:src/drv/dataflash.c **** 	else	
+ 487:src/drv/dataflash.c **** 	if (2 == BufferNo)											//program flash page from buffer 2
+ 488:src/drv/dataflash.c **** 	{
+ 489:src/drv/dataflash.c **** 		DF_SPI_RW(Buf2ToFlashWE);								//buffer 2 to flash with erase op-code
+ 490:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(PageAdr >> (16 - PageBits)));	//upper part of page address
+ 491:src/drv/dataflash.c **** 		DF_SPI_RW((unsigned char)(PageAdr << (PageBits - 8)));	//lower part of page address
+ 492:src/drv/dataflash.c **** 		DF_SPI_RW(0x00);										//don't cares
+ 493:src/drv/dataflash.c **** 	}
+ 494:src/drv/dataflash.c **** #endif
+ 495:src/drv/dataflash.c **** 	
+ 496:src/drv/dataflash.c **** 	DF_CS_inactive;												//initiate flash page programming
+ 707               		.loc 1 496 0
+ 708 004e 289A      		sbi 0x5,0
+ 497:src/drv/dataflash.c **** 	DF_CS_active;												
+ 709               		.loc 1 497 0
+ 710 0050 2898      		cbi 0x5,0
+ 711               	.L29:
+ 498:src/drv/dataflash.c **** 	
+ 499:src/drv/dataflash.c **** 	while(!(Read_DF_status() & 0x80));							//monitor the status register, wait until busy-flag is hi
+ 712               		.loc 1 499 0 discriminator 1
+ 713 0052 0E94 0000 		call Read_DF_status
+ 714               	.LVL77:
+ 715 0056 87FF      		sbrs r24,7
+ 716 0058 00C0      		rjmp .L29
+ 717               	/* epilogue start */
+ 500:src/drv/dataflash.c **** }
+ 718               		.loc 1 500 0
+ 719 005a DF91      		pop r29
+ 720 005c CF91      		pop r28
+ 721               	.LVL78:
+ 722 005e 0895      		ret
+ 723               		.cfi_endproc
+ 724               	.LFE10:
+ 726               		.section	.text.Cont_Flash_Read_Enable,"ax",@progbits
+ 727               	.global	Cont_Flash_Read_Enable
+ 729               	Cont_Flash_Read_Enable:
+ 730               	.LFB11:
+ 501:src/drv/dataflash.c **** 
+ 502:src/drv/dataflash.c **** 
+ 503:src/drv/dataflash.c **** /*****************************************************************************
+ 504:src/drv/dataflash.c **** *
+ 505:src/drv/dataflash.c **** *	Function name : Cont_Flash_Read_Enable
+ 506:src/drv/dataflash.c **** *
+ 507:src/drv/dataflash.c **** *	Returns :		None
+ 508:src/drv/dataflash.c **** *
+ 509:src/drv/dataflash.c **** *	Parameters :	PageAdr		->	Address of flash page where cont.read starts from
+ 510:src/drv/dataflash.c **** *					IntPageAdr	->	Internal page address where cont.read starts from
+ 511:src/drv/dataflash.c **** *
+ 512:src/drv/dataflash.c **** *	Purpose :		Initiates a continuous read from a location in the DataFlash
+ 513:src/drv/dataflash.c **** *
+ 514:src/drv/dataflash.c **** ******************************************************************************/
+ 515:src/drv/dataflash.c **** void Cont_Flash_Read_Enable (unsigned int PageAdr, unsigned int IntPageAdr)
+ 516:src/drv/dataflash.c **** {
+ 731               		.loc 1 516 0
+ 732               		.cfi_startproc
+ 733               	.LVL79:
+ 734 0000 0F93      		push r16
+ 735               	.LCFI26:
+ 736               		.cfi_def_cfa_offset 3
+ 737               		.cfi_offset 16, -2
+ 738 0002 1F93      		push r17
+ 739               	.LCFI27:
+ 740               		.cfi_def_cfa_offset 4
+ 741               		.cfi_offset 17, -3
+ 742 0004 CF93      		push r28
+ 743               	.LCFI28:
+ 744               		.cfi_def_cfa_offset 5
+ 745               		.cfi_offset 28, -4
+ 746 0006 DF93      		push r29
+ 747               	.LCFI29:
+ 748               		.cfi_def_cfa_offset 6
+ 749               		.cfi_offset 29, -5
+ 750               	/* prologue: function */
+ 751               	/* frame size = 0 */
+ 752               	/* stack size = 4 */
+ 753               	.L__stack_usage = 4
+ 754 0008 EC01      		movw r28,r24
+ 755 000a 8B01      		movw r16,r22
+ 517:src/drv/dataflash.c **** 	DF_CS_inactive;																//make sure to toggle CS signal in order
+ 756               		.loc 1 517 0
+ 757 000c 289A      		sbi 0x5,0
+ 518:src/drv/dataflash.c **** 	DF_CS_active;																//to reset dataflash command decoder
+ 758               		.loc 1 518 0
+ 759 000e 2898      		cbi 0x5,0
+ 519:src/drv/dataflash.c **** 	
+ 520:src/drv/dataflash.c **** 	DF_SPI_RW(ContArrayRead);													//Continuous Array Read op-code
+ 760               		.loc 1 520 0
+ 761 0010 88E6      		ldi r24,lo8(104)
+ 762               	.LVL80:
+ 763 0012 0E94 0000 		call DF_SPI_RW
+ 764               	.LVL81:
+ 521:src/drv/dataflash.c **** 	DF_SPI_RW((unsigned char)(PageAdr >> (16 - PageBits)));						//upper part of page address
+ 765               		.loc 1 521 0
+ 766 0016 8091 0000 		lds r24,PageBits
+ 767 001a 20E1      		ldi r18,lo8(16)
+ 768 001c 30E0      		ldi r19,0
+ 769 001e 281B      		sub r18,r24
+ 770 0020 3109      		sbc r19,__zero_reg__
+ 771 0022 CE01      		movw r24,r28
+ 772 0024 00C0      		rjmp 2f
+ 773               		1:
+ 774 0026 9695      		lsr r25
+ 775 0028 8795      		ror r24
+ 776               		2:
+ 777 002a 2A95      		dec r18
+ 778 002c 02F4      		brpl 1b
+ 779 002e 0E94 0000 		call DF_SPI_RW
+ 780               	.LVL82:
+ 522:src/drv/dataflash.c **** 	DF_SPI_RW((unsigned char)((PageAdr << (PageBits - 8))+ (IntPageAdr>>8)));	//lower part of page add
+ 781               		.loc 1 522 0
+ 782 0032 9091 0000 		lds r25,PageBits
+ 783 0036 9850      		subi r25,lo8(-(-8))
+ 784 0038 9E01      		movw r18,r28
+ 785 003a 00C0      		rjmp 2f
+ 786               		1:
+ 787 003c 220F      		lsl r18
+ 788 003e 331F      		rol r19
+ 789               		2:
+ 790 0040 9A95      		dec r25
+ 791 0042 02F4      		brpl 1b
+ 792 0044 C901      		movw r24,r18
+ 793 0046 810F      		add r24,r17
+ 794 0048 0E94 0000 		call DF_SPI_RW
+ 795               	.LVL83:
+ 523:src/drv/dataflash.c **** 	DF_SPI_RW((unsigned char)(IntPageAdr));										//LSB byte of internal page address
+ 796               		.loc 1 523 0
+ 797 004c 802F      		mov r24,r16
+ 798 004e 0E94 0000 		call DF_SPI_RW
+ 799               	.LVL84:
+ 524:src/drv/dataflash.c **** 	DF_SPI_RW(0x00);															//perform 4 dummy writes
+ 800               		.loc 1 524 0
+ 801 0052 80E0      		ldi r24,0
+ 802 0054 0E94 0000 		call DF_SPI_RW
+ 803               	.LVL85:
+ 525:src/drv/dataflash.c **** 	DF_SPI_RW(0x00);															//in order to intiate DataFlash
+ 804               		.loc 1 525 0
+ 805 0058 80E0      		ldi r24,0
+ 806 005a 0E94 0000 		call DF_SPI_RW
+ 807               	.LVL86:
+ 526:src/drv/dataflash.c **** 	DF_SPI_RW(0x00);															//address pointers
+ 808               		.loc 1 526 0
+ 809 005e 80E0      		ldi r24,0
+ 810 0060 0E94 0000 		call DF_SPI_RW
+ 811               	.LVL87:
+ 527:src/drv/dataflash.c **** 	DF_SPI_RW(0x00);
+ 812               		.loc 1 527 0
+ 813 0064 80E0      		ldi r24,0
+ 814               	/* epilogue start */
+ 528:src/drv/dataflash.c **** }
+ 815               		.loc 1 528 0
+ 816 0066 DF91      		pop r29
+ 817 0068 CF91      		pop r28
+ 818               	.LVL88:
+ 819 006a 1F91      		pop r17
+ 820 006c 0F91      		pop r16
+ 821               	.LVL89:
+ 527:src/drv/dataflash.c **** 	DF_SPI_RW(0x00);
+ 822               		.loc 1 527 0
+ 823 006e 0C94 0000 		jmp DF_SPI_RW
+ 824               	.LVL90:
+ 825               		.cfi_endproc
+ 826               	.LFE11:
+ 828               	.global	PageSize
+ 829               		.section	.bss.PageSize,"aw",@nobits
+ 832               	PageSize:
+ 833 0000 0000      		.zero	2
+ 834               	.global	PageBits
+ 835               		.section	.bss.PageBits,"aw",@nobits
+ 838               	PageBits:
+ 839 0000 00        		.zero	1
+ 840               	.global	DF_pagesize
+ 841               		.section	.progmem.data.DF_pagesize,"a",@progbits
+ 844               	DF_pagesize:
+ 845 0000 0801      		.word	264
+ 846 0002 0801      		.word	264
+ 847 0004 0801      		.word	264
+ 848 0006 0801      		.word	264
+ 849 0008 0801      		.word	264
+ 850 000a 1002      		.word	528
+ 851 000c 1002      		.word	528
+ 852 000e 2004      		.word	1056
+ 853               	.global	DF_pagebits
+ 854               		.section	.progmem.data.DF_pagebits,"a",@progbits
+ 857               	DF_pagebits:
+ 858 0000 09        		.byte	9
+ 859 0001 09        		.byte	9
+ 860 0002 09        		.byte	9
+ 861 0003 09        		.byte	9
+ 862 0004 09        		.byte	9
+ 863 0005 0A        		.byte	10
+ 864 0006 0A        		.byte	10
+ 865 0007 0B        		.byte	11
+ 866               		.text
+ 867               	.Letext0:
+ 868               		.file 2 "/usr/lib/avr/include/stdint.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 dataflash.c
+     /tmp/ccK65tXe.s:2      *ABS*:000000000000003e __SP_H__
+     /tmp/ccK65tXe.s:3      *ABS*:000000000000003d __SP_L__
+     /tmp/ccK65tXe.s:4      *ABS*:000000000000003f __SREG__
+     /tmp/ccK65tXe.s:5      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/ccK65tXe.s:6      *ABS*:0000000000000001 __zero_reg__
+     /tmp/ccK65tXe.s:13     .text.DF_SPI_init:0000000000000000 DF_SPI_init
+     /tmp/ccK65tXe.s:43     .text.DF_SPI_RW:0000000000000000 DF_SPI_RW
+     /tmp/ccK65tXe.s:70     .text.Read_DF_status:0000000000000000 Read_DF_status
+     /tmp/ccK65tXe.s:857    .progmem.data.DF_pagebits:0000000000000000 DF_pagebits
+     /tmp/ccK65tXe.s:838    .bss.PageBits:0000000000000000 PageBits
+     /tmp/ccK65tXe.s:844    .progmem.data.DF_pagesize:0000000000000000 DF_pagesize
+     /tmp/ccK65tXe.s:832    .bss.PageSize:0000000000000000 PageSize
+     /tmp/ccK65tXe.s:145    .text.Page_To_Buffer:0000000000000000 Page_To_Buffer
+     /tmp/ccK65tXe.s:232    .text.Buffer_Read_Byte:0000000000000000 Buffer_Read_Byte
+     /tmp/ccK65tXe.s:303    .text.Buffer_Read_Str:0000000000000000 Buffer_Read_Str
+     /tmp/ccK65tXe.s:401    .text.Buffer_Write_Enable:0000000000000000 Buffer_Write_Enable
+     /tmp/ccK65tXe.s:461    .text.Buffer_Write_Byte:0000000000000000 Buffer_Write_Byte
+     /tmp/ccK65tXe.s:549    .text.Buffer_Write_Str:0000000000000000 Buffer_Write_Str
+     /tmp/ccK65tXe.s:642    .text.Buffer_To_Page:0000000000000000 Buffer_To_Page
+     /tmp/ccK65tXe.s:729    .text.Cont_Flash_Read_Enable:0000000000000000 Cont_Flash_Read_Enable
+
+UNDEFINED SYMBOLS
+__do_clear_bss
