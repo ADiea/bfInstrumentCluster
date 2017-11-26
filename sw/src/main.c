@@ -104,9 +104,9 @@ __attribute__ ((OS_main)) int main(void)
     last_buttons='\0';  // mt
 
     // Initial state variables
-    state = ST_AVRBF;
-    nextstate = ST_AVRBF;
-    statetext = MT_AVRBF;
+    state = ST_TIME;
+    nextstate = ST_TIME;
+    statetext = MT_TIME;
     pStateFunc = NULL;
 
 
@@ -589,50 +589,6 @@ void Delay(unsigned int millisec)
 		}
 	}
 }
-
-
-
-/*****************************************************************************
-*
-*   Function name : Revision
-*
-*   Returns :       None
-*
-*   Parameters :    char input
-*
-*   Purpose :       Display the software revision
-*
-*****************************************************************************/
-char Revision(char input)
-{
-    static char enter = 1;
-    
-    if(enter)
-    {
-        enter = 0;
-        
-        LCD_putc(0, 'R');
-        LCD_putc(1, 'E');
-        LCD_putc(2, 'V');
-        // mtA 
-        // LCD_putc(3, ' ');
-        LCD_putc(3, (SWHIGH + 0x30)); // LCD_putc(4, (SWHIGH + 0x30));       //SWHIGH/LOW are defined in "main.h"
-        LCD_putc(4, (SWLOW + 0x30)); // LCD_putc(5, (SWLOW + 0x30));
-        LCD_putc(5, (SWLOWLOW + 0x30)); // LCD_putc(5, (SWLOW + 0x30));
-        LCD_putc(6, '\0');
-        // mtE
-        
-        LCD_UpdateRequired(TRUE, 0);          
-    }
-    else if (input == KEY_PREV)
-    {
-        enter = 1;
-        return ST_AVRBF;
-    }
-    
-    return ST_AVRBF_REV;
-}
-
 
 
 

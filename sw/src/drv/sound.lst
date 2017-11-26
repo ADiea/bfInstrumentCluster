@@ -1,0 +1,1517 @@
+   1               		.file	"sound.c"
+   2               	__SREG__ = 0x3f
+   3               	__SP_H__ = 0x3e
+   4               	__SP_L__ = 0x3d
+   5               	__CCP__  = 0x34
+   6               	__tmp_reg__ = 0
+   7               	__zero_reg__ = 1
+  15               	.Ltext0:
+  16               		.section	.text.PlayClick,"ax",@progbits
+  17               	.global	PlayClick
+  19               	PlayClick:
+  20               	.LFB7:
+  21               	.LSM0:
+  22 0000 1F93      		push r17
+  23               	/* prologue: function */
+  24               	/* frame size = 0 */
+  25               	.LSM1:
+  26 0002 10E0      		ldi r17,lo8(0)
+  27               	.LVL0:
+  28               	.L2:
+  29               	.LSM2:
+  30 0004 2D98      		cbi 37-32,5
+  31               	.LSM3:
+  32 0006 81E0      		ldi r24,lo8(1)
+  33 0008 90E0      		ldi r25,hi8(1)
+  34 000a 0E94 0000 		call Delay
+  35               	.LSM4:
+  36 000e 2D9A      		sbi 37-32,5
+  37               	.LSM5:
+  38 0010 81E0      		ldi r24,lo8(1)
+  39 0012 90E0      		ldi r25,hi8(1)
+  40 0014 0E94 0000 		call Delay
+  41               	.LSM6:
+  42 0018 1F5F      		subi r17,lo8(-(1))
+  43 001a 1A30      		cpi r17,lo8(10)
+  44 001c 01F4      		brne .L2
+  45               	/* epilogue start */
+  46               	.LSM7:
+  47 001e 1F91      		pop r17
+  48               	.LVL1:
+  49 0020 0895      		ret
+  50               	.LFE7:
+  52               		.section	.text.Play_Tune,"ax",@progbits
+  53               	.global	Play_Tune
+  55               	Play_Tune:
+  56               	.LFB6:
+  57               	.LSM8:
+  58               	/* prologue: function */
+  59               	/* frame size = 0 */
+  60               	.LSM9:
+  61 0000 8091 0000 		lds r24,Tone
+  62 0004 8823      		tst r24
+  63 0006 01F4      		brne .L6
+  64               	.LSM10:
+  65 0008 1092 0000 		sts Duration,__zero_reg__
+  66               	.LBB2:
+  67               	.LSM11:
+  68 000c E091 0000 		lds r30,pSong
+  69 0010 F091 0000 		lds r31,(pSong)+1
+  70               	.LVL2:
+  71               	/* #APP */
+  72               	 ;  406 "src/drv/sound.c" 1
+  73 0014 8591      		lpm r24, Z+
+  74 0016 9491      		lpm r25, Z
+  75               		
+  76               	 ;  0 "" 2
+  77               	.LVL3:
+  78               	/* #NOAPP */
+  79               	.LBE2:
+  80 0018 8093 0000 		sts Tempo,r24
+  81               	.LSM12:
+  82 001c 81E0      		ldi r24,lo8(1)
+  83               	.LVL4:
+  84 001e 8093 0000 		sts Tone,r24
+  85               	.L6:
+  86               	.LSM13:
+  87 0022 8091 0000 		lds r24,Tempo
+  88 0026 8823      		tst r24
+  89 0028 01F0      		breq .+2
+  90 002a 00C0      		rjmp .L7
+  91               	.LSM14:
+  92 002c 8091 0000 		lds r24,Duration
+  93 0030 8823      		tst r24
+  94 0032 01F0      		breq .L8
+  95               	.LSM15:
+  96 0034 8150      		subi r24,lo8(-(-1))
+  97 0036 8093 0000 		sts Duration,r24
+  98 003a 00C0      		rjmp .L9
+  99               	.L8:
+ 100               	.LBB3:
+ 101               	.LSM16:
+ 102 003c 2091 0000 		lds r18,pSong
+ 103 0040 3091 0000 		lds r19,(pSong)+1
+ 104 0044 8091 0000 		lds r24,Tone
+ 105 0048 E82F      		mov r30,r24
+ 106               	.LVL5:
+ 107 004a F0E0      		ldi r31,lo8(0)
+ 108 004c EE0F      		lsl r30
+ 109 004e FF1F      		rol r31
+ 110 0050 E20F      		add r30,r18
+ 111 0052 F31F      		adc r31,r19
+ 112               	/* #APP */
+ 113               	 ;  417 "src/drv/sound.c" 1
+ 114 0054 6591      		lpm r22, Z+
+ 115 0056 7491      		lpm r23, Z
+ 116               		
+ 117               	 ;  0 "" 2
+ 118               	.LVL6:
+ 119               	/* #NOAPP */
+ 120 0058 482F      		mov r20,r24
+ 121 005a 4F5F      		subi r20,lo8(-(1))
+ 122               	.LBE3:
+ 123 005c 6115      		cp r22,__zero_reg__
+ 124 005e 7105      		cpc r23,__zero_reg__
+ 125 0060 01F0      		breq .L10
+ 126               	.LSM17:
+ 127 0062 80E2      		ldi r24,lo8(32)
+ 128 0064 90E0      		ldi r25,hi8(32)
+ 129 0066 0E94 0000 		call __udivmodhi4
+ 130               	.LVL7:
+ 131 006a 6093 0000 		sts Duration,r22
+ 132               	.LBB4:
+ 133               	.LSM18:
+ 134 006e E42F      		mov r30,r20
+ 135               	.LVL8:
+ 136 0070 F0E0      		ldi r31,lo8(0)
+ 137               	.LVL9:
+ 138 0072 EE0F      		lsl r30
+ 139 0074 FF1F      		rol r31
+ 140               	.LVL10:
+ 141 0076 E20F      		add r30,r18
+ 142 0078 F31F      		adc r31,r19
+ 143               	/* #APP */
+ 144               	 ;  424 "src/drv/sound.c" 1
+ 145 007a 2591      		lpm r18, Z+
+ 146 007c 3491      		lpm r19, Z
+ 147               		
+ 148               	 ;  0 "" 2
+ 149               	.LVL11:
+ 150               	/* #NOAPP */
+ 151               	.LBE4:
+ 152               	.LSM19:
+ 153 007e 2130      		cpi r18,1
+ 154 0080 3105      		cpc r19,__zero_reg__
+ 155 0082 01F4      		brne .L11
+ 156               	.LSM20:
+ 157 0084 8091 8100 		lds r24,129
+ 158 0088 8E7F      		andi r24,lo8(-2)
+ 159 008a 00C0      		rjmp .L16
+ 160               	.L11:
+ 161               	.LSM21:
+ 162 008c 8091 8100 		lds r24,129
+ 163 0090 8160      		ori r24,lo8(1)
+ 164               	.L16:
+ 165 0092 8093 8100 		sts 129,r24
+ 166               	.LSM22:
+ 167               	/* #APP */
+ 168               	 ;  432 "src/drv/sound.c" 1
+ 169 0096 F894      		cli
+ 170               	 ;  0 "" 2
+ 171               	.LSM23:
+ 172               	/* #NOAPP */
+ 173 0098 1092 8500 		sts 133,__zero_reg__
+ 174               	.LSM24:
+ 175 009c 1092 8400 		sts 132,__zero_reg__
+ 176               	.LSM25:
+ 177 00a0 832F      		mov r24,r19
+ 178 00a2 9927      		clr r25
+ 179 00a4 87FD      		sbrc r24,7
+ 180 00a6 9A95      		dec r25
+ 181 00a8 8093 8700 		sts 135,r24
+ 182               	.LSM26:
+ 183 00ac 2093 8600 		sts 134,r18
+ 184               	.LSM27:
+ 185               	/* #APP */
+ 186               	 ;  447 "src/drv/sound.c" 1
+ 187 00b0 7894      		sei
+ 188               	 ;  0 "" 2
+ 189               	.LSM28:
+ 190               	/* #NOAPP */
+ 191 00b2 4F5F      		subi r20,lo8(-(1))
+ 192 00b4 4093 0000 		sts Tone,r20
+ 193 00b8 00C0      		rjmp .L9
+ 194               	.LVL12:
+ 195               	.L10:
+ 196               	.LBB5:
+ 197               	.LSM29:
+ 198 00ba E42F      		mov r30,r20
+ 199               	.LVL13:
+ 200 00bc F0E0      		ldi r31,lo8(0)
+ 201               	.LVL14:
+ 202 00be EE0F      		lsl r30
+ 203 00c0 FF1F      		rol r31
+ 204               	.LVL15:
+ 205 00c2 E20F      		add r30,r18
+ 206 00c4 F31F      		adc r31,r19
+ 207               	/* #APP */
+ 208               	 ;  456 "src/drv/sound.c" 1
+ 209 00c6 8591      		lpm r24, Z+
+ 210 00c8 9491      		lpm r25, Z
+ 211               		
+ 212               	 ;  0 "" 2
+ 213               	.LVL16:
+ 214               	/* #NOAPP */
+ 215               	.LBE5:
+ 216               	.LSM30:
+ 217 00ca 8823      		tst r24
+ 218 00cc 01F0      		breq .L13
+ 219               	.LSM31:
+ 220 00ce 81E0      		ldi r24,lo8(1)
+ 221               	.LVL17:
+ 222 00d0 8093 0000 		sts Tone,r24
+ 223 00d4 00C0      		rjmp .L9
+ 224               	.LVL18:
+ 225               	.L13:
+ 226               	.LSM32:
+ 227 00d6 1092 0000 		sts Tone,__zero_reg__
+ 228               	.LSM33:
+ 229 00da 1092 0000 		sts gPlaying,__zero_reg__
+ 230               	.LSM34:
+ 231 00de 8091 8100 		lds r24,129
+ 232               	.LVL19:
+ 233 00e2 8E7F      		andi r24,lo8(-2)
+ 234 00e4 8093 8100 		sts 129,r24
+ 235               	.LSM35:
+ 236 00e8 80E0      		ldi r24,lo8(gs(Play_Tune))
+ 237 00ea 90E0      		ldi r25,hi8(gs(Play_Tune))
+ 238 00ec 0E94 0000 		call Timer0_RemoveCallbackFunction
+ 239               	.LVL20:
+ 240               	.LSM36:
+ 241 00f0 1092 8000 		sts 128,__zero_reg__
+ 242               	.LSM37:
+ 243 00f4 1092 8100 		sts 129,__zero_reg__
+ 244               	.LSM38:
+ 245 00f8 2D9A      		sbi 37-32,5
+ 246               	.LVL21:
+ 247               	.L9:
+ 248               	.LBB6:
+ 249               	.LSM39:
+ 250 00fa E091 0000 		lds r30,pSong
+ 251 00fe F091 0000 		lds r31,(pSong)+1
+ 252               	.LVL22:
+ 253               	/* #APP */
+ 254               	 ;  475 "src/drv/sound.c" 1
+ 255 0102 8591      		lpm r24, Z+
+ 256 0104 9491      		lpm r25, Z
+ 257               		
+ 258               	 ;  0 "" 2
+ 259               	.LVL23:
+ 260               	/* #NOAPP */
+ 261 0106 00C0      		rjmp .L17
+ 262               	.LVL24:
+ 263               	.L7:
+ 264               	.LBE6:
+ 265               	.LSM40:
+ 266 0108 8150      		subi r24,lo8(-(-1))
+ 267               	.LVL25:
+ 268               	.L17:
+ 269 010a 8093 0000 		sts Tempo,r24
+ 270               	.LVL26:
+ 271 010e 0895      		ret
+ 272               	.LFE6:
+ 274               		.section	.text.showSongName,"ax",@progbits
+ 276               	showSongName:
+ 277               	.LFB3:
+ 278               	.LSM41:
+ 279               	.LVL27:
+ 280               	/* prologue: function */
+ 281               	/* frame size = 0 */
+ 282               	.LBB7:
+ 283               	.LSM42:
+ 284 0000 E82F      		mov r30,r24
+ 285               	.LVL28:
+ 286 0002 F0E0      		ldi r31,lo8(0)
+ 287               	.LVL29:
+ 288 0004 EE0F      		lsl r30
+ 289 0006 FF1F      		rol r31
+ 290               	.LVL30:
+ 291 0008 E050      		subi r30,lo8(-(TEXT_SONG_TBL))
+ 292 000a F040      		sbci r31,hi8(-(TEXT_SONG_TBL))
+ 293               	.LBE7:
+ 294               	/* #APP */
+ 295               	 ;  227 "src/drv/sound.c" 1
+ 296 000c 8591      		lpm r24, Z+
+ 297 000e 9491      		lpm r25, Z
+ 298               		
+ 299               	 ;  0 "" 2
+ 300               	.LVL31:
+ 301               	/* #NOAPP */
+ 302 0010 61E0      		ldi r22,lo8(1)
+ 303 0012 0E94 0000 		call LCD_puts_f
+ 304               	.LVL32:
+ 305               	/* epilogue start */
+ 306               	.LSM43:
+ 307 0016 0895      		ret
+ 308               	.LFE3:
+ 310               		.section	.text.SelectSound,"ax",@progbits
+ 311               	.global	SelectSound
+ 313               	SelectSound:
+ 314               	.LFB4:
+ 315               	.LSM44:
+ 316               	.LVL33:
+ 317 0000 1F93      		push r17
+ 318               	/* prologue: function */
+ 319               	/* frame size = 0 */
+ 320 0002 182F      		mov r17,r24
+ 321               	.LSM45:
+ 322 0004 8091 0000 		lds r24,enter.1447
+ 323               	.LVL34:
+ 324 0008 8823      		tst r24
+ 325 000a 01F0      		breq .L21
+ 326               	.LSM46:
+ 327 000c 1092 0000 		sts enter.1447,__zero_reg__
+ 328               	.LSM47:
+ 329 0010 8091 0000 		lds r24,song.1448
+ 330 0014 0E94 0000 		call showSongName
+ 331               	.LBB8:
+ 332               	.LSM48:
+ 333 0018 8091 0000 		lds r24,song.1448
+ 334 001c E82F      		mov r30,r24
+ 335               	.LVL35:
+ 336 001e F0E0      		ldi r31,lo8(0)
+ 337               	.LVL36:
+ 338 0020 EE0F      		lsl r30
+ 339 0022 FF1F      		rol r31
+ 340               	.LVL37:
+ 341 0024 E050      		subi r30,lo8(-(Songs))
+ 342 0026 F040      		sbci r31,hi8(-(Songs))
+ 343               	/* #APP */
+ 344               	 ;  245 "src/drv/sound.c" 1
+ 345 0028 8591      		lpm r24, Z+
+ 346 002a 9491      		lpm r25, Z
+ 347               		
+ 348               	 ;  0 "" 2
+ 349               	.LVL38:
+ 350               	/* #NOAPP */
+ 351               	.LBE8:
+ 352 002c 9093 0000 		sts (pSong)+1,r25
+ 353 0030 8093 0000 		sts pSong,r24
+ 354               	.L21:
+ 355               	.LSM49:
+ 356 0034 1430      		cpi r17,lo8(4)
+ 357 0036 01F4      		brne .L22
+ 358               	.LSM50:
+ 359 0038 8091 0000 		lds r24,song.1448
+ 360               	.LVL39:
+ 361 003c 8823      		tst r24
+ 362 003e 01F4      		brne .L23
+ 363 0040 21E0      		ldi r18,lo8(1)
+ 364               	.LVL40:
+ 365               	.L25:
+ 366               	.LBB9:
+ 367               	.LSM51:
+ 368 0042 E22F      		mov r30,r18
+ 369               	.LVL41:
+ 370 0044 F0E0      		ldi r31,lo8(0)
+ 371               	.LVL42:
+ 372 0046 EE0F      		lsl r30
+ 373 0048 FF1F      		rol r31
+ 374               	.LVL43:
+ 375 004a E050      		subi r30,lo8(-(TEXT_SONG_TBL))
+ 376 004c F040      		sbci r31,hi8(-(TEXT_SONG_TBL))
+ 377               	/* #APP */
+ 378               	 ;  253 "src/drv/sound.c" 1
+ 379 004e 8591      		lpm r24, Z+
+ 380 0050 9491      		lpm r25, Z
+ 381               		
+ 382               	 ;  0 "" 2
+ 383               	.LVL44:
+ 384               	/* #NOAPP */
+ 385 0052 322F      		mov r19,r18
+ 386 0054 3F5F      		subi r19,lo8(-(1))
+ 387               	.LBE9:
+ 388 0056 892B      		or r24,r25
+ 389 0058 01F0      		breq .L24
+ 390 005a 232F      		mov r18,r19
+ 391 005c 00C0      		rjmp .L25
+ 392               	.L24:
+ 393               	.LSM52:
+ 394 005e 2150      		subi r18,lo8(-(-1))
+ 395 0060 2093 0000 		sts song.1448,r18
+ 396 0064 00C0      		rjmp .L26
+ 397               	.LVL45:
+ 398               	.L23:
+ 399               	.LSM53:
+ 400 0066 8150      		subi r24,lo8(-(-1))
+ 401 0068 8093 0000 		sts song.1448,r24
+ 402               	.LVL46:
+ 403               	.L26:
+ 404               	.LSM54:
+ 405 006c 8091 0000 		lds r24,song.1448
+ 406               	.LVL47:
+ 407 0070 0E94 0000 		call showSongName
+ 408               	.LVL48:
+ 409               	.LBB10:
+ 410               	.LSM55:
+ 411 0074 8091 0000 		lds r24,song.1448
+ 412 0078 E82F      		mov r30,r24
+ 413               	.LVL49:
+ 414 007a F0E0      		ldi r31,lo8(0)
+ 415               	.LVL50:
+ 416 007c EE0F      		lsl r30
+ 417 007e FF1F      		rol r31
+ 418               	.LVL51:
+ 419 0080 E050      		subi r30,lo8(-(Songs))
+ 420 0082 F040      		sbci r31,hi8(-(Songs))
+ 421               	/* #APP */
+ 422               	 ;  264 "src/drv/sound.c" 1
+ 423 0084 8591      		lpm r24, Z+
+ 424 0086 9491      		lpm r25, Z
+ 425               		
+ 426               	 ;  0 "" 2
+ 427               	.LVL52:
+ 428               	/* #NOAPP */
+ 429 0088 00C0      		rjmp .L34
+ 430               	.LVL53:
+ 431               	.L22:
+ 432               	.LBE10:
+ 433               	.LSM56:
+ 434 008a 1530      		cpi r17,lo8(5)
+ 435 008c 01F4      		brne .L28
+ 436               	.LSM57:
+ 437 008e 8091 0000 		lds r24,song.1448
+ 438               	.LVL54:
+ 439 0092 8F5F      		subi r24,lo8(-(1))
+ 440 0094 8093 0000 		sts song.1448,r24
+ 441               	.LBB11:
+ 442               	.LSM58:
+ 443 0098 E82F      		mov r30,r24
+ 444               	.LVL55:
+ 445 009a F0E0      		ldi r31,lo8(0)
+ 446               	.LVL56:
+ 447 009c EE0F      		lsl r30
+ 448 009e FF1F      		rol r31
+ 449               	.LVL57:
+ 450 00a0 E050      		subi r30,lo8(-(TEXT_SONG_TBL))
+ 451 00a2 F040      		sbci r31,hi8(-(TEXT_SONG_TBL))
+ 452               	/* #APP */
+ 453               	 ;  271 "src/drv/sound.c" 1
+ 454 00a4 8591      		lpm r24, Z+
+ 455 00a6 9491      		lpm r25, Z
+ 456               		
+ 457               	 ;  0 "" 2
+ 458               	.LVL58:
+ 459               	/* #NOAPP */
+ 460               	.LBE11:
+ 461 00a8 892B      		or r24,r25
+ 462 00aa 01F4      		brne .L29
+ 463               	.LSM59:
+ 464 00ac 1092 0000 		sts song.1448,__zero_reg__
+ 465               	.L29:
+ 466               	.LSM60:
+ 467 00b0 8091 0000 		lds r24,song.1448
+ 468               	.LVL59:
+ 469 00b4 0E94 0000 		call showSongName
+ 470               	.LVL60:
+ 471               	.LBB12:
+ 472               	.LSM61:
+ 473 00b8 8091 0000 		lds r24,song.1448
+ 474 00bc E82F      		mov r30,r24
+ 475               	.LVL61:
+ 476 00be F0E0      		ldi r31,lo8(0)
+ 477               	.LVL62:
+ 478 00c0 EE0F      		lsl r30
+ 479 00c2 FF1F      		rol r31
+ 480               	.LVL63:
+ 481 00c4 E050      		subi r30,lo8(-(Songs))
+ 482 00c6 F040      		sbci r31,hi8(-(Songs))
+ 483               	/* #APP */
+ 484               	 ;  278 "src/drv/sound.c" 1
+ 485 00c8 8591      		lpm r24, Z+
+ 486 00ca 9491      		lpm r25, Z
+ 487               		
+ 488               	 ;  0 "" 2
+ 489               	.LVL64:
+ 490               	/* #NOAPP */
+ 491               	.L34:
+ 492               	.LBE12:
+ 493 00cc 9093 0000 		sts (pSong)+1,r25
+ 494 00d0 8093 0000 		sts pSong,r24
+ 495 00d4 00C0      		rjmp .L33
+ 496               	.LVL65:
+ 497               	.L28:
+ 498               	.LSM62:
+ 499 00d6 1130      		cpi r17,lo8(1)
+ 500 00d8 01F4      		brne .L30
+ 501               	.LSM63:
+ 502 00da 1093 0000 		sts enter.1447,r17
+ 503 00de 8BE2      		ldi r24,lo8(43)
+ 504               	.LVL66:
+ 505 00e0 00C0      		rjmp .L27
+ 506               	.LVL67:
+ 507               	.L30:
+ 508               	.LSM64:
+ 509 00e2 1330      		cpi r17,lo8(3)
+ 510 00e4 01F0      		breq .L31
+ 511               	.LVL68:
+ 512               	.L33:
+ 513 00e6 8AE2      		ldi r24,lo8(42)
+ 514               	.LVL69:
+ 515 00e8 00C0      		rjmp .L27
+ 516               	.LVL70:
+ 517               	.L31:
+ 518               	.LSM65:
+ 519 00ea 81E0      		ldi r24,lo8(1)
+ 520               	.LVL71:
+ 521 00ec 8093 0000 		sts enter.1447,r24
+ 522 00f0 88E2      		ldi r24,lo8(40)
+ 523               	.LVL72:
+ 524               	.L27:
+ 525               	/* epilogue start */
+ 526               	.LSM66:
+ 527 00f2 1F91      		pop r17
+ 528               	.LVL73:
+ 529 00f4 0895      		ret
+ 530               	.LFE4:
+ 532               		.section	.text.Sound_Init,"ax",@progbits
+ 533               	.global	Sound_Init
+ 535               	Sound_Init:
+ 536               	.LFB2:
+ 537               	.LSM67:
+ 538               	/* prologue: function */
+ 539               	/* frame size = 0 */
+ 540               	.LSM68:
+ 541 0000 80E8      		ldi r24,lo8(-128)
+ 542 0002 8093 8000 		sts 128,r24
+ 543               	.LSM69:
+ 544 0006 E1E8      		ldi r30,lo8(129)
+ 545 0008 F0E0      		ldi r31,hi8(129)
+ 546 000a 80E1      		ldi r24,lo8(16)
+ 547 000c 8083      		st Z,r24
+ 548               	.LSM70:
+ 549 000e 8081      		ld r24,Z
+ 550 0010 8160      		ori r24,lo8(1)
+ 551 0012 8083      		st Z,r24
+ 552               	.LSM71:
+ 553 0014 1092 8900 		sts 137,__zero_reg__
+ 554               	.LSM72:
+ 555 0018 8091 0000 		lds r24,Volume
+ 556 001c 8093 8800 		sts 136,r24
+ 557               	.LSM73:
+ 558 0020 80E0      		ldi r24,lo8(gs(Play_Tune))
+ 559 0022 90E0      		ldi r25,hi8(gs(Play_Tune))
+ 560 0024 0E94 0000 		call Timer0_RegisterCallbackFunction
+ 561               	/* epilogue start */
+ 562               	.LSM74:
+ 563 0028 0895      		ret
+ 564               	.LFE2:
+ 566               		.section	.text.Sound,"ax",@progbits
+ 567               	.global	Sound
+ 569               	Sound:
+ 570               	.LFB5:
+ 571               	.LSM75:
+ 572               	.LVL74:
+ 573 0000 1F93      		push r17
+ 574               	/* prologue: function */
+ 575               	/* frame size = 0 */
+ 576 0002 182F      		mov r17,r24
+ 577               	.LSM76:
+ 578 0004 8091 0000 		lds r24,enter.1482
+ 579               	.LVL75:
+ 580 0008 8823      		tst r24
+ 581 000a 01F0      		breq .L38
+ 582               	.LSM77:
+ 583 000c 1092 0000 		sts enter.1482,__zero_reg__
+ 584               	.LSM78:
+ 585 0010 1092 0000 		sts Tone,__zero_reg__
+ 586               	.LSM79:
+ 587 0014 0E94 0000 		call Sound_Init
+ 588               	.LSM80:
+ 589 0018 80E0      		ldi r24,lo8(PLAYING)
+ 590 001a 90E0      		ldi r25,hi8(PLAYING)
+ 591 001c 61E0      		ldi r22,lo8(1)
+ 592 001e 0E94 0000 		call LCD_puts_f
+ 593               	.LSM81:
+ 594 0022 81E0      		ldi r24,lo8(1)
+ 595 0024 8093 0000 		sts gPlaying,r24
+ 596 0028 00C0      		rjmp .L39
+ 597               	.L38:
+ 598               	.LSM82:
+ 599 002a 8091 0000 		lds r24,gPlaying
+ 600 002e 8823      		tst r24
+ 601 0030 01F4      		brne .L39
+ 602               	.LSM83:
+ 603 0032 80E0      		ldi r24,lo8(gs(Play_Tune))
+ 604 0034 90E0      		ldi r25,hi8(gs(Play_Tune))
+ 605 0036 0E94 0000 		call Timer0_RemoveCallbackFunction
+ 606               	.LSM84:
+ 607 003a 1092 8000 		sts 128,__zero_reg__
+ 608               	.LSM85:
+ 609 003e 1092 8100 		sts 129,__zero_reg__
+ 610 0042 00C0      		rjmp .L56
+ 611               	.L39:
+ 612               	.LSM86:
+ 613 0044 1430      		cpi r17,lo8(4)
+ 614 0046 01F4      		brne .L41
+ 615               	.LSM87:
+ 616 0048 8091 0000 		lds r24,Volume
+ 617 004c 8035      		cpi r24,lo8(80)
+ 618 004e 00F0      		brlo .L42
+ 619               	.LSM88:
+ 620 0050 80E5      		ldi r24,lo8(80)
+ 621 0052 00C0      		rjmp .L53
+ 622               	.L42:
+ 623               	.LSM89:
+ 624 0054 8B5F      		subi r24,lo8(-(5))
+ 625 0056 00C0      		rjmp .L53
+ 626               	.L41:
+ 627               	.LSM90:
+ 628 0058 1530      		cpi r17,lo8(5)
+ 629 005a 01F4      		brne .L45
+ 630               	.LSM91:
+ 631 005c 8091 0000 		lds r24,Volume
+ 632 0060 8B30      		cpi r24,lo8(11)
+ 633 0062 00F4      		brsh .L46
+ 634               	.LSM92:
+ 635 0064 86E0      		ldi r24,lo8(6)
+ 636 0066 00C0      		rjmp .L53
+ 637               	.L46:
+ 638               	.LSM93:
+ 639 0068 8550      		subi r24,lo8(-(-5))
+ 640               	.L53:
+ 641 006a 8093 0000 		sts Volume,r24
+ 642               	.LSM94:
+ 643 006e 1092 8900 		sts 137,__zero_reg__
+ 644               	.LSM95:
+ 645 0072 8091 0000 		lds r24,Volume
+ 646 0076 8093 8800 		sts 136,r24
+ 647 007a 00C0      		rjmp .L51
+ 648               	.L45:
+ 649               	.LSM96:
+ 650 007c 1130      		cpi r17,lo8(1)
+ 651 007e 01F4      		brne .L44
+ 652               	.LSM97:
+ 653 0080 8091 0000 		lds r24,gPlaying
+ 654 0084 8823      		tst r24
+ 655 0086 01F0      		breq .L48
+ 656               	.LSM98:
+ 657 0088 1092 0000 		sts gPlaying,__zero_reg__
+ 658               	.LSM99:
+ 659 008c 8091 8100 		lds r24,129
+ 660 0090 8E7F      		andi r24,lo8(-2)
+ 661 0092 8093 8100 		sts 129,r24
+ 662               	.LSM100:
+ 663 0096 80E0      		ldi r24,lo8(gs(Play_Tune))
+ 664 0098 90E0      		ldi r25,hi8(gs(Play_Tune))
+ 665 009a 0E94 0000 		call Timer0_RemoveCallbackFunction
+ 666               	.LSM101:
+ 667 009e 1092 8000 		sts 128,__zero_reg__
+ 668               	.LSM102:
+ 669 00a2 1092 8100 		sts 129,__zero_reg__
+ 670               	.LSM103:
+ 671 00a6 2D9A      		sbi 37-32,5
+ 672               	.LSM104:
+ 673 00a8 1093 0000 		sts enter.1482,r17
+ 674 00ac 00C0      		rjmp .L55
+ 675               	.L48:
+ 676               	.LSM105:
+ 677 00ae 1092 0000 		sts Duration,__zero_reg__
+ 678               	.LSM106:
+ 679 00b2 1093 0000 		sts Tone,r17
+ 680               	.LSM107:
+ 681 00b6 0E94 0000 		call Sound_Init
+ 682               	.LSM108:
+ 683 00ba 80E0      		ldi r24,lo8(PLAYING)
+ 684 00bc 90E0      		ldi r25,hi8(PLAYING)
+ 685 00be 61E0      		ldi r22,lo8(1)
+ 686 00c0 0E94 0000 		call LCD_puts_f
+ 687               	.LSM109:
+ 688 00c4 1093 0000 		sts gPlaying,r17
+ 689 00c8 00C0      		rjmp .L51
+ 690               	.L44:
+ 691               	.LSM110:
+ 692 00ca 1330      		cpi r17,lo8(3)
+ 693 00cc 01F0      		breq .L49
+ 694               	.L51:
+ 695 00ce 8BE2      		ldi r24,lo8(43)
+ 696 00d0 00C0      		rjmp .L40
+ 697               	.L49:
+ 698               	.LSM111:
+ 699 00d2 1092 0000 		sts gPlaying,__zero_reg__
+ 700               	.LSM112:
+ 701 00d6 8091 8100 		lds r24,129
+ 702 00da 8E7F      		andi r24,lo8(-2)
+ 703 00dc 8093 8100 		sts 129,r24
+ 704               	.LSM113:
+ 705 00e0 80E0      		ldi r24,lo8(gs(Play_Tune))
+ 706 00e2 90E0      		ldi r25,hi8(gs(Play_Tune))
+ 707 00e4 0E94 0000 		call Timer0_RemoveCallbackFunction
+ 708               	.LSM114:
+ 709 00e8 1092 8000 		sts 128,__zero_reg__
+ 710               	.LSM115:
+ 711 00ec 1092 8100 		sts 129,__zero_reg__
+ 712               	.LSM116:
+ 713 00f0 2D9A      		sbi 37-32,5
+ 714               	.L56:
+ 715               	.LSM117:
+ 716 00f2 81E0      		ldi r24,lo8(1)
+ 717 00f4 8093 0000 		sts enter.1482,r24
+ 718               	.L55:
+ 719 00f8 8AE2      		ldi r24,lo8(42)
+ 720               	.L40:
+ 721               	/* epilogue start */
+ 722               	.LSM118:
+ 723 00fa 1F91      		pop r17
+ 724               	.LVL76:
+ 725 00fc 0895      		ret
+ 726               	.LFE5:
+ 728               	.global	TEXT_SONG1
+ 729               		.section	.progmem.data,"a",@progbits
+ 732               	TEXT_SONG1:
+ 733 0000 4675 7220 		.string	"Fur Elise"
+ 733      456C 6973 
+ 733      6500 
+ 734               	.global	FurElise
+ 737               	FurElise:
+ 738 000a 0300      		.word	3
+ 739 000c 0800      		.word	8
+ 740 000e 7B01      		.word	379
+ 741 0010 0800      		.word	8
+ 742 0012 9201      		.word	402
+ 743 0014 0800      		.word	8
+ 744 0016 7B01      		.word	379
+ 745 0018 0800      		.word	8
+ 746 001a 9201      		.word	402
+ 747 001c 0800      		.word	8
+ 748 001e 7B01      		.word	379
+ 749 0020 0800      		.word	8
+ 750 0022 FA01      		.word	506
+ 751 0024 0800      		.word	8
+ 752 0026 AA01      		.word	426
+ 753 0028 0800      		.word	8
+ 754 002a DE01      		.word	478
+ 755 002c 0400      		.word	4
+ 756 002e 3802      		.word	568
+ 757 0030 0800      		.word	8
+ 758 0032 0100      		.word	1
+ 759 0034 0800      		.word	8
+ 760 0036 BC03      		.word	956
+ 761 0038 0800      		.word	8
+ 762 003a F602      		.word	758
+ 763 003c 0800      		.word	8
+ 764 003e 3802      		.word	568
+ 765 0040 0400      		.word	4
+ 766 0042 FA01      		.word	506
+ 767 0044 0800      		.word	8
+ 768 0046 0100      		.word	1
+ 769 0048 0800      		.word	8
+ 770 004a F602      		.word	758
+ 771 004c 0800      		.word	8
+ 772 004e 5A02      		.word	602
+ 773 0050 0800      		.word	8
+ 774 0052 FA01      		.word	506
+ 775 0054 0400      		.word	4
+ 776 0056 DE01      		.word	478
+ 777 0058 0800      		.word	8
+ 778 005a 0100      		.word	1
+ 779 005c 0800      		.word	8
+ 780 005e F602      		.word	758
+ 781 0060 0800      		.word	8
+ 782 0062 7B01      		.word	379
+ 783 0064 0800      		.word	8
+ 784 0066 9201      		.word	402
+ 785 0068 0800      		.word	8
+ 786 006a 7B01      		.word	379
+ 787 006c 0800      		.word	8
+ 788 006e 9201      		.word	402
+ 789 0070 0800      		.word	8
+ 790 0072 7B01      		.word	379
+ 791 0074 0800      		.word	8
+ 792 0076 FA01      		.word	506
+ 793 0078 0800      		.word	8
+ 794 007a AA01      		.word	426
+ 795 007c 0800      		.word	8
+ 796 007e DE01      		.word	478
+ 797 0080 0400      		.word	4
+ 798 0082 3802      		.word	568
+ 799 0084 0800      		.word	8
+ 800 0086 0100      		.word	1
+ 801 0088 0800      		.word	8
+ 802 008a BC03      		.word	956
+ 803 008c 0800      		.word	8
+ 804 008e F602      		.word	758
+ 805 0090 0800      		.word	8
+ 806 0092 3802      		.word	568
+ 807 0094 0400      		.word	4
+ 808 0096 FA01      		.word	506
+ 809 0098 0800      		.word	8
+ 810 009a 0100      		.word	1
+ 811 009c 0800      		.word	8
+ 812 009e F602      		.word	758
+ 813 00a0 0800      		.word	8
+ 814 00a2 DE01      		.word	478
+ 815 00a4 0800      		.word	8
+ 816 00a6 FA01      		.word	506
+ 817 00a8 0400      		.word	4
+ 818 00aa 3802      		.word	568
+ 819 00ac 0000      		.word	0
+ 820 00ae 0100      		.word	1
+ 821               	.global	TEXT_SONG2
+ 824               	TEXT_SONG2:
+ 825 00b0 5475 726B 		.string	"Turkey march"
+ 825      6579 206D 
+ 825      6172 6368 
+ 825      00
+ 826               	.global	Mozart
+ 829               	Mozart:
+ 830 00bd 0300      		.word	3
+ 831 00bf 1000      		.word	16
+ 832 00c1 A402      		.word	676
+ 833 00c3 1000      		.word	16
+ 834 00c5 F602      		.word	758
+ 835 00c7 1000      		.word	16
+ 836 00c9 2403      		.word	804
+ 837 00cb 1000      		.word	16
+ 838 00cd F602      		.word	758
+ 839 00cf 0400      		.word	4
+ 840 00d1 7E02      		.word	638
+ 841 00d3 1000      		.word	16
+ 842 00d5 3802      		.word	568
+ 843 00d7 1000      		.word	16
+ 844 00d9 7E02      		.word	638
+ 845 00db 1000      		.word	16
+ 846 00dd A402      		.word	676
+ 847 00df 1000      		.word	16
+ 848 00e1 7E02      		.word	638
+ 849 00e3 0400      		.word	4
+ 850 00e5 FA01      		.word	506
+ 851 00e7 1000      		.word	16
+ 852 00e9 DE01      		.word	478
+ 853 00eb 1000      		.word	16
+ 854 00ed FA01      		.word	506
+ 855 00ef 1000      		.word	16
+ 856 00f1 1802      		.word	536
+ 857 00f3 1000      		.word	16
+ 858 00f5 FA01      		.word	506
+ 859 00f7 1000      		.word	16
+ 860 00f9 5201      		.word	338
+ 861 00fb 1000      		.word	16
+ 862 00fd 7B01      		.word	379
+ 863 00ff 1000      		.word	16
+ 864 0101 9201      		.word	402
+ 865 0103 1000      		.word	16
+ 866 0105 7B01      		.word	379
+ 867 0107 1000      		.word	16
+ 868 0109 5201      		.word	338
+ 869 010b 1000      		.word	16
+ 870 010d 7B01      		.word	379
+ 871 010f 1000      		.word	16
+ 872 0111 9201      		.word	402
+ 873 0113 1000      		.word	16
+ 874 0115 7B01      		.word	379
+ 875 0117 0400      		.word	4
+ 876 0119 3F01      		.word	319
+ 877 011b 0800      		.word	8
+ 878 011d 7B01      		.word	379
+ 879 011f 0800      		.word	8
+ 880 0121 3F01      		.word	319
+ 881 0123 2000      		.word	32
+ 882 0125 AA01      		.word	426
+ 883 0127 2000      		.word	32
+ 884 0129 7B01      		.word	379
+ 885 012b 1000      		.word	16
+ 886 012d 5201      		.word	338
+ 887 012f 0800      		.word	8
+ 888 0131 7B01      		.word	379
+ 889 0133 0800      		.word	8
+ 890 0135 AA01      		.word	426
+ 891 0137 0800      		.word	8
+ 892 0139 7B01      		.word	379
+ 893 013b 2000      		.word	32
+ 894 013d AA01      		.word	426
+ 895 013f 2000      		.word	32
+ 896 0141 7B01      		.word	379
+ 897 0143 1000      		.word	16
+ 898 0145 5201      		.word	338
+ 899 0147 0800      		.word	8
+ 900 0149 7B01      		.word	379
+ 901 014b 0800      		.word	8
+ 902 014d AA01      		.word	426
+ 903 014f 0800      		.word	8
+ 904 0151 7B01      		.word	379
+ 905 0153 2000      		.word	32
+ 906 0155 AA01      		.word	426
+ 907 0157 2000      		.word	32
+ 908 0159 7B01      		.word	379
+ 909 015b 1000      		.word	16
+ 910 015d 5201      		.word	338
+ 911 015f 0800      		.word	8
+ 912 0161 7B01      		.word	379
+ 913 0163 0800      		.word	8
+ 914 0165 AA01      		.word	426
+ 915 0167 0800      		.word	8
+ 916 0169 C301      		.word	451
+ 917 016b 0400      		.word	4
+ 918 016d FA01      		.word	506
+ 919 016f 0000      		.word	0
+ 920 0171 0100      		.word	1
+ 921               	.global	TEXT_SONG3
+ 924               	TEXT_SONG3:
+ 925 0173 4D69 6E75 		.string	"Minuet"
+ 925      6574 00
+ 926               	.global	Minuet
+ 929               	Minuet:
+ 930 017a 0200      		.word	2
+ 931 017c 0400      		.word	4
+ 932 017e AA01      		.word	426
+ 933 0180 0800      		.word	8
+ 934 0182 7E02      		.word	638
+ 935 0184 0800      		.word	8
+ 936 0186 3802      		.word	568
+ 937 0188 0800      		.word	8
+ 938 018a FA01      		.word	506
+ 939 018c 0800      		.word	8
+ 940 018e DE01      		.word	478
+ 941 0190 0400      		.word	4
+ 942 0192 AA01      		.word	426
+ 943 0194 0400      		.word	4
+ 944 0196 7E02      		.word	638
+ 945 0198 0400      		.word	4
+ 946 019a 7E02      		.word	638
+ 947 019c 0400      		.word	4
+ 948 019e 7B01      		.word	379
+ 949 01a0 0800      		.word	8
+ 950 01a2 DE01      		.word	478
+ 951 01a4 0800      		.word	8
+ 952 01a6 AA01      		.word	426
+ 953 01a8 0800      		.word	8
+ 954 01aa 7B01      		.word	379
+ 955 01ac 0800      		.word	8
+ 956 01ae 5201      		.word	338
+ 957 01b0 0400      		.word	4
+ 958 01b2 3F01      		.word	319
+ 959 01b4 0400      		.word	4
+ 960 01b6 7E02      		.word	638
+ 961 01b8 0400      		.word	4
+ 962 01ba 7E02      		.word	638
+ 963 01bc 0400      		.word	4
+ 964 01be DE01      		.word	478
+ 965 01c0 0800      		.word	8
+ 966 01c2 AA01      		.word	426
+ 967 01c4 0800      		.word	8
+ 968 01c6 DE01      		.word	478
+ 969 01c8 0800      		.word	8
+ 970 01ca FA01      		.word	506
+ 971 01cc 0800      		.word	8
+ 972 01ce 3802      		.word	568
+ 973 01d0 0400      		.word	4
+ 974 01d2 FA01      		.word	506
+ 975 01d4 0800      		.word	8
+ 976 01d6 DE01      		.word	478
+ 977 01d8 0800      		.word	8
+ 978 01da FA01      		.word	506
+ 979 01dc 0800      		.word	8
+ 980 01de 3802      		.word	568
+ 981 01e0 0800      		.word	8
+ 982 01e2 7E02      		.word	638
+ 983 01e4 0400      		.word	4
+ 984 01e6 A402      		.word	676
+ 985 01e8 0800      		.word	8
+ 986 01ea 7E02      		.word	638
+ 987 01ec 0800      		.word	8
+ 988 01ee 3802      		.word	568
+ 989 01f0 0800      		.word	8
+ 990 01f2 FA01      		.word	506
+ 991 01f4 0800      		.word	8
+ 992 01f6 7E02      		.word	638
+ 993 01f8 0400      		.word	4
+ 994 01fa FA01      		.word	506
+ 995 01fc 0200      		.word	2
+ 996 01fe 3802      		.word	568
+ 997 0200 0000      		.word	0
+ 998 0202 0100      		.word	1
+ 999               	.global	TEXT_SONG4
+ 1002               	TEXT_SONG4:
+ 1003 0204 4175 6C64 		.string	"Auld Lang Syne"
+ 1003      204C 616E 
+ 1003      6720 5379 
+ 1003      6E65 00
+ 1004               	.global	AuldLangSyne
+ 1007               	AuldLangSyne:
+ 1008 0213 0300      		.word	3
+ 1009 0215 0400      		.word	4
+ 1010 0217 3F01      		.word	319
+ 1011 0219 0200      		.word	2
+ 1012 021b EF00      		.word	239
+ 1013 021d 0800      		.word	8
+ 1014 021f EF00      		.word	239
+ 1015 0221 0400      		.word	4
+ 1016 0223 EF00      		.word	239
+ 1017 0225 0400      		.word	4
+ 1018 0227 BE00      		.word	190
+ 1019 0229 0200      		.word	2
+ 1020 022b D500      		.word	213
+ 1021 022d 0800      		.word	8
+ 1022 022f EF00      		.word	239
+ 1023 0231 0400      		.word	4
+ 1024 0233 D500      		.word	213
+ 1025 0235 0800      		.word	8
+ 1026 0237 BE00      		.word	190
+ 1027 0239 0800      		.word	8
+ 1028 023b D500      		.word	213
+ 1029 023d 0200      		.word	2
+ 1030 023f EF00      		.word	239
+ 1031 0241 0800      		.word	8
+ 1032 0243 EF00      		.word	239
+ 1033 0245 0400      		.word	4
+ 1034 0247 BE00      		.word	190
+ 1035 0249 0400      		.word	4
+ 1036 024b 9F00      		.word	159
+ 1037 024d 0200      		.word	2
+ 1038 024f 8E00      		.word	142
+ 1039 0251 0800      		.word	8
+ 1040 0253 0100      		.word	1
+ 1041 0255 0400      		.word	4
+ 1042 0257 8E00      		.word	142
+ 1043 0259 0200      		.word	2
+ 1044 025b 9F00      		.word	159
+ 1045 025d 0800      		.word	8
+ 1046 025f BE00      		.word	190
+ 1047 0261 0400      		.word	4
+ 1048 0263 BE00      		.word	190
+ 1049 0265 0400      		.word	4
+ 1050 0267 EF00      		.word	239
+ 1051 0269 0200      		.word	2
+ 1052 026b D500      		.word	213
+ 1053 026d 0800      		.word	8
+ 1054 026f EF00      		.word	239
+ 1055 0271 0400      		.word	4
+ 1056 0273 D500      		.word	213
+ 1057 0275 0800      		.word	8
+ 1058 0277 BE00      		.word	190
+ 1059 0279 0800      		.word	8
+ 1060 027b D500      		.word	213
+ 1061 027d 0200      		.word	2
+ 1062 027f EF00      		.word	239
+ 1063 0281 0800      		.word	8
+ 1064 0283 1C01      		.word	284
+ 1065 0285 0400      		.word	4
+ 1066 0287 1C01      		.word	284
+ 1067 0289 0400      		.word	4
+ 1068 028b 3F01      		.word	319
+ 1069 028d 0200      		.word	2
+ 1070 028f EF00      		.word	239
+ 1071 0291 0400      		.word	4
+ 1072 0293 0100      		.word	1
+ 1073 0295 0000      		.word	0
+ 1074 0297 0100      		.word	1
+ 1075               	.global	TEXT_SONG5
+ 1078               	TEXT_SONG5:
+ 1079 0299 5369 7265 		.string	"Sirene1"
+ 1079      6E65 3100 
+ 1080               	.global	Sirene1
+ 1083               	Sirene1:
+ 1084 02a1 0000      		.word	0
+ 1085 02a3 2000      		.word	32
+ 1086 02a5 9001      		.word	400
+ 1087 02a7 2000      		.word	32
+ 1088 02a9 8D01      		.word	397
+ 1089 02ab 2000      		.word	32
+ 1090 02ad 8A01      		.word	394
+ 1091 02af 2000      		.word	32
+ 1092 02b1 8701      		.word	391
+ 1093 02b3 2000      		.word	32
+ 1094 02b5 8401      		.word	388
+ 1095 02b7 2000      		.word	32
+ 1096 02b9 8101      		.word	385
+ 1097 02bb 2000      		.word	32
+ 1098 02bd 7E01      		.word	382
+ 1099 02bf 2000      		.word	32
+ 1100 02c1 7B01      		.word	379
+ 1101 02c3 2000      		.word	32
+ 1102 02c5 7801      		.word	376
+ 1103 02c7 2000      		.word	32
+ 1104 02c9 7501      		.word	373
+ 1105 02cb 2000      		.word	32
+ 1106 02cd 7201      		.word	370
+ 1107 02cf 2000      		.word	32
+ 1108 02d1 6F01      		.word	367
+ 1109 02d3 2000      		.word	32
+ 1110 02d5 6C01      		.word	364
+ 1111 02d7 2000      		.word	32
+ 1112 02d9 6901      		.word	361
+ 1113 02db 2000      		.word	32
+ 1114 02dd 6601      		.word	358
+ 1115 02df 2000      		.word	32
+ 1116 02e1 6301      		.word	355
+ 1117 02e3 2000      		.word	32
+ 1118 02e5 6001      		.word	352
+ 1119 02e7 2000      		.word	32
+ 1120 02e9 5D01      		.word	349
+ 1121 02eb 2000      		.word	32
+ 1122 02ed 5A01      		.word	346
+ 1123 02ef 2000      		.word	32
+ 1124 02f1 5701      		.word	343
+ 1125 02f3 2000      		.word	32
+ 1126 02f5 5401      		.word	340
+ 1127 02f7 2000      		.word	32
+ 1128 02f9 5101      		.word	337
+ 1129 02fb 2000      		.word	32
+ 1130 02fd 4E01      		.word	334
+ 1131 02ff 2000      		.word	32
+ 1132 0301 4B01      		.word	331
+ 1133 0303 2000      		.word	32
+ 1134 0305 4801      		.word	328
+ 1135 0307 2000      		.word	32
+ 1136 0309 4501      		.word	325
+ 1137 030b 2000      		.word	32
+ 1138 030d 4201      		.word	322
+ 1139 030f 2000      		.word	32
+ 1140 0311 3F01      		.word	319
+ 1141 0313 2000      		.word	32
+ 1142 0315 3C01      		.word	316
+ 1143 0317 2000      		.word	32
+ 1144 0319 3901      		.word	313
+ 1145 031b 2000      		.word	32
+ 1146 031d 3601      		.word	310
+ 1147 031f 2000      		.word	32
+ 1148 0321 3301      		.word	307
+ 1149 0323 2000      		.word	32
+ 1150 0325 3001      		.word	304
+ 1151 0327 2000      		.word	32
+ 1152 0329 2D01      		.word	301
+ 1153 032b 2000      		.word	32
+ 1154 032d 2A01      		.word	298
+ 1155 032f 2000      		.word	32
+ 1156 0331 2A01      		.word	298
+ 1157 0333 2000      		.word	32
+ 1158 0335 2D01      		.word	301
+ 1159 0337 2000      		.word	32
+ 1160 0339 3001      		.word	304
+ 1161 033b 2000      		.word	32
+ 1162 033d 3301      		.word	307
+ 1163 033f 2000      		.word	32
+ 1164 0341 3601      		.word	310
+ 1165 0343 2000      		.word	32
+ 1166 0345 3901      		.word	313
+ 1167 0347 2000      		.word	32
+ 1168 0349 3C01      		.word	316
+ 1169 034b 2000      		.word	32
+ 1170 034d 3F01      		.word	319
+ 1171 034f 2000      		.word	32
+ 1172 0351 4201      		.word	322
+ 1173 0353 2000      		.word	32
+ 1174 0355 4501      		.word	325
+ 1175 0357 2000      		.word	32
+ 1176 0359 4801      		.word	328
+ 1177 035b 2000      		.word	32
+ 1178 035d 4B01      		.word	331
+ 1179 035f 2000      		.word	32
+ 1180 0361 4E01      		.word	334
+ 1181 0363 2000      		.word	32
+ 1182 0365 5101      		.word	337
+ 1183 0367 2000      		.word	32
+ 1184 0369 5401      		.word	340
+ 1185 036b 2000      		.word	32
+ 1186 036d 5701      		.word	343
+ 1187 036f 2000      		.word	32
+ 1188 0371 5A01      		.word	346
+ 1189 0373 2000      		.word	32
+ 1190 0375 5D01      		.word	349
+ 1191 0377 2000      		.word	32
+ 1192 0379 6001      		.word	352
+ 1193 037b 2000      		.word	32
+ 1194 037d 6301      		.word	355
+ 1195 037f 2000      		.word	32
+ 1196 0381 6601      		.word	358
+ 1197 0383 2000      		.word	32
+ 1198 0385 6901      		.word	361
+ 1199 0387 2000      		.word	32
+ 1200 0389 6C01      		.word	364
+ 1201 038b 2000      		.word	32
+ 1202 038d 6F01      		.word	367
+ 1203 038f 2000      		.word	32
+ 1204 0391 7201      		.word	370
+ 1205 0393 2000      		.word	32
+ 1206 0395 7501      		.word	373
+ 1207 0397 2000      		.word	32
+ 1208 0399 7801      		.word	376
+ 1209 039b 2000      		.word	32
+ 1210 039d 7B01      		.word	379
+ 1211 039f 2000      		.word	32
+ 1212 03a1 7E01      		.word	382
+ 1213 03a3 2000      		.word	32
+ 1214 03a5 8101      		.word	385
+ 1215 03a7 2000      		.word	32
+ 1216 03a9 8401      		.word	388
+ 1217 03ab 2000      		.word	32
+ 1218 03ad 8701      		.word	391
+ 1219 03af 2000      		.word	32
+ 1220 03b1 8A01      		.word	394
+ 1221 03b3 2000      		.word	32
+ 1222 03b5 8D01      		.word	397
+ 1223 03b7 2000      		.word	32
+ 1224 03b9 9001      		.word	400
+ 1225 03bb 0000      		.word	0
+ 1226 03bd 0100      		.word	1
+ 1227               	.global	TEXT_SONG6
+ 1230               	TEXT_SONG6:
+ 1231 03bf 5369 7265 		.string	"Sirene2"
+ 1231      6E65 3200 
+ 1232               	.global	Sirene2
+ 1235               	Sirene2:
+ 1236 03c7 0300      		.word	3
+ 1237 03c9 0400      		.word	4
+ 1238 03cb DE01      		.word	478
+ 1239 03cd 0400      		.word	4
+ 1240 03cf 3F01      		.word	319
+ 1241 03d1 0000      		.word	0
+ 1242 03d3 0100      		.word	1
+ 1243               	.global	TEXT_SONG7
+ 1246               	TEXT_SONG7:
+ 1247 03d5 5768 6973 		.string	"Whistle"
+ 1247      746C 6500 
+ 1248               	.global	Whistle
+ 1251               	Whistle:
+ 1252 03dd 0000      		.word	0
+ 1253 03df 2000      		.word	32
+ 1254 03e1 C800      		.word	200
+ 1255 03e3 2000      		.word	32
+ 1256 03e5 C300      		.word	195
+ 1257 03e7 2000      		.word	32
+ 1258 03e9 BE00      		.word	190
+ 1259 03eb 2000      		.word	32
+ 1260 03ed B900      		.word	185
+ 1261 03ef 2000      		.word	32
+ 1262 03f1 B400      		.word	180
+ 1263 03f3 2000      		.word	32
+ 1264 03f5 AF00      		.word	175
+ 1265 03f7 2000      		.word	32
+ 1266 03f9 AA00      		.word	170
+ 1267 03fb 2000      		.word	32
+ 1268 03fd A500      		.word	165
+ 1269 03ff 2000      		.word	32
+ 1270 0401 A000      		.word	160
+ 1271 0403 2000      		.word	32
+ 1272 0405 9B00      		.word	155
+ 1273 0407 2000      		.word	32
+ 1274 0409 9600      		.word	150
+ 1275 040b 2000      		.word	32
+ 1276 040d 9100      		.word	145
+ 1277 040f 2000      		.word	32
+ 1278 0411 8C00      		.word	140
+ 1279 0413 2000      		.word	32
+ 1280 0415 8700      		.word	135
+ 1281 0417 2000      		.word	32
+ 1282 0419 8200      		.word	130
+ 1283 041b 2000      		.word	32
+ 1284 041d 7D00      		.word	125
+ 1285 041f 2000      		.word	32
+ 1286 0421 7800      		.word	120
+ 1287 0423 2000      		.word	32
+ 1288 0425 7300      		.word	115
+ 1289 0427 2000      		.word	32
+ 1290 0429 6E00      		.word	110
+ 1291 042b 2000      		.word	32
+ 1292 042d 6900      		.word	105
+ 1293 042f 2000      		.word	32
+ 1294 0431 6400      		.word	100
+ 1295 0433 0800      		.word	8
+ 1296 0435 0100      		.word	1
+ 1297 0437 2000      		.word	32
+ 1298 0439 C800      		.word	200
+ 1299 043b 2000      		.word	32
+ 1300 043d C300      		.word	195
+ 1301 043f 2000      		.word	32
+ 1302 0441 BE00      		.word	190
+ 1303 0443 2000      		.word	32
+ 1304 0445 B900      		.word	185
+ 1305 0447 2000      		.word	32
+ 1306 0449 B400      		.word	180
+ 1307 044b 2000      		.word	32
+ 1308 044d AF00      		.word	175
+ 1309 044f 2000      		.word	32
+ 1310 0451 AA00      		.word	170
+ 1311 0453 2000      		.word	32
+ 1312 0455 A500      		.word	165
+ 1313 0457 2000      		.word	32
+ 1314 0459 A000      		.word	160
+ 1315 045b 2000      		.word	32
+ 1316 045d 9B00      		.word	155
+ 1317 045f 2000      		.word	32
+ 1318 0461 9600      		.word	150
+ 1319 0463 2000      		.word	32
+ 1320 0465 9100      		.word	145
+ 1321 0467 2000      		.word	32
+ 1322 0469 8C00      		.word	140
+ 1323 046b 2000      		.word	32
+ 1324 046d 8700      		.word	135
+ 1325 046f 2000      		.word	32
+ 1326 0471 8200      		.word	130
+ 1327 0473 2000      		.word	32
+ 1328 0475 7D00      		.word	125
+ 1329 0477 2000      		.word	32
+ 1330 0479 7D00      		.word	125
+ 1331 047b 2000      		.word	32
+ 1332 047d 8200      		.word	130
+ 1333 047f 2000      		.word	32
+ 1334 0481 8700      		.word	135
+ 1335 0483 2000      		.word	32
+ 1336 0485 8C00      		.word	140
+ 1337 0487 2000      		.word	32
+ 1338 0489 9100      		.word	145
+ 1339 048b 2000      		.word	32
+ 1340 048d 9600      		.word	150
+ 1341 048f 2000      		.word	32
+ 1342 0491 9B00      		.word	155
+ 1343 0493 2000      		.word	32
+ 1344 0495 A000      		.word	160
+ 1345 0497 2000      		.word	32
+ 1346 0499 A500      		.word	165
+ 1347 049b 2000      		.word	32
+ 1348 049d AA00      		.word	170
+ 1349 049f 2000      		.word	32
+ 1350 04a1 AF00      		.word	175
+ 1351 04a3 2000      		.word	32
+ 1352 04a5 B400      		.word	180
+ 1353 04a7 2000      		.word	32
+ 1354 04a9 B900      		.word	185
+ 1355 04ab 2000      		.word	32
+ 1356 04ad BE00      		.word	190
+ 1357 04af 2000      		.word	32
+ 1358 04b1 C300      		.word	195
+ 1359 04b3 2000      		.word	32
+ 1360 04b5 C800      		.word	200
+ 1361 04b7 0000      		.word	0
+ 1362 04b9 0000      		.word	0
+ 1363               	.global	TEXT_SONG8
+ 1366               	TEXT_SONG8:
+ 1367 04bb 4578 6F72 		.string	"Exorzist"
+ 1367      7A69 7374 
+ 1367      00
+ 1368               	.global	Exorcist
+ 1371               	Exorcist:
+ 1372 04c4 1500      		.word	21
+ 1373 04c6 9000      		.word	144
+ 1374 04c8 7B01      		.word	379
+ 1375 04ca 9000      		.word	144
+ 1376 04cc 1C01      		.word	284
+ 1377 04ce 9000      		.word	144
+ 1378 04d0 7B01      		.word	379
+ 1379 04d2 9000      		.word	144
+ 1380 04d4 FD00      		.word	253
+ 1381 04d6 9000      		.word	144
+ 1382 04d8 7B01      		.word	379
+ 1383 04da 9000      		.word	144
+ 1384 04dc 3F01      		.word	319
+ 1385 04de 9000      		.word	144
+ 1386 04e0 1C01      		.word	284
+ 1387 04e2 9000      		.word	144
+ 1388 04e4 7B01      		.word	379
+ 1389 04e6 9000      		.word	144
+ 1390 04e8 EF00      		.word	239
+ 1391 04ea 9000      		.word	144
+ 1392 04ec 1C01      		.word	284
+ 1393 04ee 9000      		.word	144
+ 1394 04f0 D500      		.word	213
+ 1395 04f2 9000      		.word	144
+ 1396 04f4 7B01      		.word	379
+ 1397 04f6 9000      		.word	144
+ 1398 04f8 FD00      		.word	253
+ 1399 04fa 9000      		.word	144
+ 1400 04fc EF00      		.word	239
+ 1401 04fe 9000      		.word	144
+ 1402 0500 7B01      		.word	379
+ 1403 0502 9000      		.word	144
+ 1404 0504 FD00      		.word	253
+ 1405 0506 9000      		.word	144
+ 1406 0508 7B01      		.word	379
+ 1407 050a 9000      		.word	144
+ 1408 050c 1C01      		.word	284
+ 1409 050e 9000      		.word	144
+ 1410 0510 7B01      		.word	379
+ 1411 0512 9000      		.word	144
+ 1412 0514 FD00      		.word	253
+ 1413 0516 9000      		.word	144
+ 1414 0518 3F01      		.word	319
+ 1415 051a 9000      		.word	144
+ 1416 051c 1C01      		.word	284
+ 1417 051e 9000      		.word	144
+ 1418 0520 7B01      		.word	379
+ 1419 0522 9000      		.word	144
+ 1420 0524 EF00      		.word	239
+ 1421 0526 9000      		.word	144
+ 1422 0528 7B01      		.word	379
+ 1423 052a 9000      		.word	144
+ 1424 052c D500      		.word	213
+ 1425 052e 9000      		.word	144
+ 1426 0530 7B01      		.word	379
+ 1427 0532 9000      		.word	144
+ 1428 0534 FD00      		.word	253
+ 1429 0536 9000      		.word	144
+ 1430 0538 EF00      		.word	239
+ 1431 053a 9000      		.word	144
+ 1432 053c 7B01      		.word	379
+ 1433 053e 9000      		.word	144
+ 1434 0540 FD00      		.word	253
+ 1435 0542 9000      		.word	144
+ 1436 0544 7B01      		.word	379
+ 1437 0546 9000      		.word	144
+ 1438 0548 1C01      		.word	284
+ 1439 054a 9000      		.word	144
+ 1440 054c 7B01      		.word	379
+ 1441 054e 9000      		.word	144
+ 1442 0550 FD00      		.word	253
+ 1443 0552 9000      		.word	144
+ 1444 0554 7B01      		.word	379
+ 1445 0556 9000      		.word	144
+ 1446 0558 3F01      		.word	319
+ 1447 055a 4002      		.word	576
+ 1448 055c 1C01      		.word	284
+ 1449 055e 0000      		.word	0
+ 1450 0560 0100      		.word	1
+ 1451               	.global	Songs
+ 1454               	Songs:
+ 1455 0562 0000      		.word	FurElise
+ 1456 0564 0000      		.word	Mozart
+ 1457 0566 0000      		.word	Minuet
+ 1458 0568 0000      		.word	AuldLangSyne
+ 1459 056a 0000      		.word	Sirene1
+ 1460 056c 0000      		.word	Sirene2
+ 1461 056e 0000      		.word	Whistle
+ 1462 0570 0000      		.word	Exorcist
+ 1463 0572 0000      		.word	0
+ 1464               	.global	TEXT_SONG_TBL
+ 1467               	TEXT_SONG_TBL:
+ 1468 0574 0000      		.word	TEXT_SONG1
+ 1469 0576 0000      		.word	TEXT_SONG2
+ 1470 0578 0000      		.word	TEXT_SONG3
+ 1471 057a 0000      		.word	TEXT_SONG4
+ 1472 057c 0000      		.word	TEXT_SONG5
+ 1473 057e 0000      		.word	TEXT_SONG6
+ 1474 0580 0000      		.word	TEXT_SONG7
+ 1475 0582 0000      		.word	TEXT_SONG8
+ 1476 0584 0000      		.word	0
+ 1477               	.global	PLAYING
+ 1480               	PLAYING:
+ 1481 0586 504C 4159 		.string	"PLAYING"
+ 1481      494E 4700 
+ 1482               	.global	gPlaying
+ 1483               		.section	.bss.gPlaying,"aw",@nobits
+ 1486               	gPlaying:
+ 1487 0000 00        		.skip 1,0
+ 1488               		.section	.bss.Tone,"aw",@nobits
+ 1491               	Tone:
+ 1492 0000 00        		.skip 1,0
+ 1493               		.section	.bss.Duration,"aw",@nobits
+ 1496               	Duration:
+ 1497 0000 00        		.skip 1,0
+ 1498               		.section	.data.Volume,"aw",@progbits
+ 1501               	Volume:
+ 1502 0000 50        		.byte	80
+ 1503               		.section	.data.enter.1482,"aw",@progbits
+ 1506               	enter.1482:
+ 1507 0000 01        		.byte	1
+ 1508               		.section	.bss.song.1448,"aw",@nobits
+ 1511               	song.1448:
+ 1512 0000 00        		.skip 1,0
+ 1513               		.section	.data.enter.1447,"aw",@progbits
+ 1516               	enter.1447:
+ 1517 0000 01        		.byte	1
+ 1518               		.section	.bss.Tempo,"aw",@nobits
+ 1521               	Tempo:
+ 1522 0000 00        		.skip 1,0
+ 1523               		.comm pSong,2,1
+ 1588               	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:00000000 sound.c
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:2      *ABS*:0000003f __SREG__
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:3      *ABS*:0000003e __SP_H__
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:4      *ABS*:0000003d __SP_L__
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:5      *ABS*:00000034 __CCP__
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:6      *ABS*:00000000 __tmp_reg__
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:7      *ABS*:00000001 __zero_reg__
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:19     .text.PlayClick:00000000 PlayClick
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:55     .text.Play_Tune:00000000 Play_Tune
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1491   .bss.Tone:00000000 Tone
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1496   .bss.Duration:00000000 Duration
+                            *COM*:00000002 pSong
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1521   .bss.Tempo:00000000 Tempo
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1486   .bss.gPlaying:00000000 gPlaying
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:276    .text.showSongName:00000000 showSongName
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1467   .progmem.data:00000574 TEXT_SONG_TBL
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:313    .text.SelectSound:00000000 SelectSound
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1516   .data.enter.1447:00000000 enter.1447
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1511   .bss.song.1448:00000000 song.1448
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1454   .progmem.data:00000562 Songs
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:535    .text.Sound_Init:00000000 Sound_Init
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1501   .data.Volume:00000000 Volume
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:569    .text.Sound:00000000 Sound
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1506   .data.enter.1482:00000000 enter.1482
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1480   .progmem.data:00000586 PLAYING
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:732    .progmem.data:00000000 TEXT_SONG1
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:737    .progmem.data:0000000a FurElise
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:824    .progmem.data:000000b0 TEXT_SONG2
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:829    .progmem.data:000000bd Mozart
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:924    .progmem.data:00000173 TEXT_SONG3
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:929    .progmem.data:0000017a Minuet
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1002   .progmem.data:00000204 TEXT_SONG4
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1007   .progmem.data:00000213 AuldLangSyne
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1078   .progmem.data:00000299 TEXT_SONG5
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1083   .progmem.data:000002a1 Sirene1
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1230   .progmem.data:000003bf TEXT_SONG6
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1235   .progmem.data:000003c7 Sirene2
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1246   .progmem.data:000003d5 TEXT_SONG7
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1251   .progmem.data:000003dd Whistle
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1366   .progmem.data:000004bb TEXT_SONG8
+C:\Users\MainUser\AppData\Local\Temp/cckRyx7C.s:1371   .progmem.data:000004c4 Exorcist
+
+UNDEFINED SYMBOLS
+Delay
+__udivmodhi4
+Timer0_RemoveCallbackFunction
+LCD_puts_f
+Timer0_RegisterCallbackFunction
+__do_copy_data
+__do_clear_bss

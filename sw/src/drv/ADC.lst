@@ -1,1930 +1,1228 @@
    1               		.file	"ADC.c"
-   2               	__SP_H__ = 0x3e
-   3               	__SP_L__ = 0x3d
-   4               	__SREG__ = 0x3f
-   5               	__tmp_reg__ = 0
-   6               	__zero_reg__ = 1
-   7               		.text
-   8               	.Ltext0:
-   9               		.cfi_sections	.debug_frame
-  10               		.section	.text.ADC_read,"ax",@progbits
-  11               	.global	ADC_read
-  13               	ADC_read:
-  14               	.LFB3:
-  15               		.file 1 "src/drv/ADC.c"
-   1:src/drv/ADC.c **** //***************************************************************************
-   2:src/drv/ADC.c **** //
-   3:src/drv/ADC.c **** //  File........: ADC.c
-   4:src/drv/ADC.c **** //
-   5:src/drv/ADC.c **** //  Author(s)...: ATMEL Norway
-   6:src/drv/ADC.c **** //
-   7:src/drv/ADC.c **** //  Target(s)...: ATmega169
-   8:src/drv/ADC.c **** //
-   9:src/drv/ADC.c **** //  Compiler....: AVR-GCC 3.3.1; avr-libc 1.0
-  10:src/drv/ADC.c **** //
-  11:src/drv/ADC.c **** //  Description.: AVR Butterfly ADC routines
-  12:src/drv/ADC.c **** //
-  13:src/drv/ADC.c **** //  Revisions...: 1.0
-  14:src/drv/ADC.c **** //
-  15:src/drv/ADC.c **** //  YYYYMMDD - VER. - COMMENT                                       - SIGN.
-  16:src/drv/ADC.c **** //
-  17:src/drv/ADC.c **** //  20030116 - 1.0  - Created                                       - LHM
-  18:src/drv/ADC.c **** //  20031009          port to avr-gcc/avr-libc                      - M.Thomas
-  19:src/drv/ADC.c **** //
-  20:src/drv/ADC.c **** //***************************************************************************
-  21:src/drv/ADC.c **** 
-  22:src/drv/ADC.c **** #include <avr/io.h>
-  23:src/drv/ADC.c **** #include <avr/pgmspace.h>
-  24:src/drv/ADC.c **** #include "pgmspacehlp.h"
-  25:src/drv/ADC.c **** #include "button.h"
-  26:src/drv/ADC.c **** 
-  27:src/drv/ADC.c **** #include "main.h"
-  28:src/drv/ADC.c **** #include "ADC.h"
-  29:src/drv/ADC.c **** #include "BCD.h"
-  30:src/drv/ADC.c **** #include "LCD_functions.h"
-  31:src/drv/ADC.c **** #include "timer0.h"
-  32:src/drv/ADC.c **** 
-  33:src/drv/ADC.c **** const int TEMP_Celsius_pos[] PROGMEM =    // Positive Celsius temperatures (ADC-value)
-  34:src/drv/ADC.c ****         {                           // from 0 to 60 degrees
-  35:src/drv/ADC.c ****             806,796,786,775,765,754,743,732,720,709,697,685,673,661,649,
-  36:src/drv/ADC.c ****             636,624,611,599,586,574,562,549,537,524,512,500,488,476,464,
-  37:src/drv/ADC.c ****             452,440,429,418,406,396,385,374,364,354,344,334,324,315,306,
-  38:src/drv/ADC.c ****             297,288,279,271,263,255,247,240,233,225,219,212,205,199,193,
-  39:src/drv/ADC.c ****             187,
-  40:src/drv/ADC.c ****         };
-  41:src/drv/ADC.c **** 
-  42:src/drv/ADC.c **** const int TEMP_Celsius_neg[] PROGMEM =    // Negative Celsius temperatures (ADC-value)
-  43:src/drv/ADC.c ****         {                           // from -1 to -15 degrees
-  44:src/drv/ADC.c ****             815,825,834,843,851,860,868,876,883,891,898,904,911,917,923,
-  45:src/drv/ADC.c ****         };
-  46:src/drv/ADC.c **** 
-  47:src/drv/ADC.c **** const int TEMP_Fahrenheit_pos[] PROGMEM =  // Positive Fahrenheit temperatures (ADC-value)
-  48:src/drv/ADC.c **** 		{                           // from 0 to 140 degrees
-  49:src/drv/ADC.c **** 			938, 935, 932, 929, 926, 923, 920, 916, 913, 909, 906, 902, 898, 
-  50:src/drv/ADC.c **** 			894, 891, 887, 882, 878, 874, 870, 865, 861, 856, 851, 847, 842, 
-  51:src/drv/ADC.c **** 			837, 832, 827, 822, 816, 811, 806, 800, 795, 789, 783, 778, 772, 
-  52:src/drv/ADC.c **** 			766, 760, 754, 748, 742, 735, 729, 723, 716, 710, 703, 697, 690, 
-  53:src/drv/ADC.c **** 			684, 677, 670, 663, 657, 650, 643, 636, 629, 622, 616, 609, 602, 
-  54:src/drv/ADC.c **** 			595, 588, 581, 574, 567, 560, 553, 546, 539, 533, 526, 519, 512, 
-  55:src/drv/ADC.c **** 			505, 498, 492, 485, 478, 472, 465, 459, 452, 446, 439, 433, 426, 
-  56:src/drv/ADC.c **** 			420, 414, 408, 402, 396, 390, 384, 378, 372, 366, 360, 355, 349, 
-  57:src/drv/ADC.c **** 			344, 338, 333, 327, 322, 317, 312, 307, 302, 297, 292, 287, 282, 
-  58:src/drv/ADC.c **** 			277, 273, 268, 264, 259, 255, 251, 246, 242, 238, 234, 230, 226, 
-  59:src/drv/ADC.c **** 			222, 219, 215, 211, 207, 204, 200, 197, 194, 190, 187, 
-  60:src/drv/ADC.c **** 		};
-  61:src/drv/ADC.c **** 
-  62:src/drv/ADC.c ****         
-  63:src/drv/ADC.c **** // mt __flash int LIGHT_ADC[] = // Table used to find the Vref, when using the voltage-reading func
-  64:src/drv/ADC.c **** const int LIGHT_ADC[] PROGMEM = // Table used to find the Vref, when using the voltage-reading func
-  65:src/drv/ADC.c ****         { 
-  66:src/drv/ADC.c ****             0x35,0x60,0x80,0x0B0,0x11D,0x13D,0x15A,0x17A,0x197,0x1B9,0x1DA,
-  67:src/drv/ADC.c ****             0x1F9,0x216,0x240,0x26D,0x282,0x2A2,0x2EF,0x332,0x3B0,0x3F2
-  68:src/drv/ADC.c ****         };
-  69:src/drv/ADC.c ****         
-  70:src/drv/ADC.c **** //mt __flash float LIGHT_VOLTAGE[] = // Vref table correspondent to the LIGHT_ADC[] table
-  71:src/drv/ADC.c **** const float LIGHT_VOLTAGE[] PROGMEM = // Vref table correspondent to the LIGHT_ADC[] table
-  72:src/drv/ADC.c ****         {
-  73:src/drv/ADC.c ****             2.818,2.820,2.824,2.827,2.832,2.835,2.839,2.841,2.843,2.847,2.850,
-  74:src/drv/ADC.c ****             2.853,2.857,2.863,2.867,2.870,2.874,2.882,2.893,2.917,2.939
-  75:src/drv/ADC.c ****         };
-  76:src/drv/ADC.c **** 
-  77:src/drv/ADC.c **** 
-  78:src/drv/ADC.c **** float Vref = 2.900; // initial value
-  79:src/drv/ADC.c **** char degree = CELSIUS; // char degree = CELCIUS;
-  80:src/drv/ADC.c **** 
-  81:src/drv/ADC.c **** 
-  82:src/drv/ADC.c **** /*****************************************************************************
-  83:src/drv/ADC.c **** *
-  84:src/drv/ADC.c **** *   Function name : ADC_init
-  85:src/drv/ADC.c **** *
-  86:src/drv/ADC.c **** *   Returns :       None
-  87:src/drv/ADC.c **** *
-  88:src/drv/ADC.c **** *   Parameters :    char input
-  89:src/drv/ADC.c **** *
-  90:src/drv/ADC.c **** *   Purpose :       Initialize the ADC with the selected ADC-channel
-  91:src/drv/ADC.c **** *
-  92:src/drv/ADC.c **** *****************************************************************************/
-  93:src/drv/ADC.c **** void ADC_init(char input)
-  94:src/drv/ADC.c **** {
-  95:src/drv/ADC.c ****   
-  96:src/drv/ADC.c ****     ADMUX = input;    // external AREF and ADCx
-  97:src/drv/ADC.c ****     
-  98:src/drv/ADC.c ****     ADCSRA = (1<<ADEN) | (1<<ADPS1) | (1<<ADPS0);    // set ADC prescaler to , 1MHz / 8 = 125kHz   
-  99:src/drv/ADC.c **** 
- 100:src/drv/ADC.c ****     input = ADC_read();        // dummy 
- 101:src/drv/ADC.c **** }
- 102:src/drv/ADC.c **** 
- 103:src/drv/ADC.c **** 
- 104:src/drv/ADC.c **** /*****************************************************************************
- 105:src/drv/ADC.c **** *
- 106:src/drv/ADC.c **** *   Function name : ADC_read
- 107:src/drv/ADC.c **** *
- 108:src/drv/ADC.c **** *   Returns :       int ADC
- 109:src/drv/ADC.c **** *
- 110:src/drv/ADC.c **** *   Parameters :    None
- 111:src/drv/ADC.c **** *
- 112:src/drv/ADC.c **** *   Purpose :       Do a Analog to Digital Conversion
- 113:src/drv/ADC.c **** *
- 114:src/drv/ADC.c **** *****************************************************************************/
- 115:src/drv/ADC.c **** int ADC_read(void)
- 116:src/drv/ADC.c **** {
-  16               		.loc 1 116 0
-  17               		.cfi_startproc
-  18               	/* prologue: function */
-  19               	/* frame size = 0 */
-  20               	/* stack size = 0 */
-  21               	.L__stack_usage = 0
-  22               	.LVL0:
- 117:src/drv/ADC.c ****     char i;
- 118:src/drv/ADC.c ****     int ADC_temp;
- 119:src/drv/ADC.c ****     // mt int ADC = 0 ;
- 120:src/drv/ADC.c ****     int ADCr = 0;
- 121:src/drv/ADC.c ****     
- 122:src/drv/ADC.c ****     // To save power, the voltage over the LDR and the NTC is turned off when not used
- 123:src/drv/ADC.c ****     // This is done by controlling the voltage from a I/O-pin (PORTF3)
- 124:src/drv/ADC.c ****     sbiBF(PORTF, PF3); // mt sbi(PORTF, PORTF3);     // Enable the VCP (VC-peripheral)
-  23               		.loc 1 124 0
-  24 0000 8B9A      		sbi 0x11,3
- 125:src/drv/ADC.c ****     sbiBF(DDRF, DDF3); // sbi(DDRF, PORTF3);        
-  25               		.loc 1 125 0
-  26 0002 839A      		sbi 0x10,3
- 126:src/drv/ADC.c **** 
- 127:src/drv/ADC.c ****     sbiBF(ADCSRA, ADEN);     // Enable the ADC
-  27               		.loc 1 127 0
-  28 0004 8091 7A00 		lds r24,122
-  29 0008 8068      		ori r24,lo8(-128)
-  30 000a 8093 7A00 		sts 122,r24
- 128:src/drv/ADC.c **** 
- 129:src/drv/ADC.c ****     //do a dummy readout first
- 130:src/drv/ADC.c ****     ADCSRA |= (1<<ADSC);        // do single conversion
-  31               		.loc 1 130 0
-  32 000e 8091 7A00 		lds r24,122
-  33 0012 8064      		ori r24,lo8(64)
-  34 0014 8093 7A00 		sts 122,r24
-  35               	.L2:
- 131:src/drv/ADC.c ****     while(!(ADCSRA & 0x10));    // wait for conversion done, ADIF flag active
-  36               		.loc 1 131 0 discriminator 1
-  37 0018 8091 7A00 		lds r24,122
-  38 001c 84FF      		sbrs r24,4
-  39 001e 00C0      		rjmp .L2
-  40 0020 48E0      		ldi r20,lo8(8)
-  41 0022 80E0      		ldi r24,0
-  42 0024 90E0      		ldi r25,0
-  43               	.LVL1:
-  44               	.L4:
- 132:src/drv/ADC.c ****         
- 133:src/drv/ADC.c ****     for(i=0;i<8;i++)            // do the ADC conversion 8 times for better accuracy 
- 134:src/drv/ADC.c ****     {
- 135:src/drv/ADC.c ****         ADCSRA |= (1<<ADSC);        // do single conversion
-  45               		.loc 1 135 0
-  46 0026 2091 7A00 		lds r18,122
-  47 002a 2064      		ori r18,lo8(64)
-  48 002c 2093 7A00 		sts 122,r18
-  49               	.L3:
- 136:src/drv/ADC.c ****         while(!(ADCSRA & 0x10));    // wait for conversion done, ADIF flag active
-  50               		.loc 1 136 0 discriminator 1
-  51 0030 2091 7A00 		lds r18,122
-  52 0034 24FF      		sbrs r18,4
-  53 0036 00C0      		rjmp .L3
- 137:src/drv/ADC.c ****         
- 138:src/drv/ADC.c ****         ADC_temp = ADCL;            // read out ADCL register
-  54               		.loc 1 138 0 discriminator 2
-  55 0038 5091 7800 		lds r21,120
-  56               	.LVL2:
- 139:src/drv/ADC.c ****         ADC_temp += (ADCH << 8);    // read out ADCH register        
-  57               		.loc 1 139 0 discriminator 2
-  58 003c 2091 7900 		lds r18,121
-  59               	.LVL3:
-  60 0040 30E0      		ldi r19,0
-  61 0042 322F      		mov r19,r18
-  62 0044 2227      		clr r18
-  63               	.LVL4:
-  64 0046 250F      		add r18,r21
-  65 0048 311D      		adc r19,__zero_reg__
- 140:src/drv/ADC.c **** 
- 141:src/drv/ADC.c ****         ADCr += ADC_temp;      // accumulate result (8 samples) for later averaging
-  66               		.loc 1 141 0 discriminator 2
-  67 004a 820F      		add r24,r18
-  68 004c 931F      		adc r25,r19
-  69               	.LVL5:
-  70 004e 4150      		subi r20,lo8(-(-1))
-  71               	.LVL6:
- 133:src/drv/ADC.c ****     {
-  72               		.loc 1 133 0 discriminator 2
-  73 0050 01F4      		brne .L4
-  74               	.LVL7:
- 142:src/drv/ADC.c ****     }
- 143:src/drv/ADC.c **** 
- 144:src/drv/ADC.c ****     ADCr = ADCr >> 3;     // average the 8 samples
- 145:src/drv/ADC.c ****         
- 146:src/drv/ADC.c ****     cbiBF(PORTF,PF3); // mt cbi(PORTF, PORTF3);     // disable the VCP
-  75               		.loc 1 146 0
-  76 0052 8B98      		cbi 0x11,3
- 147:src/drv/ADC.c ****     cbiBF(DDRF,DDF3); // mt cbi(DDRF, PORTF3);  
-  77               		.loc 1 147 0
-  78 0054 8398      		cbi 0x10,3
- 148:src/drv/ADC.c ****     
- 149:src/drv/ADC.c ****     cbiBF(ADCSRA, ADEN);      // disable the ADC
-  79               		.loc 1 149 0
-  80 0056 2091 7A00 		lds r18,122
-  81 005a 2F77      		andi r18,lo8(127)
-  82 005c 2093 7A00 		sts 122,r18
- 150:src/drv/ADC.c **** 
- 151:src/drv/ADC.c ****     return ADCr;
- 152:src/drv/ADC.c **** }
-  83               		.loc 1 152 0
-  84 0060 23E0      		ldi r18,3
-  85               		1:
-  86 0062 9595      		asr r25
-  87 0064 8795      		ror r24
-  88 0066 2A95      		dec r18
-  89 0068 01F4      		brne 1b
-  90               	.LVL8:
-  91 006a 0895      		ret
-  92               		.cfi_endproc
-  93               	.LFE3:
-  95               		.section	.text.ADC_init,"ax",@progbits
-  96               	.global	ADC_init
-  98               	ADC_init:
-  99               	.LFB2:
-  94:src/drv/ADC.c ****   
- 100               		.loc 1 94 0
- 101               		.cfi_startproc
- 102               	.LVL9:
- 103               	/* prologue: function */
- 104               	/* frame size = 0 */
- 105               	/* stack size = 0 */
- 106               	.L__stack_usage = 0
-  96:src/drv/ADC.c ****     
- 107               		.loc 1 96 0
- 108 0000 8093 7C00 		sts 124,r24
-  98:src/drv/ADC.c **** 
- 109               		.loc 1 98 0
- 110 0004 83E8      		ldi r24,lo8(-125)
- 111               	.LVL10:
- 112 0006 8093 7A00 		sts 122,r24
- 113               	.LVL11:
- 100:src/drv/ADC.c **** }
- 114               		.loc 1 100 0
- 115 000a 0C94 0000 		jmp ADC_read
- 116               	.LVL12:
- 117               		.cfi_endproc
- 118               	.LFE2:
- 120               	.global	__floatsisf
- 121               	.global	__mulsf3
- 122               	.global	__fixunssfsi
- 123               	.global	__subsf3
- 124               		.section	.text.ADC_periphery,"ax",@progbits
- 125               	.global	ADC_periphery
- 127               	ADC_periphery:
- 128               	.LFB4:
- 153:src/drv/ADC.c **** 
- 154:src/drv/ADC.c **** 
- 155:src/drv/ADC.c **** /*****************************************************************************
- 156:src/drv/ADC.c **** *
- 157:src/drv/ADC.c **** *   Function name : ADC_periphery
- 158:src/drv/ADC.c **** *
- 159:src/drv/ADC.c **** *   Returns :       None
- 160:src/drv/ADC.c **** *
- 161:src/drv/ADC.c **** *   Parameters :    None
- 162:src/drv/ADC.c **** *
- 163:src/drv/ADC.c **** *   Purpose :       Calculates the Temperature/Voltage/Ligth from the ADC_read
- 164:src/drv/ADC.c **** *                   and puts it out on the LCD.
- 165:src/drv/ADC.c **** *
- 166:src/drv/ADC.c **** *****************************************************************************/
- 167:src/drv/ADC.c **** void ADC_periphery(void)
- 168:src/drv/ADC.c **** {
- 129               		.loc 1 168 0
- 130               		.cfi_startproc
- 131 0000 8F92      		push r8
- 132               	.LCFI0:
- 133               		.cfi_def_cfa_offset 3
- 134               		.cfi_offset 8, -2
- 135 0002 9F92      		push r9
- 136               	.LCFI1:
- 137               		.cfi_def_cfa_offset 4
- 138               		.cfi_offset 9, -3
- 139 0004 AF92      		push r10
- 140               	.LCFI2:
- 141               		.cfi_def_cfa_offset 5
- 142               		.cfi_offset 10, -4
- 143 0006 BF92      		push r11
- 144               	.LCFI3:
- 145               		.cfi_def_cfa_offset 6
- 146               		.cfi_offset 11, -5
- 147 0008 CF92      		push r12
- 148               	.LCFI4:
- 149               		.cfi_def_cfa_offset 7
- 150               		.cfi_offset 12, -6
- 151 000a DF92      		push r13
- 152               	.LCFI5:
- 153               		.cfi_def_cfa_offset 8
- 154               		.cfi_offset 13, -7
- 155 000c EF92      		push r14
- 156               	.LCFI6:
- 157               		.cfi_def_cfa_offset 9
- 158               		.cfi_offset 14, -8
- 159 000e FF92      		push r15
- 160               	.LCFI7:
- 161               		.cfi_def_cfa_offset 10
- 162               		.cfi_offset 15, -9
- 163 0010 1F93      		push r17
- 164               	.LCFI8:
- 165               		.cfi_def_cfa_offset 11
- 166               		.cfi_offset 17, -10
- 167 0012 CF93      		push r28
- 168               	.LCFI9:
- 169               		.cfi_def_cfa_offset 12
- 170               		.cfi_offset 28, -11
- 171 0014 DF93      		push r29
- 172               	.LCFI10:
- 173               		.cfi_def_cfa_offset 13
- 174               		.cfi_offset 29, -12
+   2               	__SREG__ = 0x3f
+   3               	__SP_H__ = 0x3e
+   4               	__SP_L__ = 0x3d
+   5               	__CCP__  = 0x34
+   6               	__tmp_reg__ = 0
+   7               	__zero_reg__ = 1
+  15               	.Ltext0:
+  16               		.section	.text.ADC_read,"ax",@progbits
+  17               	.global	ADC_read
+  19               	ADC_read:
+  20               	.LFB4:
+  21               	.LSM0:
+  22               	/* prologue: function */
+  23               	/* frame size = 0 */
+  24               	.LSM1:
+  25 0000 8B9A      		sbi 49-32,3
+  26               	.LSM2:
+  27 0002 839A      		sbi 48-32,3
+  28               	.LSM3:
+  29 0004 8091 7A00 		lds r24,122
+  30 0008 8068      		ori r24,lo8(-128)
+  31 000a 8093 7A00 		sts 122,r24
+  32               	.LSM4:
+  33 000e 8091 7A00 		lds r24,122
+  34 0012 8064      		ori r24,lo8(64)
+  35 0014 8093 7A00 		sts 122,r24
+  36               	.L2:
+  37               	.LSM5:
+  38 0018 8091 7A00 		lds r24,122
+  39 001c 84FF      		sbrs r24,4
+  40 001e 00C0      		rjmp .L2
+  41 0020 30E0      		ldi r19,lo8(0)
+  42               	.LVL0:
+  43 0022 40E0      		ldi r20,lo8(0)
+  44 0024 50E0      		ldi r21,hi8(0)
+  45               	.LVL1:
+  46               	.L4:
+  47               	.LSM6:
+  48 0026 8091 7A00 		lds r24,122
+  49 002a 8064      		ori r24,lo8(64)
+  50 002c 8093 7A00 		sts 122,r24
+  51               	.L3:
+  52               	.LSM7:
+  53 0030 8091 7A00 		lds r24,122
+  54 0034 84FF      		sbrs r24,4
+  55 0036 00C0      		rjmp .L3
+  56               	.LSM8:
+  57 0038 2091 7800 		lds r18,120
+  58               	.LSM9:
+  59 003c 8091 7900 		lds r24,121
+  60               	.LSM10:
+  61 0040 90E0      		ldi r25,lo8(0)
+  62 0042 982F      		mov r25,r24
+  63 0044 8827      		clr r24
+  64 0046 820F      		add r24,r18
+  65 0048 911D      		adc r25,__zero_reg__
+  66 004a 480F      		add r20,r24
+  67 004c 591F      		adc r21,r25
+  68               	.LSM11:
+  69 004e 3F5F      		subi r19,lo8(-(1))
+  70 0050 3830      		cpi r19,lo8(8)
+  71 0052 01F4      		brne .L4
+  72               	.LSM12:
+  73 0054 8B98      		cbi 49-32,3
+  74               	.LSM13:
+  75 0056 8398      		cbi 48-32,3
+  76               	.LSM14:
+  77 0058 8091 7A00 		lds r24,122
+  78 005c 8F77      		andi r24,lo8(127)
+  79 005e 8093 7A00 		sts 122,r24
+  80               	.LSM15:
+  81 0062 CA01      		movw r24,r20
+  82 0064 23E0      		ldi r18,3
+  83 0066 9595      	1:	asr r25
+  84 0068 8795      		ror r24
+  85 006a 2A95      		dec r18
+  86 006c 01F4      		brne 1b
+  87               	/* epilogue start */
+  88 006e 0895      		ret
+  89               	.LFE4:
+  91               		.section	.text.ADC_init,"ax",@progbits
+  92               	.global	ADC_init
+  94               	ADC_init:
+  95               	.LFB3:
+  96               	.LSM16:
+  97               	.LVL2:
+  98               	/* prologue: function */
+  99               	/* frame size = 0 */
+ 100               	.LSM17:
+ 101 0000 8093 7C00 		sts 124,r24
+ 102               	.LSM18:
+ 103 0004 83E8      		ldi r24,lo8(-125)
+ 104               	.LVL3:
+ 105 0006 8093 7A00 		sts 122,r24
+ 106               	.LSM19:
+ 107 000a 0E94 0000 		call ADC_read
+ 108               	/* epilogue start */
+ 109               	.LSM20:
+ 110 000e 0895      		ret
+ 111               	.LFE3:
+ 113               		.section	.text.LightFunc,"ax",@progbits
+ 114               	.global	LightFunc
+ 116               	LightFunc:
+ 117               	.LFB8:
+ 118               	.LSM21:
+ 119               	.LVL4:
+ 120 0000 1F93      		push r17
+ 121               	/* prologue: function */
+ 122               	/* frame size = 0 */
+ 123 0002 182F      		mov r17,r24
+ 124               	.LSM22:
+ 125 0004 8091 0000 		lds r24,enter.1579
+ 126               	.LVL5:
+ 127 0008 8823      		tst r24
+ 128 000a 01F0      		breq .L12
+ 129               	.LSM23:
+ 130 000c 1092 0000 		sts enter.1579,__zero_reg__
+ 131               	.LSM24:
+ 132 0010 82E0      		ldi r24,lo8(2)
+ 133 0012 0E94 0000 		call ADC_init
+ 134               	.LSM25:
+ 135 0016 80E0      		ldi r24,lo8(gs(ADC_periphery))
+ 136 0018 90E0      		ldi r25,hi8(gs(ADC_periphery))
+ 137 001a 0E94 0000 		call Timer0_RegisterCallbackFunction
+ 138 001e 00C0      		rjmp .L13
+ 139               	.L12:
+ 140               	.LSM26:
+ 141 0020 81E0      		ldi r24,lo8(1)
+ 142 0022 60E0      		ldi r22,lo8(0)
+ 143 0024 0E94 0000 		call LCD_UpdateRequired
+ 144               	.L13:
+ 145               	.LSM27:
+ 146 0028 1330      		cpi r17,lo8(3)
+ 147 002a 01F0      		breq .L14
+ 148 002c 81E5      		ldi r24,lo8(81)
+ 149 002e 00C0      		rjmp .L15
+ 150               	.L14:
+ 151               	.LSM28:
+ 152 0030 80E0      		ldi r24,lo8(gs(ADC_periphery))
+ 153 0032 90E0      		ldi r25,hi8(gs(ADC_periphery))
+ 154 0034 0E94 0000 		call Timer0_RemoveCallbackFunction
+ 155               	.LSM29:
+ 156 0038 81E0      		ldi r24,lo8(1)
+ 157 003a 8093 0000 		sts enter.1579,r24
+ 158 003e 80E5      		ldi r24,lo8(80)
+ 159               	.L15:
+ 160               	/* epilogue start */
+ 161               	.LSM30:
+ 162 0040 1F91      		pop r17
+ 163               	.LVL6:
+ 164 0042 0895      		ret
+ 165               	.LFE8:
+ 167               		.section	.text.VoltageFunc,"ax",@progbits
+ 168               	.global	VoltageFunc
+ 170               	VoltageFunc:
+ 171               	.LFB7:
+ 172               	.LSM31:
+ 173               	.LVL7:
+ 174 0000 1F93      		push r17
  175               	/* prologue: function */
  176               	/* frame size = 0 */
- 177               	/* stack size = 11 */
- 178               	.L__stack_usage = 11
- 179               	.LVL13:
- 169:src/drv/ADC.c ****     int ADCresult = 0;
- 170:src/drv/ADC.c ****     int ADCresult_temp = 0;
- 171:src/drv/ADC.c ****     int Temp_int;
- 172:src/drv/ADC.c ****     char Temp;
- 173:src/drv/ADC.c ****     unsigned char i = 0;
- 174:src/drv/ADC.c ****     char TL;
- 175:src/drv/ADC.c ****     char TH;
- 176:src/drv/ADC.c ****     char VL;
- 177:src/drv/ADC.c **** 
- 178:src/drv/ADC.c ****     float V_ADC;
- 179:src/drv/ADC.c ****     char VoltageHB;
- 180:src/drv/ADC.c ****     char VoltageLB;
- 181:src/drv/ADC.c ****     
- 182:src/drv/ADC.c ****     ADCresult = ADC_read();         // Find the ADC value
- 180               		.loc 1 182 0
- 181 0016 0E94 0000 		call ADC_read
- 182               	.LVL14:
- 183 001a 7C01      		movw r14,r24
- 184               	.LVL15:
- 183:src/drv/ADC.c ****      
- 184:src/drv/ADC.c ****     if( ADMUX == TEMPERATURE_SENSOR )
- 185               		.loc 1 184 0
- 186 001c 8091 7C00 		lds r24,124
- 187 0020 8111      		cpse r24,__zero_reg__
- 188 0022 00C0      		rjmp .L13
- 185:src/drv/ADC.c ****     {
- 186:src/drv/ADC.c ****         if(degree == CELSIUS)
- 189               		.loc 1 186 0
- 190 0024 8091 0000 		lds r24,degree
- 191 0028 8330      		cpi r24,lo8(3)
- 192 002a 01F0      		breq .+2
- 193 002c 00C0      		rjmp .L14
- 187:src/drv/ADC.c ****         {
- 188:src/drv/ADC.c ****             if(ADCresult > 810)         // If it's a negtive temperature
- 194               		.loc 1 188 0
- 195 002e 8BE2      		ldi r24,43
- 196 0030 E816      		cp r14,r24
- 197 0032 83E0      		ldi r24,3
- 198 0034 F806      		cpc r15,r24
- 199 0036 04F0      		brlt .L15
- 200 0038 80E0      		ldi r24,lo8(TEMP_Celsius_neg)
- 201 003a 90E0      		ldi r25,hi8(TEMP_Celsius_neg)
- 202 003c C0E0      		ldi r28,0
- 203               	.LVL16:
- 204               	.L17:
- 205               	.LBB10:
- 189:src/drv/ADC.c ****             {    
- 190:src/drv/ADC.c ****                 for (i=0; i<=25; i++)   // Find the temperature
- 191:src/drv/ADC.c ****                 {
- 192:src/drv/ADC.c ****                     // mt if (ADCresult <= TEMP_Celcius_neg[i])
- 193:src/drv/ADC.c ****                     if (ADCresult <= (int)pgm_read_word(&TEMP_Celsius_neg[i]))
- 206               		.loc 1 193 0
- 207 003e FC01      		movw r30,r24
- 208               	/* #APP */
- 209               	 ;  193 "src/drv/ADC.c" 1
- 210 0040 2591      		lpm r18, Z+
- 211 0042 3491      		lpm r19, Z
- 212               		
- 213               	 ;  0 "" 2
- 214               	.LVL17:
- 215               	/* #NOAPP */
- 216               	.LBE10:
- 217 0044 2E15      		cp r18,r14
- 218 0046 3F05      		cpc r19,r15
- 219 0048 04F4      		brge .L16
- 190:src/drv/ADC.c ****                 {
- 220               		.loc 1 190 0 discriminator 2
- 221 004a CF5F      		subi r28,lo8(-(1))
- 222               	.LVL18:
- 223 004c 0296      		adiw r24,2
- 224 004e CA31      		cpi r28,lo8(26)
- 225 0050 01F4      		brne .L17
- 226               	.L16:
- 194:src/drv/ADC.c ****                     {
- 195:src/drv/ADC.c ****                         break;
- 196:src/drv/ADC.c ****                     }
- 197:src/drv/ADC.c ****                 }
- 198:src/drv/ADC.c ****                 
- 199:src/drv/ADC.c ****                 LCD_putc(1, '-');       // Put a minus sign in front of the temperature
- 227               		.loc 1 199 0
- 228 0052 6DE2      		ldi r22,lo8(45)
- 229 0054 00C0      		rjmp .L40
- 230               	.LVL19:
- 231               	.L15:
- 200:src/drv/ADC.c ****             }
- 201:src/drv/ADC.c ****             else if (ADCresult < 800)   // If it's a positive temperature
- 232               		.loc 1 201 0
- 233 0056 80E2      		ldi r24,32
- 234 0058 E816      		cp r14,r24
- 235 005a 83E0      		ldi r24,3
- 236 005c F806      		cpc r15,r24
- 237 005e 04F4      		brge .L19
- 238 0060 80E0      		ldi r24,lo8(TEMP_Celsius_pos)
- 239 0062 90E0      		ldi r25,hi8(TEMP_Celsius_pos)
- 240 0064 C0E0      		ldi r28,0
- 241               	.LVL20:
- 242               	.L21:
- 243               	.LBB11:
- 202:src/drv/ADC.c ****             {
- 203:src/drv/ADC.c ****                 for (i=0; i<100; i++)  
- 204:src/drv/ADC.c ****                 {
- 205:src/drv/ADC.c ****                     // mt if (ADCresult >= TEMP_Celcius_pos[i])
- 206:src/drv/ADC.c ****                     if (ADCresult >= (int)pgm_read_word(&TEMP_Celsius_pos[i]))
- 244               		.loc 1 206 0
- 245 0066 FC01      		movw r30,r24
- 246               	/* #APP */
- 247               	 ;  206 "src/drv/ADC.c" 1
- 248 0068 2591      		lpm r18, Z+
- 249 006a 3491      		lpm r19, Z
- 250               		
- 251               	 ;  0 "" 2
- 252               	.LVL21:
- 253               	/* #NOAPP */
- 254               	.LBE11:
- 255 006c E216      		cp r14,r18
- 256 006e F306      		cpc r15,r19
- 257 0070 04F4      		brge .L20
- 203:src/drv/ADC.c ****                 {
- 258               		.loc 1 203 0 discriminator 2
- 259 0072 CF5F      		subi r28,lo8(-(1))
- 260               	.LVL22:
- 261 0074 0296      		adiw r24,2
- 262 0076 C436      		cpi r28,lo8(100)
- 263 0078 01F4      		brne .L21
- 264               	.L20:
- 207:src/drv/ADC.c ****                     {
- 208:src/drv/ADC.c ****                         break;
- 209:src/drv/ADC.c ****                     }
- 210:src/drv/ADC.c ****                 }        
- 211:src/drv/ADC.c ****             
- 212:src/drv/ADC.c ****                 LCD_putc(1, '+');       // Put a plus sign in front of the temperature
- 265               		.loc 1 212 0
- 266 007a 6BE2      		ldi r22,lo8(43)
- 267               	.LVL23:
- 268               	.L40:
- 269 007c 81E0      		ldi r24,lo8(1)
- 270 007e 0E94 0000 		call LCD_putc
- 271               	.LVL24:
- 272 0082 00C0      		rjmp .L18
- 273               	.LVL25:
- 274               	.L19:
- 213:src/drv/ADC.c ****             }
- 214:src/drv/ADC.c ****             else                        //If the temperature is zero degrees
- 215:src/drv/ADC.c ****             {
- 216:src/drv/ADC.c ****                 i = 0;
- 217:src/drv/ADC.c ****                 LCD_putc(1, ' ');
- 275               		.loc 1 217 0
- 276 0084 60E2      		ldi r22,lo8(32)
- 277 0086 81E0      		ldi r24,lo8(1)
- 278 0088 0E94 0000 		call LCD_putc
- 279               	.LVL26:
- 216:src/drv/ADC.c ****                 LCD_putc(1, ' ');
- 280               		.loc 1 216 0
- 281 008c C0E0      		ldi r28,0
- 282               	.LVL27:
- 283               	.L18:
- 218:src/drv/ADC.c ****             }
- 219:src/drv/ADC.c ****             
- 220:src/drv/ADC.c ****             Temp = CHAR2BCD2(i);        // Convert from char to bin
- 284               		.loc 1 220 0
- 285 008e 8C2F      		mov r24,r28
- 286 0090 0E94 0000 		call CHAR2BCD2
- 287               	.LVL28:
- 288 0094 C82F      		mov r28,r24
- 289               	.LVL29:
- 221:src/drv/ADC.c ****     
- 222:src/drv/ADC.c ****             TL = (Temp & 0x0F) + '0';   // Find the low-byte
- 223:src/drv/ADC.c ****             TH = (Temp >> 4) + '0';     // Find the high-byte
- 224:src/drv/ADC.c ****             
- 225:src/drv/ADC.c ****             LCD_putc(0, ' ');
- 290               		.loc 1 225 0
- 291 0096 60E2      		ldi r22,lo8(32)
- 292 0098 80E0      		ldi r24,0
- 293               	.LVL30:
- 294 009a 0E94 0000 		call LCD_putc
- 295               	.LVL31:
- 223:src/drv/ADC.c ****             
- 296               		.loc 1 223 0
- 297 009e 6C2F      		mov r22,r28
- 298 00a0 6295      		swap r22
- 299 00a2 6F70      		andi r22,lo8(15)
- 300 00a4 605D      		subi r22,lo8(-(48))
- 226:src/drv/ADC.c ****             //LCD character 1 is allready written to
- 227:src/drv/ADC.c ****             LCD_putc(2, TH);
- 301               		.loc 1 227 0
- 302 00a6 82E0      		ldi r24,lo8(2)
- 303 00a8 0E94 0000 		call LCD_putc
- 304               	.LVL32:
- 222:src/drv/ADC.c ****             TH = (Temp >> 4) + '0';     // Find the high-byte
- 305               		.loc 1 222 0
- 306 00ac 6C2F      		mov r22,r28
- 307 00ae 6F70      		andi r22,lo8(15)
- 308 00b0 605D      		subi r22,lo8(-(48))
- 309               	.LVL33:
- 228:src/drv/ADC.c ****             LCD_putc(3, TL);
- 310               		.loc 1 228 0
- 311 00b2 83E0      		ldi r24,lo8(3)
- 312 00b4 0E94 0000 		call LCD_putc
- 313               	.LVL34:
- 229:src/drv/ADC.c ****             LCD_putc(4, '*');
- 314               		.loc 1 229 0
- 315 00b8 6AE2      		ldi r22,lo8(42)
- 316 00ba 84E0      		ldi r24,lo8(4)
- 317 00bc 0E94 0000 		call LCD_putc
- 318               	.LVL35:
- 230:src/drv/ADC.c ****             LCD_putc(5, 'C');
- 319               		.loc 1 230 0
- 320 00c0 63E4      		ldi r22,lo8(67)
- 321 00c2 00C0      		rjmp .L43
- 322               	.LVL36:
- 323               	.L14:
- 231:src/drv/ADC.c ****             LCD_putc(6, '\0');
- 232:src/drv/ADC.c ****         }
- 233:src/drv/ADC.c ****         else if (degree == FAHRENHEIT)
- 324               		.loc 1 233 0
- 325 00c4 8430      		cpi r24,lo8(4)
- 326 00c6 01F0      		breq .+2
- 327 00c8 00C0      		rjmp .L12
- 328 00ca 80E0      		ldi r24,lo8(TEMP_Fahrenheit_pos)
- 329 00cc 90E0      		ldi r25,hi8(TEMP_Fahrenheit_pos)
- 330 00ce 10E0      		ldi r17,0
- 331               	.LVL37:
- 332               	.L24:
- 333               	.LBB12:
- 234:src/drv/ADC.c ****         {
- 235:src/drv/ADC.c ****             for (i=0; i<=141; i++)   // Find the temperature
- 236:src/drv/ADC.c ****             {
- 237:src/drv/ADC.c ****                 // mt if (ADCresult > TEMP_Farenheit_pos[i])
- 238:src/drv/ADC.c ****                 if (ADCresult > (int)pgm_read_word(&TEMP_Fahrenheit_pos[i]))
- 334               		.loc 1 238 0
- 335 00d0 FC01      		movw r30,r24
- 336               	/* #APP */
- 337               	 ;  238 "src/drv/ADC.c" 1
- 338 00d2 2591      		lpm r18, Z+
- 339 00d4 3491      		lpm r19, Z
- 340               		
- 341               	 ;  0 "" 2
- 342               	.LVL38:
- 343               	/* #NOAPP */
- 344               	.LBE12:
- 345 00d6 2E15      		cp r18,r14
- 346 00d8 3F05      		cpc r19,r15
- 347 00da 04F0      		brlt .L23
- 235:src/drv/ADC.c ****             {
- 348               		.loc 1 235 0 discriminator 2
- 349 00dc 1F5F      		subi r17,lo8(-(1))
- 350               	.LVL39:
- 351 00de 0296      		adiw r24,2
- 352 00e0 1E38      		cpi r17,lo8(-114)
- 353 00e2 01F4      		brne .L24
- 354               	.L23:
- 239:src/drv/ADC.c ****                 {
- 240:src/drv/ADC.c ****                     break;
- 241:src/drv/ADC.c ****                 }
- 242:src/drv/ADC.c ****             }        
- 243:src/drv/ADC.c ****         
- 244:src/drv/ADC.c ****             Temp_int = CHAR2BCD3(i);
- 355               		.loc 1 244 0
- 356 00e4 812F      		mov r24,r17
- 357 00e6 0E94 0000 		call CHAR2BCD3
- 358               	.LVL40:
- 359 00ea EC01      		movw r28,r24
- 360               	.LVL41:
- 245:src/drv/ADC.c ****         
- 246:src/drv/ADC.c ****             if (i > 99) // if there are three digits
- 361               		.loc 1 246 0
- 362 00ec 1436      		cpi r17,lo8(100)
- 363 00ee 00F0      		brlo .L25
- 247:src/drv/ADC.c ****             {
- 248:src/drv/ADC.c ****                 LCD_putc(0, '+');
- 364               		.loc 1 248 0
- 365 00f0 6BE2      		ldi r22,lo8(43)
- 366 00f2 80E0      		ldi r24,0
- 367               	.LVL42:
- 368 00f4 0E94 0000 		call LCD_putc
- 369               	.LVL43:
- 249:src/drv/ADC.c ****                 TH = (Temp_int >> 8) + '0';   // Find the high-byte
- 370               		.loc 1 249 0
- 371 00f8 6D2F      		mov r22,r29
- 372 00fa 605D      		subi r22,lo8(-(48))
- 373 00fc 00C0      		rjmp .L41
- 374               	.LVL44:
- 375               	.L25:
- 250:src/drv/ADC.c ****                 LCD_putc(1, TH);
- 251:src/drv/ADC.c ****             }
- 252:src/drv/ADC.c ****             else    // if only two digits
- 253:src/drv/ADC.c ****             {
- 254:src/drv/ADC.c ****                 LCD_putc(0, ' ');
- 376               		.loc 1 254 0
- 377 00fe 60E2      		ldi r22,lo8(32)
- 378 0100 80E0      		ldi r24,0
- 379               	.LVL45:
- 380 0102 0E94 0000 		call LCD_putc
- 381               	.LVL46:
- 255:src/drv/ADC.c ****                 LCD_putc(1, '+');
- 382               		.loc 1 255 0
- 383 0106 6BE2      		ldi r22,lo8(43)
- 384               	.L41:
- 385 0108 81E0      		ldi r24,lo8(1)
- 386 010a 0E94 0000 		call LCD_putc
- 387               	.LVL47:
- 256:src/drv/ADC.c ****             }
- 257:src/drv/ADC.c ****             
- 258:src/drv/ADC.c ****             TL = (Temp_int & 0x0F) + '0';   // Find the low-byte
- 259:src/drv/ADC.c ****             TH = ( (Temp_int >> 4) & 0x0F ) + '0';     // Find the high-byte                
- 388               		.loc 1 259 0
- 389 010e BE01      		movw r22,r28
- 390 0110 94E0      		ldi r25,4
- 391               		1:
- 392 0112 7595      		asr r23
- 393 0114 6795      		ror r22
- 394 0116 9A95      		dec r25
- 395 0118 01F4      		brne 1b
- 396 011a 6F70      		andi r22,lo8(15)
- 397 011c 605D      		subi r22,lo8(-(48))
- 260:src/drv/ADC.c **** 
- 261:src/drv/ADC.c ****             LCD_putc(2, TH);
- 398               		.loc 1 261 0
- 399 011e 82E0      		ldi r24,lo8(2)
- 400 0120 0E94 0000 		call LCD_putc
- 401               	.LVL48:
- 258:src/drv/ADC.c ****             TH = ( (Temp_int >> 4) & 0x0F ) + '0';     // Find the high-byte                
- 402               		.loc 1 258 0
- 403 0124 6C2F      		mov r22,r28
- 404 0126 6F70      		andi r22,lo8(15)
- 405 0128 605D      		subi r22,lo8(-(48))
- 262:src/drv/ADC.c ****             LCD_putc(3, TL);
- 406               		.loc 1 262 0
- 407 012a 83E0      		ldi r24,lo8(3)
- 408 012c 0E94 0000 		call LCD_putc
- 409               	.LVL49:
- 263:src/drv/ADC.c ****             LCD_putc(4, '*');
- 410               		.loc 1 263 0
- 411 0130 6AE2      		ldi r22,lo8(42)
- 412 0132 84E0      		ldi r24,lo8(4)
- 413 0134 0E94 0000 		call LCD_putc
- 414               	.LVL50:
- 264:src/drv/ADC.c ****             LCD_putc(5, 'F');
- 415               		.loc 1 264 0
- 416 0138 66E4      		ldi r22,lo8(70)
- 417 013a 00C0      		rjmp .L43
- 418               	.LVL51:
- 419               	.L13:
- 265:src/drv/ADC.c ****             LCD_putc(6, '\0');
- 266:src/drv/ADC.c ****         
- 267:src/drv/ADC.c ****         }
- 268:src/drv/ADC.c **** 
- 269:src/drv/ADC.c **** //        Can't set LCD_UpdateRequired = TRUE here cause we are inside the Timer0 interrupt
- 270:src/drv/ADC.c **** //        LCD_UpdateRequired(TRUE, 0);        
- 271:src/drv/ADC.c **** 
- 272:src/drv/ADC.c ****     }
- 273:src/drv/ADC.c ****     else if( ADMUX == VOLTAGE_SENSOR )
- 420               		.loc 1 273 0
- 421 013c 8091 7C00 		lds r24,124
- 422 0140 8130      		cpi r24,lo8(1)
- 423 0142 01F0      		breq .+2
- 424 0144 00C0      		rjmp .L27
- 425               	.LVL52:
- 274:src/drv/ADC.c ****     {
- 275:src/drv/ADC.c ****         //  Do a Light-measurement first to determine the Vref, 
- 276:src/drv/ADC.c ****         //  because the LDR affects the Vref 
- 277:src/drv/ADC.c **** 
- 278:src/drv/ADC.c ****         ADCresult_temp = ADCresult;     // Store the ADCresult from the voltage reading
- 279:src/drv/ADC.c ****           
- 280:src/drv/ADC.c ****         ADC_init(LIGHT_SENSOR);         // Init the ADC to measure light
- 426               		.loc 1 280 0
- 427 0146 82E0      		ldi r24,lo8(2)
- 428 0148 0E94 0000 		call ADC_init
- 429               	.LVL53:
- 281:src/drv/ADC.c ****             
- 282:src/drv/ADC.c ****         ADCresult = ADC_read();         // Read the light value
- 430               		.loc 1 282 0
- 431 014c 0E94 0000 		call ADC_read
- 432               	.LVL54:
- 433 0150 DC01      		movw r26,r24
- 434               	.LVL55:
- 435 0152 40E0      		ldi r20,lo8(LIGHT_ADC)
- 436 0154 50E0      		ldi r21,hi8(LIGHT_ADC)
- 437 0156 20E0      		ldi r18,0
- 438 0158 30E0      		ldi r19,0
- 439               	.LVL56:
- 440               	.L29:
- 441               	.LBB13:
- 283:src/drv/ADC.c **** 
- 284:src/drv/ADC.c ****         // Find Vref
- 285:src/drv/ADC.c ****         for (i=0; i<=22; i++)
- 286:src/drv/ADC.c ****         {
- 287:src/drv/ADC.c ****             // mt if (ADCresult <= LIGHT_ADC[i])
- 288:src/drv/ADC.c ****             if (ADCresult <= (int)pgm_read_word(&LIGHT_ADC[i]))
- 442               		.loc 1 288 0
- 443 015a FA01      		movw r30,r20
- 444               	/* #APP */
- 445               	 ;  288 "src/drv/ADC.c" 1
- 446 015c C591      		lpm r28, Z+
- 447 015e D491      		lpm r29, Z
- 448               		
- 449               	 ;  0 "" 2
- 450               	.LVL57:
- 451               	/* #NOAPP */
- 452               	.LBE13:
- 453 0160 CA17      		cp r28,r26
- 454 0162 DB07      		cpc r29,r27
- 455 0164 04F4      		brge .L28
- 456               	.LVL58:
- 457 0166 2F5F      		subi r18,-1
- 458 0168 3F4F      		sbci r19,-1
- 459               	.LVL59:
- 460 016a 4E5F      		subi r20,-2
- 461 016c 5F4F      		sbci r21,-1
- 285:src/drv/ADC.c ****         {
- 462               		.loc 1 285 0 discriminator 2
- 463 016e 2731      		cpi r18,23
- 464 0170 3105      		cpc r19,__zero_reg__
- 465 0172 01F4      		brne .L29
- 466 0174 00C0      		rjmp .L30
- 467               	.L28:
- 289:src/drv/ADC.c ****             {
- 290:src/drv/ADC.c ****                 break;
- 291:src/drv/ADC.c ****             }
- 292:src/drv/ADC.c ****         }
- 293:src/drv/ADC.c ****         if(!i)              // if it's very bright
- 468               		.loc 1 293 0
- 469 0176 2111      		cpse r18,__zero_reg__
- 470 0178 00C0      		rjmp .L31
- 294:src/drv/ADC.c ****             Vref = 2.815;
- 471               		.loc 1 294 0
- 472 017a 86EF      		ldi r24,lo8(-10)
- 473 017c 98E2      		ldi r25,lo8(40)
- 474 017e A4E3      		ldi r26,lo8(52)
- 475 0180 B0E4      		ldi r27,lo8(64)
- 476               	.LVL60:
- 477 0182 00C0      		rjmp .L42
- 478               	.LVL61:
- 479               	.L31:
- 295:src/drv/ADC.c ****         else if(i >= 21)
- 480               		.loc 1 295 0
- 481 0184 2531      		cpi r18,lo8(21)
- 482 0186 00F0      		brlo .L33
- 483               	.LVL62:
- 484               	.L30:
- 296:src/drv/ADC.c ****             Vref = 2.942;   // if it's totally dark
- 485               		.loc 1 296 0
- 486 0188 8AEB      		ldi r24,lo8(-70)
- 487 018a 99E4      		ldi r25,lo8(73)
- 488 018c ACE3      		ldi r26,lo8(60)
- 489 018e B0E4      		ldi r27,lo8(64)
- 490               	.LVL63:
- 491 0190 00C0      		rjmp .L42
- 492               	.LVL64:
- 493               	.L33:
- 297:src/drv/ADC.c ****         else {
- 298:src/drv/ADC.c ****             // mt: Vref = LIGHT_VOLTAGE[i];   
- 299:src/drv/ADC.c ****             // mt using helper from pgmspacehlp.h - new code
- 300:src/drv/ADC.c ****             Vref = pgm_read_float_hlp(&LIGHT_VOLTAGE[i]);
- 494               		.loc 1 300 0
- 495 0192 220F      		lsl r18
- 496 0194 331F      		rol r19
- 497 0196 220F      		lsl r18
- 498 0198 331F      		rol r19
- 499               	.LVL65:
- 500 019a 2050      		subi r18,lo8(-(LIGHT_VOLTAGE))
- 501 019c 3040      		sbci r19,hi8(-(LIGHT_VOLTAGE))
- 502               	.LVL66:
- 503               	.LBB14:
- 504               	.LBB15:
- 505               	.LBB16:
- 506               		.file 2 "inc/pgmspacehlp.h"
-   1:inc/pgmspacehlp.h **** /*
-   2:inc/pgmspacehlp.h **** 	Local helper functions for the
-   3:inc/pgmspacehlp.h **** 	missing __flash workaround 
-   4:inc/pgmspacehlp.h **** 	
-   5:inc/pgmspacehlp.h **** 	- not part of the org. ATMEL code -
-   6:inc/pgmspacehlp.h **** 	done by Martin Thomas, KL, .de
-   7:inc/pgmspacehlp.h **** */
-   8:inc/pgmspacehlp.h **** 
-   9:inc/pgmspacehlp.h **** #ifndef PGMSPACEHLP_H_
-  10:inc/pgmspacehlp.h **** #define PGMSPACEHLP_H_
-  11:inc/pgmspacehlp.h **** 
-  12:inc/pgmspacehlp.h **** #include <stdint.h>
-  13:inc/pgmspacehlp.h **** #include <avr/pgmspace.h>
-  14:inc/pgmspacehlp.h **** 
-  15:inc/pgmspacehlp.h **** /* Read a float (4 Bytes) from PROGMEM
-  16:inc/pgmspacehlp.h ****     the idea using a union is from Joerg Wunsch, found
-  17:inc/pgmspacehlp.h ****     on the avr-gcc mailing-list, marked as "public domain"
-  18:inc/pgmspacehlp.h ****     modifications by mt: (a) use pgm_read_word, (b) pass 
-  19:inc/pgmspacehlp.h **** 	pointer to float as param. and cast
-  20:inc/pgmspacehlp.h **** */
-  21:inc/pgmspacehlp.h **** static inline float pgm_read_float_hlp(const float *addr)
-  22:inc/pgmspacehlp.h **** {	
-  23:inc/pgmspacehlp.h **** 	union
-  24:inc/pgmspacehlp.h **** 	{
-  25:inc/pgmspacehlp.h **** 		uint16_t i[2];
-  26:inc/pgmspacehlp.h **** 		float f;
-  27:inc/pgmspacehlp.h **** 	} u;
-  28:inc/pgmspacehlp.h **** 	
-  29:inc/pgmspacehlp.h **** 	u.i[0]=pgm_read_word((PGM_P)addr);
- 507               		.loc 2 29 0
- 508 019e F901      		movw r30,r18
- 509               	/* #APP */
- 510               	 ;  29 "inc/pgmspacehlp.h" 1
- 511 01a0 4591      		lpm r20, Z+
- 512 01a2 5491      		lpm r21, Z
- 513               		
- 514               	 ;  0 "" 2
- 515               	.LVL67:
- 516               	/* #NOAPP */
- 517               	.LBE16:
- 518 01a4 CA01      		movw r24,r20
- 519               	.LVL68:
- 520               	.LBB17:
-  30:inc/pgmspacehlp.h **** 	u.i[1]=pgm_read_word((PGM_P)addr+2);
- 521               		.loc 2 30 0
- 522 01a6 F901      		movw r30,r18
- 523 01a8 3296      		adiw r30,2
- 524               	.LVL69:
- 525               	.LBE17:
- 526               	/* #APP */
- 527               	 ;  30 "inc/pgmspacehlp.h" 1
- 528 01aa A591      		lpm r26, Z+
- 529 01ac B491      		lpm r27, Z
- 530               		
- 531               	 ;  0 "" 2
- 532               	.LVL70:
- 533               	/* #NOAPP */
- 534               	.L42:
- 535               	.LBE15:
- 536               	.LBE14:
- 537               		.loc 1 300 0
- 538 01ae 8093 0000 		sts Vref,r24
- 539 01b2 9093 0000 		sts Vref+1,r25
- 540 01b6 A093 0000 		sts Vref+2,r26
- 541 01ba B093 0000 		sts Vref+3,r27
- 301:src/drv/ADC.c ****         }
- 302:src/drv/ADC.c ****           
- 303:src/drv/ADC.c ****         ADMUX = VOLTAGE_SENSOR;     
- 542               		.loc 1 303 0
- 543 01be 81E0      		ldi r24,lo8(1)
- 544               	.LVL71:
- 545 01c0 8093 7C00 		sts 124,r24
- 546               	.LVL72:
- 304:src/drv/ADC.c ****         ADCresult = ADCresult_temp; // Get the ADCresult from the voltage reading
- 305:src/drv/ADC.c **** 
- 306:src/drv/ADC.c ****         // Light-measurement finished
- 307:src/drv/ADC.c **** 
- 308:src/drv/ADC.c ****         V_ADC = ( ADCresult * Vref ) / 1024; // Calculate the voltage
- 547               		.loc 1 308 0
- 548 01c4 B701      		movw r22,r14
- 549 01c6 FF0C      		lsl r15
- 550 01c8 880B      		sbc r24,r24
- 551 01ca 990B      		sbc r25,r25
- 552 01cc 0E94 0000 		call __floatsisf
- 553               	.LVL73:
- 554 01d0 2091 0000 		lds r18,Vref
- 555 01d4 3091 0000 		lds r19,Vref+1
- 556 01d8 4091 0000 		lds r20,Vref+2
- 557 01dc 5091 0000 		lds r21,Vref+3
- 558 01e0 0E94 0000 		call __mulsf3
- 559               	.LVL74:
- 560 01e4 20E0      		ldi r18,0
- 561 01e6 30E0      		ldi r19,0
- 562 01e8 40E8      		ldi r20,lo8(-128)
- 563 01ea 5AE3      		ldi r21,lo8(58)
- 564 01ec 0E94 0000 		call __mulsf3
- 565               	.LVL75:
- 309:src/drv/ADC.c ****            
- 310:src/drv/ADC.c ****         V_ADC = ( V_ADC * 6 );      // Multiply by 6 cause of the voltage division
- 566               		.loc 1 310 0
- 567 01f0 20E0      		ldi r18,0
- 568 01f2 30E0      		ldi r19,0
- 569 01f4 40EC      		ldi r20,lo8(-64)
- 570 01f6 50E4      		ldi r21,lo8(64)
- 571 01f8 0E94 0000 		call __mulsf3
- 572               	.LVL76:
- 573 01fc 4B01      		movw r8,r22
- 574 01fe 5C01      		movw r10,r24
- 575               	.LVL77:
- 311:src/drv/ADC.c ****             
- 312:src/drv/ADC.c ****         VoltageHB = V_ADC;              // Store the high-byte
- 576               		.loc 1 312 0
- 577 0200 0E94 0000 		call __fixunssfsi
- 578               	.LVL78:
- 579 0204 6B01      		movw r12,r22
- 580 0206 7C01      		movw r14,r24
- 581               	.LVL79:
- 313:src/drv/ADC.c ****         V_ADC = ( V_ADC - VoltageHB );
- 314:src/drv/ADC.c ****         VoltageLB = ( V_ADC * 100 );    // Store the low-byte
- 315:src/drv/ADC.c ****      
- 316:src/drv/ADC.c ****         Temp = CHAR2BCD2(VoltageHB);    // Convert from char to bin
- 582               		.loc 1 316 0
- 583 0208 862F      		mov r24,r22
- 584 020a 0E94 0000 		call CHAR2BCD2
- 585               	.LVL80:
- 586 020e D82F      		mov r29,r24
- 587               	.LVL81:
- 313:src/drv/ADC.c ****         V_ADC = ( V_ADC - VoltageHB );
- 588               		.loc 1 313 0
- 589 0210 6C2D      		mov r22,r12
- 590 0212 70E0      		ldi r23,0
- 591 0214 80E0      		ldi r24,0
- 592 0216 90E0      		ldi r25,0
- 593               	.LVL82:
- 594 0218 0E94 0000 		call __floatsisf
- 595               	.LVL83:
- 596 021c 9B01      		movw r18,r22
- 597 021e AC01      		movw r20,r24
- 598 0220 C501      		movw r24,r10
- 599 0222 B401      		movw r22,r8
- 600 0224 0E94 0000 		call __subsf3
- 601               	.LVL84:
- 314:src/drv/ADC.c ****      
- 602               		.loc 1 314 0
- 603 0228 20E0      		ldi r18,0
- 604 022a 30E0      		ldi r19,0
- 605 022c 48EC      		ldi r20,lo8(-56)
- 606 022e 52E4      		ldi r21,lo8(66)
- 607 0230 0E94 0000 		call __mulsf3
- 608               	.LVL85:
- 609 0234 0E94 0000 		call __fixunssfsi
- 610               	.LVL86:
- 317:src/drv/ADC.c ****     
- 318:src/drv/ADC.c ****         TL = (Temp & 0x0F) + '0';
- 319:src/drv/ADC.c ****         TH = (Temp >> 4) + '0';
- 320:src/drv/ADC.c ****             
- 321:src/drv/ADC.c ****         Temp = CHAR2BCD2(VoltageLB);    // Convert from char to bin
- 611               		.loc 1 321 0
- 612 0238 862F      		mov r24,r22
- 613 023a 0E94 0000 		call CHAR2BCD2
- 614               	.LVL87:
- 615 023e C82F      		mov r28,r24
- 616               	.LVL88:
- 322:src/drv/ADC.c ****    
- 323:src/drv/ADC.c ****         VL = (Temp >> 4) + '0';
- 324:src/drv/ADC.c **** 
- 325:src/drv/ADC.c ****         LCD_putc(0, ' ');
- 617               		.loc 1 325 0
- 618 0240 60E2      		ldi r22,lo8(32)
- 619 0242 80E0      		ldi r24,0
- 620               	.LVL89:
- 621 0244 0E94 0000 		call LCD_putc
- 622               	.LVL90:
- 326:src/drv/ADC.c ****         LCD_putc(1, ' ');
- 623               		.loc 1 326 0
- 624 0248 60E2      		ldi r22,lo8(32)
- 625 024a 81E0      		ldi r24,lo8(1)
- 626 024c 0E94 0000 		call LCD_putc
- 627               	.LVL91:
- 327:src/drv/ADC.c ****         LCD_putc(2, ' ');
- 628               		.loc 1 327 0
- 629 0250 60E2      		ldi r22,lo8(32)
- 630 0252 82E0      		ldi r24,lo8(2)
- 631 0254 0E94 0000 		call LCD_putc
- 632               	.LVL92:
- 318:src/drv/ADC.c ****         TH = (Temp >> 4) + '0';
- 633               		.loc 1 318 0
- 634 0258 6D2F      		mov r22,r29
- 635 025a 6F70      		andi r22,lo8(15)
- 636 025c 605D      		subi r22,lo8(-(48))
- 637               	.LVL93:
- 328:src/drv/ADC.c ****         LCD_putc(3, TL);
- 638               		.loc 1 328 0
- 639 025e 83E0      		ldi r24,lo8(3)
- 640 0260 0E94 0000 		call LCD_putc
- 641               	.LVL94:
- 329:src/drv/ADC.c ****         LCD_putc(4, 'V');
- 642               		.loc 1 329 0
- 643 0264 66E5      		ldi r22,lo8(86)
- 644 0266 84E0      		ldi r24,lo8(4)
- 645 0268 0E94 0000 		call LCD_putc
- 646               	.LVL95:
- 323:src/drv/ADC.c **** 
- 647               		.loc 1 323 0
- 648 026c 6C2F      		mov r22,r28
- 649 026e 6295      		swap r22
- 650 0270 6F70      		andi r22,lo8(15)
- 651 0272 605D      		subi r22,lo8(-(48))
- 652 0274 00C0      		rjmp .L43
- 653               	.LVL96:
- 654               	.L27:
- 330:src/drv/ADC.c ****         LCD_putc(5, VL);
- 331:src/drv/ADC.c ****         LCD_putc(6, '\0');
- 332:src/drv/ADC.c ****         
- 333:src/drv/ADC.c **** //        Can't set LCD_UpdateRequired = TRUE here cause we are inside the Timer0 interrupt
- 334:src/drv/ADC.c **** //        LCD_UpdateRequired(TRUE, 0);
- 335:src/drv/ADC.c ****                              
- 336:src/drv/ADC.c ****     }
- 337:src/drv/ADC.c ****     else if( ADMUX == LIGHT_SENSOR )
- 655               		.loc 1 337 0
- 656 0276 8091 7C00 		lds r24,124
- 657 027a 8230      		cpi r24,lo8(2)
- 658 027c 01F0      		breq .+2
- 659 027e 00C0      		rjmp .L12
- 338:src/drv/ADC.c ****     {
- 339:src/drv/ADC.c ****         // The relation between ADC-value and lux is yet to be found, 
- 340:src/drv/ADC.c ****         // for now the ADC-value is presented on the LCD
- 341:src/drv/ADC.c ****         
- 342:src/drv/ADC.c ****         VoltageHB = CHAR2BCD2(ADCH);    // Convert from char to bin
- 660               		.loc 1 342 0
- 661 0280 8091 7900 		lds r24,121
- 662 0284 0E94 0000 		call CHAR2BCD2
- 663               	.LVL97:
- 343:src/drv/ADC.c **** 
- 344:src/drv/ADC.c ****         Temp = ADCL;                
- 664               		.loc 1 344 0
- 665 0288 8091 7800 		lds r24,120
- 666               	.LVL98:
- 345:src/drv/ADC.c ****     
- 346:src/drv/ADC.c ****         TL = (Temp & 0x0F) + '0';       
- 667               		.loc 1 346 0
- 668 028c 982F      		mov r25,r24
- 669 028e 9F70      		andi r25,lo8(15)
- 670 0290 C0E3      		ldi r28,lo8(48)
- 671 0292 C90F      		add r28,r25
- 672               	.LVL99:
- 347:src/drv/ADC.c ****         if(TL > '9')        // if the hex-value is over 9, add 7 in order to go 
- 673               		.loc 1 347 0
- 674 0294 CA33      		cpi r28,lo8(58)
- 675 0296 00F0      		brlo .L34
- 348:src/drv/ADC.c ****             TL += 7;        // jump to the character in the ASCII-table
- 676               		.loc 1 348 0
- 677 0298 C7E3      		ldi r28,lo8(55)
- 678               	.LVL100:
- 679 029a C90F      		add r28,r25
- 680               	.LVL101:
- 681               	.L34:
- 349:src/drv/ADC.c ****                 
- 350:src/drv/ADC.c ****         TH = (Temp >> 4) + '0';
- 682               		.loc 1 350 0
- 683 029c 8295      		swap r24
- 684               	.LVL102:
- 685 029e 8F70      		andi r24,lo8(15)
- 686 02a0 D0E3      		ldi r29,lo8(48)
- 687 02a2 D80F      		add r29,r24
- 688               	.LVL103:
- 351:src/drv/ADC.c ****         if(TH > '9')        // if the hex-value is over 9, add 7 in order to go 
- 689               		.loc 1 351 0
- 690 02a4 DA33      		cpi r29,lo8(58)
- 691 02a6 00F0      		brlo .L35
- 352:src/drv/ADC.c ****             TH += 7;        // jump to the character in the ASCII-table
- 692               		.loc 1 352 0
- 693 02a8 D7E3      		ldi r29,lo8(55)
- 694               	.LVL104:
- 695 02aa D80F      		add r29,r24
- 696               	.LVL105:
- 697               	.L35:
- 353:src/drv/ADC.c ****             
- 354:src/drv/ADC.c ****         LCD_putc(0, 'A');
- 698               		.loc 1 354 0
- 699 02ac 61E4      		ldi r22,lo8(65)
- 700 02ae 80E0      		ldi r24,0
- 701 02b0 0E94 0000 		call LCD_putc
- 702               	.LVL106:
- 355:src/drv/ADC.c ****         LCD_putc(1, 'D');
- 703               		.loc 1 355 0
- 704 02b4 64E4      		ldi r22,lo8(68)
- 705 02b6 81E0      		ldi r24,lo8(1)
- 706 02b8 0E94 0000 		call LCD_putc
- 707               	.LVL107:
- 356:src/drv/ADC.c ****         LCD_putc(2, 'C');
- 708               		.loc 1 356 0
- 709 02bc 63E4      		ldi r22,lo8(67)
- 710 02be 82E0      		ldi r24,lo8(2)
- 711 02c0 0E94 0000 		call LCD_putc
- 712               	.LVL108:
- 357:src/drv/ADC.c ****         LCD_putc(3, (ADCH + 0x30));
- 713               		.loc 1 357 0
- 714 02c4 6091 7900 		lds r22,121
- 715 02c8 605D      		subi r22,lo8(-(48))
- 716 02ca 83E0      		ldi r24,lo8(3)
- 717 02cc 0E94 0000 		call LCD_putc
- 718               	.LVL109:
- 358:src/drv/ADC.c ****         LCD_putc(4, TH);
- 719               		.loc 1 358 0
- 720 02d0 6D2F      		mov r22,r29
- 721 02d2 84E0      		ldi r24,lo8(4)
- 722 02d4 0E94 0000 		call LCD_putc
- 723               	.LVL110:
- 359:src/drv/ADC.c ****         LCD_putc(5, TL);
- 724               		.loc 1 359 0
- 725 02d8 6C2F      		mov r22,r28
- 726               	.LVL111:
- 727               	.L43:
- 728 02da 85E0      		ldi r24,lo8(5)
- 729 02dc 0E94 0000 		call LCD_putc
- 730               	.LVL112:
- 360:src/drv/ADC.c ****         LCD_putc(6, '\0');
- 731               		.loc 1 360 0
- 732 02e0 60E0      		ldi r22,0
- 733 02e2 86E0      		ldi r24,lo8(6)
- 734               	/* epilogue start */
- 361:src/drv/ADC.c **** 
- 362:src/drv/ADC.c **** //        Can't set LCD_UpdateRequired = TRUE here cause we are inside the Timer0 interrupt
- 363:src/drv/ADC.c **** //        LCD_UpdateRequired(TRUE, 0);        
- 364:src/drv/ADC.c **** 
- 365:src/drv/ADC.c ****     }
- 366:src/drv/ADC.c **** }
- 735               		.loc 1 366 0
- 736 02e4 DF91      		pop r29
- 737 02e6 CF91      		pop r28
- 738 02e8 1F91      		pop r17
- 739 02ea FF90      		pop r15
- 740 02ec EF90      		pop r14
- 741               	.LVL113:
- 742 02ee DF90      		pop r13
- 743 02f0 CF90      		pop r12
- 744 02f2 BF90      		pop r11
- 745 02f4 AF90      		pop r10
- 746 02f6 9F90      		pop r9
- 747 02f8 8F90      		pop r8
- 360:src/drv/ADC.c ****         LCD_putc(6, '\0');
- 748               		.loc 1 360 0
- 749 02fa 0C94 0000 		jmp LCD_putc
- 750               	.LVL114:
- 751               	.L12:
- 752               	/* epilogue start */
- 753               		.loc 1 366 0
- 754 02fe DF91      		pop r29
- 755 0300 CF91      		pop r28
- 756 0302 1F91      		pop r17
- 757 0304 FF90      		pop r15
- 758 0306 EF90      		pop r14
- 759               	.LVL115:
- 760 0308 DF90      		pop r13
- 761 030a CF90      		pop r12
- 762 030c BF90      		pop r11
- 763 030e AF90      		pop r10
- 764 0310 9F90      		pop r9
- 765 0312 8F90      		pop r8
- 766 0314 0895      		ret
- 767               		.cfi_endproc
- 768               	.LFE4:
- 770               		.section	.text.TemperatureFunc,"ax",@progbits
- 771               	.global	TemperatureFunc
- 773               	TemperatureFunc:
- 774               	.LFB5:
- 367:src/drv/ADC.c **** 
- 368:src/drv/ADC.c **** 
- 369:src/drv/ADC.c **** /*****************************************************************************
- 370:src/drv/ADC.c **** *
- 371:src/drv/ADC.c **** *   Function name : TemperatureFunc
- 372:src/drv/ADC.c **** *
- 373:src/drv/ADC.c **** *   Returns :       char ST_state (to the state-machine)
- 374:src/drv/ADC.c **** *
- 375:src/drv/ADC.c **** *   Parameters :    char input (from joystick)
- 376:src/drv/ADC.c **** *
- 377:src/drv/ADC.c **** *   Purpose :       Enable or disable temperature measurements
- 378:src/drv/ADC.c **** *
- 379:src/drv/ADC.c **** *****************************************************************************/
- 380:src/drv/ADC.c **** char TemperatureFunc(char input)
- 381:src/drv/ADC.c **** {
- 775               		.loc 1 381 0
- 776               		.cfi_startproc
- 777               	.LVL116:
- 778 0000 CF93      		push r28
- 779               	.LCFI11:
- 780               		.cfi_def_cfa_offset 3
- 781               		.cfi_offset 28, -2
- 782               	/* prologue: function */
- 783               	/* frame size = 0 */
- 784               	/* stack size = 1 */
- 785               	.L__stack_usage = 1
- 786 0002 C82F      		mov r28,r24
- 382:src/drv/ADC.c ****     static char enter = 1;
- 383:src/drv/ADC.c ****     
- 384:src/drv/ADC.c ****     if (enter)
- 787               		.loc 1 384 0
- 788 0004 8091 0000 		lds r24,enter.1831
- 789               	.LVL117:
- 790 0008 8823      		tst r24
- 791 000a 01F0      		breq .L45
- 385:src/drv/ADC.c ****     {
- 386:src/drv/ADC.c ****         enter = 0;
- 792               		.loc 1 386 0
- 793 000c 1092 0000 		sts enter.1831,__zero_reg__
- 387:src/drv/ADC.c ****         
- 388:src/drv/ADC.c ****         ADC_init(TEMPERATURE_SENSOR);       // Init the ADC
- 794               		.loc 1 388 0
- 795 0010 80E0      		ldi r24,0
- 796 0012 0E94 0000 		call ADC_init
- 797               	.LVL118:
- 389:src/drv/ADC.c **** 
- 390:src/drv/ADC.c ****         // Enable auto-run of the ADC_perphery every 10ms 
- 391:src/drv/ADC.c ****         // (it will actually be more than 10ms cause of the SLEEP)
- 392:src/drv/ADC.c ****         Timer0_RegisterCallbackFunction(ADC_periphery); 
- 798               		.loc 1 392 0
- 799 0016 80E0      		ldi r24,lo8(gs(ADC_periphery))
- 800 0018 90E0      		ldi r25,hi8(gs(ADC_periphery))
- 801 001a 0E94 0000 		call Timer0_RegisterCallbackFunction
- 802               	.LVL119:
- 803 001e 00C0      		rjmp .L46
- 804               	.L45:
- 393:src/drv/ADC.c ****     }
- 394:src/drv/ADC.c ****     else
- 395:src/drv/ADC.c ****         LCD_UpdateRequired(TRUE, 0);        // New data to be presented
- 805               		.loc 1 395 0
- 806 0020 60E0      		ldi r22,0
- 807 0022 81E0      		ldi r24,lo8(1)
- 808 0024 0E94 0000 		call LCD_UpdateRequired
- 809               	.LVL120:
- 810               	.L46:
- 396:src/drv/ADC.c ****     
- 397:src/drv/ADC.c ****     if (input == KEY_PREV)
- 811               		.loc 1 397 0
- 812 0028 C330      		cpi r28,lo8(3)
- 813 002a 01F4      		brne .L47
- 398:src/drv/ADC.c ****     {
- 399:src/drv/ADC.c ****         // Disable the auto-run of the ADC_periphery
- 400:src/drv/ADC.c ****         Timer0_RemoveCallbackFunction(ADC_periphery);
- 814               		.loc 1 400 0
- 815 002c 80E0      		ldi r24,lo8(gs(ADC_periphery))
- 816 002e 90E0      		ldi r25,hi8(gs(ADC_periphery))
- 817 0030 0E94 0000 		call Timer0_RemoveCallbackFunction
- 818               	.LVL121:
- 401:src/drv/ADC.c ****         
- 402:src/drv/ADC.c ****         enter = 1;  // Set enter to 1 before leaving the TemperatureFunc
- 819               		.loc 1 402 0
- 820 0034 81E0      		ldi r24,lo8(1)
- 821 0036 8093 0000 		sts enter.1831,r24
- 403:src/drv/ADC.c ****         
- 404:src/drv/ADC.c ****         return ST_TEMPERATURE;
- 822               		.loc 1 404 0
- 823 003a 8CE3      		ldi r24,lo8(60)
- 824 003c 00C0      		rjmp .L48
- 825               	.L47:
- 405:src/drv/ADC.c ****     }
- 406:src/drv/ADC.c ****     else if (input == KEY_PLUS)
- 826               		.loc 1 406 0
- 827 003e C450      		subi r28,lo8(-(-4))
- 828               	.LVL122:
- 829 0040 C230      		cpi r28,lo8(2)
- 830 0042 00F4      		brsh .L50
- 407:src/drv/ADC.c ****     {   
- 408:src/drv/ADC.c ****         if (degree == FAHRENHEIT)
- 831               		.loc 1 408 0
- 832 0044 8091 0000 		lds r24,degree
- 833 0048 8430      		cpi r24,lo8(4)
- 834 004a 01F4      		brne .L49
- 409:src/drv/ADC.c ****             degree = CELSIUS;
- 835               		.loc 1 409 0
- 836 004c 83E0      		ldi r24,lo8(3)
- 837 004e 00C0      		rjmp .L51
- 838               	.L49:
- 410:src/drv/ADC.c ****         else
- 411:src/drv/ADC.c ****             degree = FAHRENHEIT;
- 839               		.loc 1 411 0
- 840 0050 84E0      		ldi r24,lo8(4)
- 841               	.L51:
- 842 0052 8093 0000 		sts degree,r24
- 843               	.L50:
- 412:src/drv/ADC.c ****     }
- 413:src/drv/ADC.c ****     else if (input == KEY_MINUS)
- 414:src/drv/ADC.c ****     {
- 415:src/drv/ADC.c ****         if (degree == FAHRENHEIT)
- 416:src/drv/ADC.c ****             degree = CELSIUS;
- 417:src/drv/ADC.c ****         else
- 418:src/drv/ADC.c ****             degree = FAHRENHEIT;
- 419:src/drv/ADC.c ****     }
- 420:src/drv/ADC.c ****     
- 421:src/drv/ADC.c ****     return ST_TEMPERATURE_FUNC;
- 844               		.loc 1 421 0
- 845 0056 8DE3      		ldi r24,lo8(61)
- 846               	.LVL123:
- 847               	.L48:
- 848               	/* epilogue start */
- 422:src/drv/ADC.c **** }
- 849               		.loc 1 422 0
- 850 0058 CF91      		pop r28
- 851 005a 0895      		ret
- 852               		.cfi_endproc
- 853               	.LFE5:
- 855               		.section	.text.VoltageFunc,"ax",@progbits
- 856               	.global	VoltageFunc
- 858               	VoltageFunc:
- 859               	.LFB6:
- 423:src/drv/ADC.c **** 
- 424:src/drv/ADC.c **** 
- 425:src/drv/ADC.c **** /*****************************************************************************
- 426:src/drv/ADC.c **** *
- 427:src/drv/ADC.c **** *   Function name : VoltageFunc
- 428:src/drv/ADC.c **** *
- 429:src/drv/ADC.c **** *   Returns :       char ST_state (to the state-machine)
- 430:src/drv/ADC.c **** *
- 431:src/drv/ADC.c **** *   Parameters :    char input (from joystick)
- 432:src/drv/ADC.c **** *
- 433:src/drv/ADC.c **** *   Purpose :       Enable or disable voltage measurements
- 434:src/drv/ADC.c **** *
- 435:src/drv/ADC.c **** *****************************************************************************/
- 436:src/drv/ADC.c **** char VoltageFunc(char input)
- 437:src/drv/ADC.c **** {
- 860               		.loc 1 437 0
- 861               		.cfi_startproc
- 862               	.LVL124:
- 863 0000 CF93      		push r28
- 864               	.LCFI12:
- 865               		.cfi_def_cfa_offset 3
- 866               		.cfi_offset 28, -2
- 867               	/* prologue: function */
- 868               	/* frame size = 0 */
- 869               	/* stack size = 1 */
- 870               	.L__stack_usage = 1
- 871 0002 C82F      		mov r28,r24
- 438:src/drv/ADC.c ****     static char enter = 1;
- 439:src/drv/ADC.c ****     
- 440:src/drv/ADC.c ****     if (enter)
- 872               		.loc 1 440 0
- 873 0004 8091 0000 		lds r24,enter.1835
- 874               	.LVL125:
- 875 0008 8823      		tst r24
- 876 000a 01F0      		breq .L53
- 441:src/drv/ADC.c ****     {
- 442:src/drv/ADC.c ****         enter = 0;
- 877               		.loc 1 442 0
- 878 000c 1092 0000 		sts enter.1835,__zero_reg__
- 443:src/drv/ADC.c **** 
- 444:src/drv/ADC.c ****         ADC_init(VOLTAGE_SENSOR);       // Init the ADC
- 879               		.loc 1 444 0
- 880 0010 81E0      		ldi r24,lo8(1)
- 881 0012 0E94 0000 		call ADC_init
- 882               	.LVL126:
- 445:src/drv/ADC.c ****         
- 446:src/drv/ADC.c ****         // Enable auto-run of the ADC_perphery every 10ms 
- 447:src/drv/ADC.c ****         // (it will actually be more than 10ms cause of the SLEEP)        
- 448:src/drv/ADC.c ****         Timer0_RegisterCallbackFunction(ADC_periphery);        
- 883               		.loc 1 448 0
- 884 0016 80E0      		ldi r24,lo8(gs(ADC_periphery))
- 885 0018 90E0      		ldi r25,hi8(gs(ADC_periphery))
- 886 001a 0E94 0000 		call Timer0_RegisterCallbackFunction
- 887               	.LVL127:
- 888 001e 00C0      		rjmp .L54
- 889               	.L53:
- 449:src/drv/ADC.c ****     }
- 450:src/drv/ADC.c ****     else
- 451:src/drv/ADC.c ****         LCD_UpdateRequired(TRUE, 0); 
- 890               		.loc 1 451 0
- 891 0020 60E0      		ldi r22,0
- 892 0022 81E0      		ldi r24,lo8(1)
- 893 0024 0E94 0000 		call LCD_UpdateRequired
- 894               	.LVL128:
- 895               	.L54:
- 452:src/drv/ADC.c **** 
- 453:src/drv/ADC.c ****     if (input == KEY_PREV)
- 896               		.loc 1 453 0
- 897 0028 C330      		cpi r28,lo8(3)
- 898 002a 01F4      		brne .L56
- 454:src/drv/ADC.c ****     {
- 455:src/drv/ADC.c ****         // Disable the auto-run of the ADC_periphery        
- 456:src/drv/ADC.c ****         Timer0_RemoveCallbackFunction(ADC_periphery);
- 899               		.loc 1 456 0
- 900 002c 80E0      		ldi r24,lo8(gs(ADC_periphery))
- 901 002e 90E0      		ldi r25,hi8(gs(ADC_periphery))
- 902 0030 0E94 0000 		call Timer0_RemoveCallbackFunction
- 903               	.LVL129:
- 457:src/drv/ADC.c ****         
- 458:src/drv/ADC.c ****         enter = 1;  // Set enter to 1 before leaving the TemperatureFunc
- 904               		.loc 1 458 0
- 905 0034 81E0      		ldi r24,lo8(1)
- 906 0036 8093 0000 		sts enter.1835,r24
- 459:src/drv/ADC.c ****         
- 460:src/drv/ADC.c ****         return ST_VOLTAGE;
- 907               		.loc 1 460 0
- 908 003a 86E4      		ldi r24,lo8(70)
- 909 003c 00C0      		rjmp .L55
- 910               	.L56:
- 461:src/drv/ADC.c ****     }
- 462:src/drv/ADC.c ****     else
- 463:src/drv/ADC.c ****         return ST_VOLTAGE_FUNC;    
- 911               		.loc 1 463 0
- 912 003e 87E4      		ldi r24,lo8(71)
- 913               	.L55:
- 914               	/* epilogue start */
- 464:src/drv/ADC.c **** }
- 915               		.loc 1 464 0
- 916 0040 CF91      		pop r28
- 917               	.LVL130:
- 918 0042 0895      		ret
- 919               		.cfi_endproc
- 920               	.LFE6:
- 922               		.section	.text.LightFunc,"ax",@progbits
- 923               	.global	LightFunc
- 925               	LightFunc:
- 926               	.LFB7:
- 465:src/drv/ADC.c **** 
- 466:src/drv/ADC.c **** 
- 467:src/drv/ADC.c **** /*****************************************************************************
- 468:src/drv/ADC.c **** *
- 469:src/drv/ADC.c **** *   Function name : LightFunc
- 470:src/drv/ADC.c **** *
- 471:src/drv/ADC.c **** *   Returns :       char ST_state (to the state-machine)
- 472:src/drv/ADC.c **** *
- 473:src/drv/ADC.c **** *   Parameters :    char input (from joystick)
- 474:src/drv/ADC.c **** *
- 475:src/drv/ADC.c **** *   Purpose :       Enable or disable light measurements
- 476:src/drv/ADC.c **** *
- 477:src/drv/ADC.c **** *****************************************************************************/
- 478:src/drv/ADC.c **** char LightFunc(char input)
- 479:src/drv/ADC.c **** {
- 927               		.loc 1 479 0
- 928               		.cfi_startproc
- 929               	.LVL131:
- 930 0000 CF93      		push r28
- 931               	.LCFI13:
- 932               		.cfi_def_cfa_offset 3
- 933               		.cfi_offset 28, -2
- 934               	/* prologue: function */
- 935               	/* frame size = 0 */
- 936               	/* stack size = 1 */
- 937               	.L__stack_usage = 1
- 938 0002 C82F      		mov r28,r24
- 480:src/drv/ADC.c ****     static char enter = 1;
- 481:src/drv/ADC.c ****     
- 482:src/drv/ADC.c ****     if (enter)
- 939               		.loc 1 482 0
- 940 0004 8091 0000 		lds r24,enter.1839
- 941               	.LVL132:
- 942 0008 8823      		tst r24
- 943 000a 01F0      		breq .L58
- 483:src/drv/ADC.c ****     {
- 484:src/drv/ADC.c ****     
- 485:src/drv/ADC.c ****         enter = 0;
- 944               		.loc 1 485 0
- 945 000c 1092 0000 		sts enter.1839,__zero_reg__
- 486:src/drv/ADC.c ****         
- 487:src/drv/ADC.c ****         ADC_init(LIGHT_SENSOR);     // Init the ADC
- 946               		.loc 1 487 0
- 947 0010 82E0      		ldi r24,lo8(2)
- 948 0012 0E94 0000 		call ADC_init
- 949               	.LVL133:
- 488:src/drv/ADC.c ****         
- 489:src/drv/ADC.c ****         // Enable auto-run of the ADC_perphery every 10ms 
- 490:src/drv/ADC.c ****         // (it will actually be more than 10ms cause of the SLEEP)  
- 491:src/drv/ADC.c ****         Timer0_RegisterCallbackFunction(ADC_periphery);        
- 950               		.loc 1 491 0
- 951 0016 80E0      		ldi r24,lo8(gs(ADC_periphery))
- 952 0018 90E0      		ldi r25,hi8(gs(ADC_periphery))
- 953 001a 0E94 0000 		call Timer0_RegisterCallbackFunction
- 954               	.LVL134:
- 955 001e 00C0      		rjmp .L59
- 956               	.L58:
- 492:src/drv/ADC.c ****     }
- 493:src/drv/ADC.c ****     else
- 494:src/drv/ADC.c ****         LCD_UpdateRequired(TRUE, 0); 
- 957               		.loc 1 494 0
- 958 0020 60E0      		ldi r22,0
- 959 0022 81E0      		ldi r24,lo8(1)
- 960 0024 0E94 0000 		call LCD_UpdateRequired
- 961               	.LVL135:
- 962               	.L59:
- 495:src/drv/ADC.c **** 
- 496:src/drv/ADC.c ****     if (input == KEY_PREV)
- 963               		.loc 1 496 0
- 964 0028 C330      		cpi r28,lo8(3)
- 965 002a 01F4      		brne .L61
- 497:src/drv/ADC.c ****     {
- 498:src/drv/ADC.c ****         // Disable the auto-run of the ADC_periphery      
- 499:src/drv/ADC.c ****         Timer0_RemoveCallbackFunction(ADC_periphery);
- 966               		.loc 1 499 0
- 967 002c 80E0      		ldi r24,lo8(gs(ADC_periphery))
- 968 002e 90E0      		ldi r25,hi8(gs(ADC_periphery))
- 969 0030 0E94 0000 		call Timer0_RemoveCallbackFunction
- 970               	.LVL136:
- 500:src/drv/ADC.c ****         
- 501:src/drv/ADC.c ****         enter = 1;  // Set enter to 1 before leaving the TemperatureFunc
- 971               		.loc 1 501 0
- 972 0034 81E0      		ldi r24,lo8(1)
- 973 0036 8093 0000 		sts enter.1839,r24
- 502:src/drv/ADC.c ****     
- 503:src/drv/ADC.c ****         return ST_LIGHT;
- 974               		.loc 1 503 0
- 975 003a 80E5      		ldi r24,lo8(80)
- 976 003c 00C0      		rjmp .L60
- 977               	.L61:
- 504:src/drv/ADC.c ****     }
- 505:src/drv/ADC.c ****     else
- 506:src/drv/ADC.c ****         return ST_LIGHT_FUNC;    
- 978               		.loc 1 506 0
- 979 003e 81E5      		ldi r24,lo8(81)
- 980               	.L60:
- 981               	/* epilogue start */
- 507:src/drv/ADC.c **** }
- 982               		.loc 1 507 0
- 983 0040 CF91      		pop r28
- 984               	.LVL137:
- 985 0042 0895      		ret
- 986               		.cfi_endproc
- 987               	.LFE7:
- 989               		.section	.data.enter.1839,"aw",@progbits
- 992               	enter.1839:
- 993 0000 01        		.byte	1
- 994               		.section	.data.enter.1835,"aw",@progbits
- 997               	enter.1835:
- 998 0000 01        		.byte	1
- 999               		.section	.data.enter.1831,"aw",@progbits
- 1002               	enter.1831:
- 1003 0000 01        		.byte	1
- 1004               	.global	degree
- 1005               		.section	.data.degree,"aw",@progbits
- 1008               	degree:
- 1009 0000 03        		.byte	3
- 1010               	.global	Vref
- 1011               		.section	.data.Vref,"aw",@progbits
- 1014               	Vref:
- 1015 0000 9A        		.byte	-102
- 1016 0001 99        		.byte	-103
- 1017 0002 39        		.byte	57
- 1018 0003 40        		.byte	64
- 1019               	.global	LIGHT_VOLTAGE
- 1020               		.section	.progmem.data.LIGHT_VOLTAGE,"a",@progbits
- 1023               	LIGHT_VOLTAGE:
- 1024 0000 1D        		.byte	29
- 1025 0001 5A        		.byte	90
- 1026 0002 34        		.byte	52
- 1027 0003 40        		.byte	64
- 1028 0004 E1        		.byte	-31
- 1029 0005 7A        		.byte	122
- 1030 0006 34        		.byte	52
- 1031 0007 40        		.byte	64
- 1032 0008 6A        		.byte	106
- 1033 0009 BC        		.byte	-68
- 1034 000a 34        		.byte	52
- 1035 000b 40        		.byte	64
- 1036 000c 91        		.byte	-111
- 1037 000d ED        		.byte	-19
- 1038 000e 34        		.byte	52
- 1039 000f 40        		.byte	64
- 1040 0010 7D        		.byte	125
- 1041 0011 3F        		.byte	63
- 1042 0012 35        		.byte	53
- 1043 0013 40        		.byte	64
- 1044 0014 A4        		.byte	-92
- 1045 0015 70        		.byte	112
- 1046 0016 35        		.byte	53
- 1047 0017 40        		.byte	64
- 1048 0018 2D        		.byte	45
- 1049 0019 B2        		.byte	-78
- 1050 001a 35        		.byte	53
- 1051 001b 40        		.byte	64
- 1052 001c F2        		.byte	-14
- 1053 001d D2        		.byte	-46
- 1054 001e 35        		.byte	53
- 1055 001f 40        		.byte	64
- 1056 0020 B6        		.byte	-74
- 1057 0021 F3        		.byte	-13
- 1058 0022 35        		.byte	53
- 1059 0023 40        		.byte	64
- 1060 0024 3F        		.byte	63
- 1061 0025 35        		.byte	53
- 1062 0026 36        		.byte	54
- 1063 0027 40        		.byte	64
- 1064 0028 66        		.byte	102
- 1065 0029 66        		.byte	102
- 1066 002a 36        		.byte	54
- 1067 002b 40        		.byte	64
- 1068 002c 8D        		.byte	-115
- 1069 002d 97        		.byte	-105
- 1070 002e 36        		.byte	54
- 1071 002f 40        		.byte	64
- 1072 0030 17        		.byte	23
- 1073 0031 D9        		.byte	-39
- 1074 0032 36        		.byte	54
- 1075 0033 40        		.byte	64
- 1076 0034 64        		.byte	100
- 1077 0035 3B        		.byte	59
- 1078 0036 37        		.byte	55
- 1079 0037 40        		.byte	64
- 1080 0038 EE        		.byte	-18
- 1081 0039 7C        		.byte	124
- 1082 003a 37        		.byte	55
- 1083 003b 40        		.byte	64
- 1084 003c 14        		.byte	20
- 1085 003d AE        		.byte	-82
- 1086 003e 37        		.byte	55
- 1087 003f 40        		.byte	64
- 1088 0040 9E        		.byte	-98
- 1089 0041 EF        		.byte	-17
- 1090 0042 37        		.byte	55
- 1091 0043 40        		.byte	64
- 1092 0044 B0        		.byte	-80
- 1093 0045 72        		.byte	114
- 1094 0046 38        		.byte	56
- 1095 0047 40        		.byte	64
- 1096 0048 E9        		.byte	-23
- 1097 0049 26        		.byte	38
- 1098 004a 39        		.byte	57
- 1099 004b 40        		.byte	64
- 1100 004c 21        		.byte	33
- 1101 004d B0        		.byte	-80
- 1102 004e 3A        		.byte	58
- 1103 004f 40        		.byte	64
- 1104 0050 93        		.byte	-109
- 1105 0051 18        		.byte	24
- 1106 0052 3C        		.byte	60
- 1107 0053 40        		.byte	64
- 1108               	.global	LIGHT_ADC
- 1109               		.section	.progmem.data.LIGHT_ADC,"a",@progbits
- 1112               	LIGHT_ADC:
- 1113 0000 3500      		.word	53
- 1114 0002 6000      		.word	96
- 1115 0004 8000      		.word	128
- 1116 0006 B000      		.word	176
- 1117 0008 1D01      		.word	285
- 1118 000a 3D01      		.word	317
- 1119 000c 5A01      		.word	346
- 1120 000e 7A01      		.word	378
- 1121 0010 9701      		.word	407
- 1122 0012 B901      		.word	441
- 1123 0014 DA01      		.word	474
- 1124 0016 F901      		.word	505
- 1125 0018 1602      		.word	534
- 1126 001a 4002      		.word	576
- 1127 001c 6D02      		.word	621
- 1128 001e 8202      		.word	642
- 1129 0020 A202      		.word	674
- 1130 0022 EF02      		.word	751
- 1131 0024 3203      		.word	818
- 1132 0026 B003      		.word	944
- 1133 0028 F203      		.word	1010
- 1134               	.global	TEMP_Fahrenheit_pos
- 1135               		.section	.progmem.data.TEMP_Fahrenheit_pos,"a",@progbits
- 1138               	TEMP_Fahrenheit_pos:
- 1139 0000 AA03      		.word	938
- 1140 0002 A703      		.word	935
- 1141 0004 A403      		.word	932
- 1142 0006 A103      		.word	929
- 1143 0008 9E03      		.word	926
- 1144 000a 9B03      		.word	923
- 1145 000c 9803      		.word	920
- 1146 000e 9403      		.word	916
- 1147 0010 9103      		.word	913
- 1148 0012 8D03      		.word	909
- 1149 0014 8A03      		.word	906
- 1150 0016 8603      		.word	902
- 1151 0018 8203      		.word	898
- 1152 001a 7E03      		.word	894
- 1153 001c 7B03      		.word	891
- 1154 001e 7703      		.word	887
- 1155 0020 7203      		.word	882
- 1156 0022 6E03      		.word	878
- 1157 0024 6A03      		.word	874
- 1158 0026 6603      		.word	870
- 1159 0028 6103      		.word	865
- 1160 002a 5D03      		.word	861
- 1161 002c 5803      		.word	856
- 1162 002e 5303      		.word	851
- 1163 0030 4F03      		.word	847
- 1164 0032 4A03      		.word	842
- 1165 0034 4503      		.word	837
- 1166 0036 4003      		.word	832
- 1167 0038 3B03      		.word	827
- 1168 003a 3603      		.word	822
- 1169 003c 3003      		.word	816
- 1170 003e 2B03      		.word	811
- 1171 0040 2603      		.word	806
- 1172 0042 2003      		.word	800
- 1173 0044 1B03      		.word	795
- 1174 0046 1503      		.word	789
- 1175 0048 0F03      		.word	783
- 1176 004a 0A03      		.word	778
- 1177 004c 0403      		.word	772
- 1178 004e FE02      		.word	766
- 1179 0050 F802      		.word	760
- 1180 0052 F202      		.word	754
- 1181 0054 EC02      		.word	748
- 1182 0056 E602      		.word	742
- 1183 0058 DF02      		.word	735
- 1184 005a D902      		.word	729
- 1185 005c D302      		.word	723
- 1186 005e CC02      		.word	716
- 1187 0060 C602      		.word	710
- 1188 0062 BF02      		.word	703
- 1189 0064 B902      		.word	697
- 1190 0066 B202      		.word	690
- 1191 0068 AC02      		.word	684
- 1192 006a A502      		.word	677
- 1193 006c 9E02      		.word	670
- 1194 006e 9702      		.word	663
- 1195 0070 9102      		.word	657
- 1196 0072 8A02      		.word	650
- 1197 0074 8302      		.word	643
- 1198 0076 7C02      		.word	636
- 1199 0078 7502      		.word	629
- 1200 007a 6E02      		.word	622
- 1201 007c 6802      		.word	616
- 1202 007e 6102      		.word	609
- 1203 0080 5A02      		.word	602
- 1204 0082 5302      		.word	595
- 1205 0084 4C02      		.word	588
- 1206 0086 4502      		.word	581
- 1207 0088 3E02      		.word	574
- 1208 008a 3702      		.word	567
- 1209 008c 3002      		.word	560
- 1210 008e 2902      		.word	553
- 1211 0090 2202      		.word	546
- 1212 0092 1B02      		.word	539
- 1213 0094 1502      		.word	533
- 1214 0096 0E02      		.word	526
- 1215 0098 0702      		.word	519
- 1216 009a 0002      		.word	512
- 1217 009c F901      		.word	505
- 1218 009e F201      		.word	498
- 1219 00a0 EC01      		.word	492
- 1220 00a2 E501      		.word	485
- 1221 00a4 DE01      		.word	478
- 1222 00a6 D801      		.word	472
- 1223 00a8 D101      		.word	465
- 1224 00aa CB01      		.word	459
- 1225 00ac C401      		.word	452
- 1226 00ae BE01      		.word	446
- 1227 00b0 B701      		.word	439
- 1228 00b2 B101      		.word	433
- 1229 00b4 AA01      		.word	426
- 1230 00b6 A401      		.word	420
- 1231 00b8 9E01      		.word	414
- 1232 00ba 9801      		.word	408
- 1233 00bc 9201      		.word	402
- 1234 00be 8C01      		.word	396
- 1235 00c0 8601      		.word	390
- 1236 00c2 8001      		.word	384
- 1237 00c4 7A01      		.word	378
- 1238 00c6 7401      		.word	372
- 1239 00c8 6E01      		.word	366
- 1240 00ca 6801      		.word	360
- 1241 00cc 6301      		.word	355
- 1242 00ce 5D01      		.word	349
- 1243 00d0 5801      		.word	344
- 1244 00d2 5201      		.word	338
- 1245 00d4 4D01      		.word	333
- 1246 00d6 4701      		.word	327
- 1247 00d8 4201      		.word	322
- 1248 00da 3D01      		.word	317
- 1249 00dc 3801      		.word	312
- 1250 00de 3301      		.word	307
- 1251 00e0 2E01      		.word	302
- 1252 00e2 2901      		.word	297
- 1253 00e4 2401      		.word	292
- 1254 00e6 1F01      		.word	287
- 1255 00e8 1A01      		.word	282
- 1256 00ea 1501      		.word	277
- 1257 00ec 1101      		.word	273
- 1258 00ee 0C01      		.word	268
- 1259 00f0 0801      		.word	264
- 1260 00f2 0301      		.word	259
- 1261 00f4 FF00      		.word	255
- 1262 00f6 FB00      		.word	251
- 1263 00f8 F600      		.word	246
- 1264 00fa F200      		.word	242
- 1265 00fc EE00      		.word	238
- 1266 00fe EA00      		.word	234
- 1267 0100 E600      		.word	230
- 1268 0102 E200      		.word	226
- 1269 0104 DE00      		.word	222
- 1270 0106 DB00      		.word	219
- 1271 0108 D700      		.word	215
- 1272 010a D300      		.word	211
- 1273 010c CF00      		.word	207
- 1274 010e CC00      		.word	204
- 1275 0110 C800      		.word	200
- 1276 0112 C500      		.word	197
- 1277 0114 C200      		.word	194
- 1278 0116 BE00      		.word	190
- 1279 0118 BB00      		.word	187
- 1280               	.global	TEMP_Celsius_neg
- 1281               		.section	.progmem.data.TEMP_Celsius_neg,"a",@progbits
- 1284               	TEMP_Celsius_neg:
- 1285 0000 2F03      		.word	815
- 1286 0002 3903      		.word	825
- 1287 0004 4203      		.word	834
- 1288 0006 4B03      		.word	843
- 1289 0008 5303      		.word	851
- 1290 000a 5C03      		.word	860
- 1291 000c 6403      		.word	868
- 1292 000e 6C03      		.word	876
- 1293 0010 7303      		.word	883
- 1294 0012 7B03      		.word	891
- 1295 0014 8203      		.word	898
- 1296 0016 8803      		.word	904
- 1297 0018 8F03      		.word	911
- 1298 001a 9503      		.word	917
- 1299 001c 9B03      		.word	923
- 1300               	.global	TEMP_Celsius_pos
- 1301               		.section	.progmem.data.TEMP_Celsius_pos,"a",@progbits
- 1304               	TEMP_Celsius_pos:
- 1305 0000 2603      		.word	806
- 1306 0002 1C03      		.word	796
- 1307 0004 1203      		.word	786
- 1308 0006 0703      		.word	775
- 1309 0008 FD02      		.word	765
- 1310 000a F202      		.word	754
- 1311 000c E702      		.word	743
- 1312 000e DC02      		.word	732
- 1313 0010 D002      		.word	720
- 1314 0012 C502      		.word	709
- 1315 0014 B902      		.word	697
- 1316 0016 AD02      		.word	685
- 1317 0018 A102      		.word	673
- 1318 001a 9502      		.word	661
- 1319 001c 8902      		.word	649
- 1320 001e 7C02      		.word	636
- 1321 0020 7002      		.word	624
- 1322 0022 6302      		.word	611
- 1323 0024 5702      		.word	599
- 1324 0026 4A02      		.word	586
- 1325 0028 3E02      		.word	574
- 1326 002a 3202      		.word	562
- 1327 002c 2502      		.word	549
- 1328 002e 1902      		.word	537
- 1329 0030 0C02      		.word	524
- 1330 0032 0002      		.word	512
- 1331 0034 F401      		.word	500
- 1332 0036 E801      		.word	488
- 1333 0038 DC01      		.word	476
- 1334 003a D001      		.word	464
- 1335 003c C401      		.word	452
- 1336 003e B801      		.word	440
- 1337 0040 AD01      		.word	429
- 1338 0042 A201      		.word	418
- 1339 0044 9601      		.word	406
- 1340 0046 8C01      		.word	396
- 1341 0048 8101      		.word	385
- 1342 004a 7601      		.word	374
- 1343 004c 6C01      		.word	364
- 1344 004e 6201      		.word	354
- 1345 0050 5801      		.word	344
- 1346 0052 4E01      		.word	334
- 1347 0054 4401      		.word	324
- 1348 0056 3B01      		.word	315
- 1349 0058 3201      		.word	306
- 1350 005a 2901      		.word	297
- 1351 005c 2001      		.word	288
- 1352 005e 1701      		.word	279
- 1353 0060 0F01      		.word	271
- 1354 0062 0701      		.word	263
- 1355 0064 FF00      		.word	255
- 1356 0066 F700      		.word	247
- 1357 0068 F000      		.word	240
- 1358 006a E900      		.word	233
- 1359 006c E100      		.word	225
- 1360 006e DB00      		.word	219
- 1361 0070 D400      		.word	212
- 1362 0072 CD00      		.word	205
- 1363 0074 C700      		.word	199
- 1364 0076 C100      		.word	193
- 1365 0078 BB00      		.word	187
- 1366               		.text
- 1367               	.Letext0:
- 1368               		.file 3 "/usr/lib/avr/include/stdint.h"
- 1369               		.file 4 "inc/timer0.h"
- 1370               		.file 5 "inc/BCD.h"
- 1371               		.file 6 "inc/LCD_functions.h"
+ 177 0002 182F      		mov r17,r24
+ 178               	.LSM32:
+ 179 0004 8091 0000 		lds r24,enter.1573
+ 180               	.LVL8:
+ 181 0008 8823      		tst r24
+ 182 000a 01F0      		breq .L18
+ 183               	.LSM33:
+ 184 000c 1092 0000 		sts enter.1573,__zero_reg__
+ 185               	.LSM34:
+ 186 0010 81E0      		ldi r24,lo8(1)
+ 187 0012 0E94 0000 		call ADC_init
+ 188               	.LSM35:
+ 189 0016 80E0      		ldi r24,lo8(gs(ADC_periphery))
+ 190 0018 90E0      		ldi r25,hi8(gs(ADC_periphery))
+ 191 001a 0E94 0000 		call Timer0_RegisterCallbackFunction
+ 192 001e 00C0      		rjmp .L19
+ 193               	.L18:
+ 194               	.LSM36:
+ 195 0020 81E0      		ldi r24,lo8(1)
+ 196 0022 60E0      		ldi r22,lo8(0)
+ 197 0024 0E94 0000 		call LCD_UpdateRequired
+ 198               	.L19:
+ 199               	.LSM37:
+ 200 0028 1330      		cpi r17,lo8(3)
+ 201 002a 01F0      		breq .L20
+ 202 002c 87E4      		ldi r24,lo8(71)
+ 203 002e 00C0      		rjmp .L21
+ 204               	.L20:
+ 205               	.LSM38:
+ 206 0030 80E0      		ldi r24,lo8(gs(ADC_periphery))
+ 207 0032 90E0      		ldi r25,hi8(gs(ADC_periphery))
+ 208 0034 0E94 0000 		call Timer0_RemoveCallbackFunction
+ 209               	.LSM39:
+ 210 0038 81E0      		ldi r24,lo8(1)
+ 211 003a 8093 0000 		sts enter.1573,r24
+ 212 003e 86E4      		ldi r24,lo8(70)
+ 213               	.L21:
+ 214               	/* epilogue start */
+ 215               	.LSM40:
+ 216 0040 1F91      		pop r17
+ 217               	.LVL9:
+ 218 0042 0895      		ret
+ 219               	.LFE7:
+ 221               		.section	.text.TemperatureFunc,"ax",@progbits
+ 222               	.global	TemperatureFunc
+ 224               	TemperatureFunc:
+ 225               	.LFB6:
+ 226               	.LSM41:
+ 227               	.LVL10:
+ 228 0000 1F93      		push r17
+ 229               	/* prologue: function */
+ 230               	/* frame size = 0 */
+ 231 0002 182F      		mov r17,r24
+ 232               	.LSM42:
+ 233 0004 8091 0000 		lds r24,enter.1566
+ 234               	.LVL11:
+ 235 0008 8823      		tst r24
+ 236 000a 01F0      		breq .L24
+ 237               	.LSM43:
+ 238 000c 1092 0000 		sts enter.1566,__zero_reg__
+ 239               	.LSM44:
+ 240 0010 80E0      		ldi r24,lo8(0)
+ 241 0012 0E94 0000 		call ADC_init
+ 242               	.LSM45:
+ 243 0016 80E0      		ldi r24,lo8(gs(ADC_periphery))
+ 244 0018 90E0      		ldi r25,hi8(gs(ADC_periphery))
+ 245 001a 0E94 0000 		call Timer0_RegisterCallbackFunction
+ 246 001e 00C0      		rjmp .L25
+ 247               	.L24:
+ 248               	.LSM46:
+ 249 0020 81E0      		ldi r24,lo8(1)
+ 250 0022 60E0      		ldi r22,lo8(0)
+ 251 0024 0E94 0000 		call LCD_UpdateRequired
+ 252               	.L25:
+ 253               	.LSM47:
+ 254 0028 1330      		cpi r17,lo8(3)
+ 255 002a 01F4      		brne .L26
+ 256               	.LSM48:
+ 257 002c 80E0      		ldi r24,lo8(gs(ADC_periphery))
+ 258 002e 90E0      		ldi r25,hi8(gs(ADC_periphery))
+ 259 0030 0E94 0000 		call Timer0_RemoveCallbackFunction
+ 260               	.LSM49:
+ 261 0034 81E0      		ldi r24,lo8(1)
+ 262 0036 8093 0000 		sts enter.1566,r24
+ 263 003a 8CE3      		ldi r24,lo8(60)
+ 264 003c 00C0      		rjmp .L27
+ 265               	.L26:
+ 266               	.LSM50:
+ 267 003e 1430      		cpi r17,lo8(4)
+ 268 0040 01F4      		brne .L28
+ 269               	.LSM51:
+ 270 0042 8091 0000 		lds r24,degree
+ 271 0046 8430      		cpi r24,lo8(4)
+ 272 0048 01F0      		breq .L35
+ 273               	.L29:
+ 274               	.LSM52:
+ 275 004a 1093 0000 		sts degree,r17
+ 276 004e 00C0      		rjmp .L33
+ 277               	.L28:
+ 278               	.LSM53:
+ 279 0050 1530      		cpi r17,lo8(5)
+ 280 0052 01F4      		brne .L33
+ 281               	.L30:
+ 282               	.LSM54:
+ 283 0054 8091 0000 		lds r24,degree
+ 284 0058 8430      		cpi r24,lo8(4)
+ 285 005a 01F4      		brne .L31
+ 286               	.L35:
+ 287               	.LSM55:
+ 288 005c 83E0      		ldi r24,lo8(3)
+ 289 005e 00C0      		rjmp .L34
+ 290               	.L31:
+ 291               	.LSM56:
+ 292 0060 84E0      		ldi r24,lo8(4)
+ 293               	.L34:
+ 294 0062 8093 0000 		sts degree,r24
+ 295               	.L33:
+ 296 0066 8DE3      		ldi r24,lo8(61)
+ 297               	.L27:
+ 298               	/* epilogue start */
+ 299               	.LSM57:
+ 300 0068 1F91      		pop r17
+ 301               	.LVL12:
+ 302 006a 0895      		ret
+ 303               	.LFE6:
+ 305               		.section	.text.ADC_periphery,"ax",@progbits
+ 306               	.global	ADC_periphery
+ 308               	ADC_periphery:
+ 309               	.LFB5:
+ 310               	.LSM58:
+ 311 0000 9F92      		push r9
+ 312 0002 AF92      		push r10
+ 313 0004 BF92      		push r11
+ 314 0006 CF92      		push r12
+ 315 0008 DF92      		push r13
+ 316 000a EF92      		push r14
+ 317 000c FF92      		push r15
+ 318 000e 0F93      		push r16
+ 319 0010 1F93      		push r17
+ 320 0012 CF93      		push r28
+ 321 0014 DF93      		push r29
+ 322               	/* prologue: function */
+ 323               	/* frame size = 0 */
+ 324               	.LSM59:
+ 325 0016 0E94 0000 		call ADC_read
+ 326 001a EC01      		movw r28,r24
+ 327               	.LVL13:
+ 328               	.LSM60:
+ 329 001c 8091 7C00 		lds r24,124
+ 330 0020 8823      		tst r24
+ 331 0022 01F0      		breq .+2
+ 332 0024 00C0      		rjmp .L37
+ 333               	.LSM61:
+ 334 0026 8091 0000 		lds r24,degree
+ 335 002a 8330      		cpi r24,lo8(3)
+ 336 002c 01F0      		breq .+2
+ 337 002e 00C0      		rjmp .L38
+ 338               	.LSM62:
+ 339 0030 83E0      		ldi r24,hi8(811)
+ 340 0032 CB32      		cpi r28,lo8(811)
+ 341 0034 D807      		cpc r29,r24
+ 342 0036 04F0      		brlt .L39
+ 343 0038 20E0      		ldi r18,lo8(TEMP_Celsius_neg)
+ 344 003a 30E0      		ldi r19,hi8(TEMP_Celsius_neg)
+ 345 003c 10E0      		ldi r17,lo8(0)
+ 346               	.LVL14:
+ 347               	.L41:
+ 348               	.LBB10:
+ 349               	.LSM63:
+ 350 003e F901      		movw r30,r18
+ 351               	/* #APP */
+ 352               	 ;  193 "src/drv/ADC.c" 1
+ 353 0040 8591      		lpm r24, Z+
+ 354 0042 9491      		lpm r25, Z
+ 355               		
+ 356               	 ;  0 "" 2
+ 357               	/* #NOAPP */
+ 358               	.LBE10:
+ 359 0044 8C17      		cp r24,r28
+ 360 0046 9D07      		cpc r25,r29
+ 361 0048 04F4      		brge .L40
+ 362               	.LSM64:
+ 363 004a 1F5F      		subi r17,lo8(-(1))
+ 364 004c 2E5F      		subi r18,lo8(-(2))
+ 365 004e 3F4F      		sbci r19,hi8(-(2))
+ 366 0050 1A31      		cpi r17,lo8(26)
+ 367 0052 01F4      		brne .L41
+ 368               	.L40:
+ 369               	.LSM65:
+ 370 0054 81E0      		ldi r24,lo8(1)
+ 371               	.LVL15:
+ 372 0056 6DE2      		ldi r22,lo8(45)
+ 373 0058 00C0      		rjmp .L65
+ 374               	.LVL16:
+ 375               	.L39:
+ 376               	.LSM66:
+ 377 005a 93E0      		ldi r25,hi8(800)
+ 378 005c C032      		cpi r28,lo8(800)
+ 379 005e D907      		cpc r29,r25
+ 380 0060 04F4      		brge .L43
+ 381 0062 20E0      		ldi r18,lo8(TEMP_Celsius_pos)
+ 382 0064 30E0      		ldi r19,hi8(TEMP_Celsius_pos)
+ 383 0066 10E0      		ldi r17,lo8(0)
+ 384               	.LVL17:
+ 385               	.L45:
+ 386               	.LBB11:
+ 387               	.LSM67:
+ 388 0068 F901      		movw r30,r18
+ 389               	/* #APP */
+ 390               	 ;  206 "src/drv/ADC.c" 1
+ 391 006a 8591      		lpm r24, Z+
+ 392 006c 9491      		lpm r25, Z
+ 393               		
+ 394               	 ;  0 "" 2
+ 395               	/* #NOAPP */
+ 396               	.LBE11:
+ 397 006e C817      		cp r28,r24
+ 398 0070 D907      		cpc r29,r25
+ 399 0072 04F4      		brge .L44
+ 400               	.LSM68:
+ 401 0074 1F5F      		subi r17,lo8(-(1))
+ 402 0076 2E5F      		subi r18,lo8(-(2))
+ 403 0078 3F4F      		sbci r19,hi8(-(2))
+ 404 007a 1436      		cpi r17,lo8(100)
+ 405 007c 01F4      		brne .L45
+ 406               	.L44:
+ 407               	.LSM69:
+ 408 007e 81E0      		ldi r24,lo8(1)
+ 409               	.LVL18:
+ 410 0080 6BE2      		ldi r22,lo8(43)
+ 411               	.LVL19:
+ 412               	.L65:
+ 413 0082 0E94 0000 		call LCD_putc
+ 414               	.LVL20:
+ 415 0086 00C0      		rjmp .L42
+ 416               	.LVL21:
+ 417               	.L43:
+ 418               	.LSM70:
+ 419 0088 81E0      		ldi r24,lo8(1)
+ 420 008a 60E2      		ldi r22,lo8(32)
+ 421 008c 0E94 0000 		call LCD_putc
+ 422 0090 10E0      		ldi r17,lo8(0)
+ 423               	.LVL22:
+ 424               	.L42:
+ 425               	.LSM71:
+ 426 0092 812F      		mov r24,r17
+ 427 0094 0E94 0000 		call CHAR2BCD2
+ 428 0098 182F      		mov r17,r24
+ 429               	.LVL23:
+ 430               	.LSM72:
+ 431 009a 80E0      		ldi r24,lo8(0)
+ 432 009c 60E2      		ldi r22,lo8(32)
+ 433 009e 0E94 0000 		call LCD_putc
+ 434               	.LSM73:
+ 435 00a2 612F      		mov r22,r17
+ 436 00a4 6295      		swap r22
+ 437 00a6 6F70      		andi r22,lo8(15)
+ 438 00a8 605D      		subi r22,lo8(-(48))
+ 439 00aa 82E0      		ldi r24,lo8(2)
+ 440 00ac 0E94 0000 		call LCD_putc
+ 441               	.LSM74:
+ 442 00b0 1F70      		andi r17,lo8(15)
+ 443 00b2 105D      		subi r17,lo8(-(48))
+ 444 00b4 83E0      		ldi r24,lo8(3)
+ 445 00b6 612F      		mov r22,r17
+ 446 00b8 0E94 0000 		call LCD_putc
+ 447               	.LSM75:
+ 448 00bc 84E0      		ldi r24,lo8(4)
+ 449 00be 6AE2      		ldi r22,lo8(42)
+ 450 00c0 0E94 0000 		call LCD_putc
+ 451               	.LSM76:
+ 452 00c4 85E0      		ldi r24,lo8(5)
+ 453 00c6 63E4      		ldi r22,lo8(67)
+ 454 00c8 00C0      		rjmp .L68
+ 455               	.LVL24:
+ 456               	.L38:
+ 457               	.LSM77:
+ 458 00ca 8430      		cpi r24,lo8(4)
+ 459 00cc 01F0      		breq .+2
+ 460 00ce 00C0      		rjmp .L60
+ 461 00d0 20E0      		ldi r18,lo8(TEMP_Fahrenheit_pos)
+ 462 00d2 30E0      		ldi r19,hi8(TEMP_Fahrenheit_pos)
+ 463 00d4 10E0      		ldi r17,lo8(0)
+ 464               	.LVL25:
+ 465               	.L48:
+ 466               	.LBB12:
+ 467               	.LSM78:
+ 468 00d6 F901      		movw r30,r18
+ 469               	/* #APP */
+ 470               	 ;  238 "src/drv/ADC.c" 1
+ 471 00d8 8591      		lpm r24, Z+
+ 472 00da 9491      		lpm r25, Z
+ 473               		
+ 474               	 ;  0 "" 2
+ 475               	/* #NOAPP */
+ 476               	.LBE12:
+ 477 00dc 8C17      		cp r24,r28
+ 478 00de 9D07      		cpc r25,r29
+ 479 00e0 04F0      		brlt .L47
+ 480               	.LSM79:
+ 481 00e2 1F5F      		subi r17,lo8(-(1))
+ 482 00e4 2E5F      		subi r18,lo8(-(2))
+ 483 00e6 3F4F      		sbci r19,hi8(-(2))
+ 484 00e8 1E38      		cpi r17,lo8(-114)
+ 485 00ea 01F4      		brne .L48
+ 486               	.L47:
+ 487               	.LSM80:
+ 488 00ec 812F      		mov r24,r17
+ 489               	.LVL26:
+ 490 00ee 0E94 0000 		call CHAR2BCD3
+ 491               	.LVL27:
+ 492 00f2 EC01      		movw r28,r24
+ 493               	.LVL28:
+ 494               	.LSM81:
+ 495 00f4 1436      		cpi r17,lo8(100)
+ 496 00f6 00F0      		brlo .L49
+ 497               	.LSM82:
+ 498 00f8 80E0      		ldi r24,lo8(0)
+ 499 00fa 6BE2      		ldi r22,lo8(43)
+ 500 00fc 0E94 0000 		call LCD_putc
+ 501               	.LSM83:
+ 502 0100 6D2F      		mov r22,r29
+ 503 0102 7727      		clr r23
+ 504 0104 67FD      		sbrc r22,7
+ 505 0106 7A95      		dec r23
+ 506 0108 605D      		subi r22,lo8(-(48))
+ 507 010a 81E0      		ldi r24,lo8(1)
+ 508 010c 00C0      		rjmp .L66
+ 509               	.L49:
+ 510               	.LSM84:
+ 511 010e 80E0      		ldi r24,lo8(0)
+ 512 0110 60E2      		ldi r22,lo8(32)
+ 513 0112 0E94 0000 		call LCD_putc
+ 514               	.LSM85:
+ 515 0116 81E0      		ldi r24,lo8(1)
+ 516 0118 6BE2      		ldi r22,lo8(43)
+ 517               	.L66:
+ 518 011a 0E94 0000 		call LCD_putc
+ 519               	.LSM86:
+ 520 011e BE01      		movw r22,r28
+ 521 0120 E4E0      		ldi r30,4
+ 522 0122 7595      	1:	asr r23
+ 523 0124 6795      		ror r22
+ 524 0126 EA95      		dec r30
+ 525 0128 01F4      		brne 1b
+ 526 012a 6F70      		andi r22,lo8(15)
+ 527 012c 605D      		subi r22,lo8(-(48))
+ 528 012e 82E0      		ldi r24,lo8(2)
+ 529 0130 0E94 0000 		call LCD_putc
+ 530               	.LSM87:
+ 531 0134 CE01      		movw r24,r28
+ 532 0136 8F70      		andi r24,lo8(15)
+ 533 0138 682F      		mov r22,r24
+ 534 013a 605D      		subi r22,lo8(-(48))
+ 535 013c 83E0      		ldi r24,lo8(3)
+ 536 013e 0E94 0000 		call LCD_putc
+ 537               	.LSM88:
+ 538 0142 84E0      		ldi r24,lo8(4)
+ 539 0144 6AE2      		ldi r22,lo8(42)
+ 540 0146 0E94 0000 		call LCD_putc
+ 541               	.LSM89:
+ 542 014a 85E0      		ldi r24,lo8(5)
+ 543 014c 66E4      		ldi r22,lo8(70)
+ 544 014e 00C0      		rjmp .L68
+ 545               	.LVL29:
+ 546               	.L37:
+ 547               	.LSM90:
+ 548 0150 8091 7C00 		lds r24,124
+ 549 0154 8130      		cpi r24,lo8(1)
+ 550 0156 01F0      		breq .+2
+ 551 0158 00C0      		rjmp .L51
+ 552               	.LSM91:
+ 553 015a 82E0      		ldi r24,lo8(2)
+ 554 015c 0E94 0000 		call ADC_init
+ 555               	.LSM92:
+ 556 0160 0E94 0000 		call ADC_read
+ 557 0164 BC01      		movw r22,r24
+ 558               	.LVL30:
+ 559 0166 20E0      		ldi r18,lo8(LIGHT_ADC)
+ 560 0168 30E0      		ldi r19,hi8(LIGHT_ADC)
+ 561 016a 40E0      		ldi r20,lo8(0)
+ 562               	.LVL31:
+ 563               	.L53:
+ 564               	.LBB13:
+ 565               	.LSM93:
+ 566 016c F901      		movw r30,r18
+ 567               	/* #APP */
+ 568               	 ;  288 "src/drv/ADC.c" 1
+ 569 016e 8591      		lpm r24, Z+
+ 570 0170 9491      		lpm r25, Z
+ 571               		
+ 572               	 ;  0 "" 2
+ 573               	/* #NOAPP */
+ 574               	.LBE13:
+ 575 0172 8617      		cp r24,r22
+ 576 0174 9707      		cpc r25,r23
+ 577 0176 04F4      		brge .L52
+ 578               	.LSM94:
+ 579 0178 4F5F      		subi r20,lo8(-(1))
+ 580 017a 2E5F      		subi r18,lo8(-(2))
+ 581 017c 3F4F      		sbci r19,hi8(-(2))
+ 582 017e 4731      		cpi r20,lo8(23)
+ 583 0180 01F4      		brne .L53
+ 584 0182 00C0      		rjmp .L54
+ 585               	.L52:
+ 586               	.LSM95:
+ 587 0184 4423      		tst r20
+ 588 0186 01F4      		brne .L55
+ 589               	.LSM96:
+ 590 0188 86EF      		ldi r24,lo8(0x403428f6)
+ 591 018a 98E2      		ldi r25,hi8(0x403428f6)
+ 592 018c A4E3      		ldi r26,hlo8(0x403428f6)
+ 593 018e B0E4      		ldi r27,hhi8(0x403428f6)
+ 594               	.LVL32:
+ 595 0190 00C0      		rjmp .L67
+ 596               	.LVL33:
+ 597               	.L55:
+ 598               	.LSM97:
+ 599 0192 4531      		cpi r20,lo8(21)
+ 600 0194 00F0      		brlo .L57
+ 601               	.L54:
+ 602               	.LSM98:
+ 603 0196 8AEB      		ldi r24,lo8(0x403c49ba)
+ 604 0198 99E4      		ldi r25,hi8(0x403c49ba)
+ 605 019a ACE3      		ldi r26,hlo8(0x403c49ba)
+ 606 019c B0E4      		ldi r27,hhi8(0x403c49ba)
+ 607               	.LVL34:
+ 608               	.L67:
+ 609 019e 8093 0000 		sts Vref,r24
+ 610 01a2 9093 0000 		sts (Vref)+1,r25
+ 611 01a6 A093 0000 		sts (Vref)+2,r26
+ 612 01aa B093 0000 		sts (Vref)+3,r27
+ 613 01ae 00C0      		rjmp .L56
+ 614               	.LVL35:
+ 615               	.L57:
+ 616               	.LSM99:
+ 617 01b0 842F      		mov r24,r20
+ 618               	.LVL36:
+ 619 01b2 90E0      		ldi r25,lo8(0)
+ 620 01b4 880F      		lsl r24
+ 621 01b6 991F      		rol r25
+ 622 01b8 880F      		lsl r24
+ 623 01ba 991F      		rol r25
+ 624 01bc 8050      		subi r24,lo8(-(LIGHT_VOLTAGE))
+ 625 01be 9040      		sbci r25,hi8(-(LIGHT_VOLTAGE))
+ 626               	.LBB14:
+ 627               	.LBB15:
+ 628               	.LBB16:
+ 629               	.LSM100:
+ 630 01c0 FC01      		movw r30,r24
+ 631               	.LVL37:
+ 632               	/* #APP */
+ 633               	 ;  29 "inc/pgmspacehlp.h" 1
+ 634 01c2 6591      		lpm r22, Z+
+ 635 01c4 7491      		lpm r23, Z
+ 636               		
+ 637               	 ;  0 "" 2
+ 638               	.LVL38:
+ 639               	/* #NOAPP */
+ 640               	.LBE16:
+ 641 01c6 9B01      		movw r18,r22
+ 642               	.LVL39:
+ 643               	.LBB17:
+ 644               	.LSM101:
+ 645 01c8 FC01      		movw r30,r24
+ 646               	.LVL40:
+ 647 01ca 3296      		adiw r30,2
+ 648               	.LBE17:
+ 649               	/* #APP */
+ 650               	 ;  30 "inc/pgmspacehlp.h" 1
+ 651 01cc 4591      		lpm r20, Z+
+ 652 01ce 5491      		lpm r21, Z
+ 653               		
+ 654               	 ;  0 "" 2
+ 655               	.LVL41:
+ 656               	/* #NOAPP */
+ 657               	.LBE15:
+ 658               	.LBE14:
+ 659               	.LSM102:
+ 660 01d0 2093 0000 		sts Vref,r18
+ 661 01d4 3093 0000 		sts (Vref)+1,r19
+ 662 01d8 4093 0000 		sts (Vref)+2,r20
+ 663 01dc 5093 0000 		sts (Vref)+3,r21
+ 664               	.LVL42:
+ 665               	.L56:
+ 666               	.LSM103:
+ 667 01e0 81E0      		ldi r24,lo8(1)
+ 668 01e2 8093 7C00 		sts 124,r24
+ 669               	.LSM104:
+ 670 01e6 BE01      		movw r22,r28
+ 671 01e8 8827      		clr r24
+ 672 01ea 77FD      		sbrc r23,7
+ 673 01ec 8095      		com r24
+ 674 01ee 982F      		mov r25,r24
+ 675               	.LVL43:
+ 676 01f0 0E94 0000 		call __floatsisf
+ 677               	.LVL44:
+ 678 01f4 2091 0000 		lds r18,Vref
+ 679 01f8 3091 0000 		lds r19,(Vref)+1
+ 680 01fc 4091 0000 		lds r20,(Vref)+2
+ 681 0200 5091 0000 		lds r21,(Vref)+3
+ 682 0204 0E94 0000 		call __mulsf3
+ 683 0208 20E0      		ldi r18,lo8(0x3a800000)
+ 684 020a 30E0      		ldi r19,hi8(0x3a800000)
+ 685 020c 40E8      		ldi r20,hlo8(0x3a800000)
+ 686 020e 5AE3      		ldi r21,hhi8(0x3a800000)
+ 687 0210 0E94 0000 		call __mulsf3
+ 688               	.LSM105:
+ 689 0214 20E0      		ldi r18,lo8(0x40c00000)
+ 690 0216 30E0      		ldi r19,hi8(0x40c00000)
+ 691 0218 40EC      		ldi r20,hlo8(0x40c00000)
+ 692 021a 50E4      		ldi r21,hhi8(0x40c00000)
+ 693 021c 0E94 0000 		call __mulsf3
+ 694 0220 5B01      		movw r10,r22
+ 695 0222 6C01      		movw r12,r24
+ 696               	.LSM106:
+ 697 0224 0E94 0000 		call __fixunssfsi
+ 698 0228 DC01      		movw r26,r24
+ 699 022a CB01      		movw r24,r22
+ 700 022c E82E      		mov r14,r24
+ 701               	.LVL45:
+ 702               	.LSM107:
+ 703 022e 0E94 0000 		call CHAR2BCD2
+ 704 0232 982E      		mov r9,r24
+ 705               	.LVL46:
+ 706               	.LSM108:
+ 707 0234 FF24      		clr r15
+ 708               	.LVL47:
+ 709 0236 0027      		clr r16
+ 710 0238 F7FC      		sbrc r15,7
+ 711 023a 0095      		com r16
+ 712 023c 102F      		mov r17,r16
+ 713               	.LVL48:
+ 714 023e C801      		movw r24,r16
+ 715 0240 B701      		movw r22,r14
+ 716 0242 0E94 0000 		call __floatsisf
+ 717 0246 9B01      		movw r18,r22
+ 718 0248 AC01      		movw r20,r24
+ 719 024a C601      		movw r24,r12
+ 720 024c B501      		movw r22,r10
+ 721 024e 0E94 0000 		call __subsf3
+ 722 0252 20E0      		ldi r18,lo8(0x42c80000)
+ 723 0254 30E0      		ldi r19,hi8(0x42c80000)
+ 724 0256 48EC      		ldi r20,hlo8(0x42c80000)
+ 725 0258 52E4      		ldi r21,hhi8(0x42c80000)
+ 726 025a 0E94 0000 		call __mulsf3
+ 727 025e 0E94 0000 		call __fixunssfsi
+ 728 0262 DC01      		movw r26,r24
+ 729 0264 CB01      		movw r24,r22
+ 730 0266 0E94 0000 		call CHAR2BCD2
+ 731 026a 182F      		mov r17,r24
+ 732               	.LVL49:
+ 733               	.LSM109:
+ 734 026c 80E0      		ldi r24,lo8(0)
+ 735 026e 60E2      		ldi r22,lo8(32)
+ 736 0270 0E94 0000 		call LCD_putc
+ 737               	.LSM110:
+ 738 0274 81E0      		ldi r24,lo8(1)
+ 739 0276 60E2      		ldi r22,lo8(32)
+ 740 0278 0E94 0000 		call LCD_putc
+ 741               	.LSM111:
+ 742 027c 82E0      		ldi r24,lo8(2)
+ 743 027e 60E2      		ldi r22,lo8(32)
+ 744 0280 0E94 0000 		call LCD_putc
+ 745               	.LSM112:
+ 746 0284 9FE0      		ldi r25,lo8(15)
+ 747 0286 9922      		and r9,r25
+ 748               	.LVL50:
+ 749 0288 80E3      		ldi r24,lo8(48)
+ 750 028a 980E      		add r9,r24
+ 751 028c 83E0      		ldi r24,lo8(3)
+ 752 028e 692D      		mov r22,r9
+ 753 0290 0E94 0000 		call LCD_putc
+ 754               	.LSM113:
+ 755 0294 84E0      		ldi r24,lo8(4)
+ 756 0296 66E5      		ldi r22,lo8(86)
+ 757 0298 0E94 0000 		call LCD_putc
+ 758               	.LSM114:
+ 759 029c 1295      		swap r17
+ 760               	.LVL51:
+ 761 029e 1F70      		andi r17,lo8(15)
+ 762 02a0 105D      		subi r17,lo8(-(48))
+ 763 02a2 85E0      		ldi r24,lo8(5)
+ 764 02a4 612F      		mov r22,r17
+ 765 02a6 00C0      		rjmp .L68
+ 766               	.LVL52:
+ 767               	.L51:
+ 768               	.LSM115:
+ 769 02a8 8091 7C00 		lds r24,124
+ 770 02ac 8230      		cpi r24,lo8(2)
+ 771 02ae 01F4      		brne .L60
+ 772               	.LSM116:
+ 773 02b0 8091 7900 		lds r24,121
+ 774 02b4 0E94 0000 		call CHAR2BCD2
+ 775               	.LSM117:
+ 776 02b8 9091 7800 		lds r25,120
+ 777               	.LVL53:
+ 778               	.LSM118:
+ 779 02bc 892F      		mov r24,r25
+ 780 02be 8F70      		andi r24,lo8(15)
+ 781 02c0 082F      		mov r16,r24
+ 782               	.LVL54:
+ 783 02c2 005D      		subi r16,lo8(-(48))
+ 784               	.LSM119:
+ 785 02c4 0A33      		cpi r16,lo8(58)
+ 786 02c6 00F0      		brlo .L58
+ 787               	.LSM120:
+ 788 02c8 095F      		subi r16,lo8(-(7))
+ 789               	.L58:
+ 790               	.LSM121:
+ 791 02ca 892F      		mov r24,r25
+ 792 02cc 8295      		swap r24
+ 793 02ce 8F70      		andi r24,lo8(15)
+ 794 02d0 182F      		mov r17,r24
+ 795               	.LVL55:
+ 796 02d2 105D      		subi r17,lo8(-(48))
+ 797               	.LSM122:
+ 798 02d4 1A33      		cpi r17,lo8(58)
+ 799 02d6 00F0      		brlo .L59
+ 800               	.LSM123:
+ 801 02d8 195F      		subi r17,lo8(-(7))
+ 802               	.L59:
+ 803               	.LSM124:
+ 804 02da 80E0      		ldi r24,lo8(0)
+ 805 02dc 61E4      		ldi r22,lo8(65)
+ 806 02de 0E94 0000 		call LCD_putc
+ 807               	.LVL56:
+ 808               	.LSM125:
+ 809 02e2 81E0      		ldi r24,lo8(1)
+ 810 02e4 64E4      		ldi r22,lo8(68)
+ 811 02e6 0E94 0000 		call LCD_putc
+ 812               	.LSM126:
+ 813 02ea 82E0      		ldi r24,lo8(2)
+ 814 02ec 63E4      		ldi r22,lo8(67)
+ 815 02ee 0E94 0000 		call LCD_putc
+ 816               	.LSM127:
+ 817 02f2 6091 7900 		lds r22,121
+ 818 02f6 605D      		subi r22,lo8(-(48))
+ 819 02f8 83E0      		ldi r24,lo8(3)
+ 820 02fa 0E94 0000 		call LCD_putc
+ 821               	.LSM128:
+ 822 02fe 84E0      		ldi r24,lo8(4)
+ 823 0300 612F      		mov r22,r17
+ 824 0302 0E94 0000 		call LCD_putc
+ 825               	.LSM129:
+ 826 0306 85E0      		ldi r24,lo8(5)
+ 827 0308 602F      		mov r22,r16
+ 828               	.LVL57:
+ 829               	.L68:
+ 830 030a 0E94 0000 		call LCD_putc
+ 831               	.LSM130:
+ 832 030e 86E0      		ldi r24,lo8(6)
+ 833 0310 60E0      		ldi r22,lo8(0)
+ 834 0312 0E94 0000 		call LCD_putc
+ 835               	.L60:
+ 836               	/* epilogue start */
+ 837               	.LSM131:
+ 838 0316 DF91      		pop r29
+ 839 0318 CF91      		pop r28
+ 840               	.LVL58:
+ 841 031a 1F91      		pop r17
+ 842               	.LVL59:
+ 843 031c 0F91      		pop r16
+ 844               	.LVL60:
+ 845 031e FF90      		pop r15
+ 846               	.LVL61:
+ 847 0320 EF90      		pop r14
+ 848               	.LVL62:
+ 849 0322 DF90      		pop r13
+ 850 0324 CF90      		pop r12
+ 851 0326 BF90      		pop r11
+ 852 0328 AF90      		pop r10
+ 853 032a 9F90      		pop r9
+ 854 032c 0895      		ret
+ 855               	.LFE5:
+ 857               	.global	TEMP_Celsius_pos
+ 858               		.section	.progmem.data,"a",@progbits
+ 861               	TEMP_Celsius_pos:
+ 862 0000 2603      		.word	806
+ 863 0002 1C03      		.word	796
+ 864 0004 1203      		.word	786
+ 865 0006 0703      		.word	775
+ 866 0008 FD02      		.word	765
+ 867 000a F202      		.word	754
+ 868 000c E702      		.word	743
+ 869 000e DC02      		.word	732
+ 870 0010 D002      		.word	720
+ 871 0012 C502      		.word	709
+ 872 0014 B902      		.word	697
+ 873 0016 AD02      		.word	685
+ 874 0018 A102      		.word	673
+ 875 001a 9502      		.word	661
+ 876 001c 8902      		.word	649
+ 877 001e 7C02      		.word	636
+ 878 0020 7002      		.word	624
+ 879 0022 6302      		.word	611
+ 880 0024 5702      		.word	599
+ 881 0026 4A02      		.word	586
+ 882 0028 3E02      		.word	574
+ 883 002a 3202      		.word	562
+ 884 002c 2502      		.word	549
+ 885 002e 1902      		.word	537
+ 886 0030 0C02      		.word	524
+ 887 0032 0002      		.word	512
+ 888 0034 F401      		.word	500
+ 889 0036 E801      		.word	488
+ 890 0038 DC01      		.word	476
+ 891 003a D001      		.word	464
+ 892 003c C401      		.word	452
+ 893 003e B801      		.word	440
+ 894 0040 AD01      		.word	429
+ 895 0042 A201      		.word	418
+ 896 0044 9601      		.word	406
+ 897 0046 8C01      		.word	396
+ 898 0048 8101      		.word	385
+ 899 004a 7601      		.word	374
+ 900 004c 6C01      		.word	364
+ 901 004e 6201      		.word	354
+ 902 0050 5801      		.word	344
+ 903 0052 4E01      		.word	334
+ 904 0054 4401      		.word	324
+ 905 0056 3B01      		.word	315
+ 906 0058 3201      		.word	306
+ 907 005a 2901      		.word	297
+ 908 005c 2001      		.word	288
+ 909 005e 1701      		.word	279
+ 910 0060 0F01      		.word	271
+ 911 0062 0701      		.word	263
+ 912 0064 FF00      		.word	255
+ 913 0066 F700      		.word	247
+ 914 0068 F000      		.word	240
+ 915 006a E900      		.word	233
+ 916 006c E100      		.word	225
+ 917 006e DB00      		.word	219
+ 918 0070 D400      		.word	212
+ 919 0072 CD00      		.word	205
+ 920 0074 C700      		.word	199
+ 921 0076 C100      		.word	193
+ 922 0078 BB00      		.word	187
+ 923               	.global	TEMP_Celsius_neg
+ 926               	TEMP_Celsius_neg:
+ 927 007a 2F03      		.word	815
+ 928 007c 3903      		.word	825
+ 929 007e 4203      		.word	834
+ 930 0080 4B03      		.word	843
+ 931 0082 5303      		.word	851
+ 932 0084 5C03      		.word	860
+ 933 0086 6403      		.word	868
+ 934 0088 6C03      		.word	876
+ 935 008a 7303      		.word	883
+ 936 008c 7B03      		.word	891
+ 937 008e 8203      		.word	898
+ 938 0090 8803      		.word	904
+ 939 0092 8F03      		.word	911
+ 940 0094 9503      		.word	917
+ 941 0096 9B03      		.word	923
+ 942               	.global	TEMP_Fahrenheit_pos
+ 945               	TEMP_Fahrenheit_pos:
+ 946 0098 AA03      		.word	938
+ 947 009a A703      		.word	935
+ 948 009c A403      		.word	932
+ 949 009e A103      		.word	929
+ 950 00a0 9E03      		.word	926
+ 951 00a2 9B03      		.word	923
+ 952 00a4 9803      		.word	920
+ 953 00a6 9403      		.word	916
+ 954 00a8 9103      		.word	913
+ 955 00aa 8D03      		.word	909
+ 956 00ac 8A03      		.word	906
+ 957 00ae 8603      		.word	902
+ 958 00b0 8203      		.word	898
+ 959 00b2 7E03      		.word	894
+ 960 00b4 7B03      		.word	891
+ 961 00b6 7703      		.word	887
+ 962 00b8 7203      		.word	882
+ 963 00ba 6E03      		.word	878
+ 964 00bc 6A03      		.word	874
+ 965 00be 6603      		.word	870
+ 966 00c0 6103      		.word	865
+ 967 00c2 5D03      		.word	861
+ 968 00c4 5803      		.word	856
+ 969 00c6 5303      		.word	851
+ 970 00c8 4F03      		.word	847
+ 971 00ca 4A03      		.word	842
+ 972 00cc 4503      		.word	837
+ 973 00ce 4003      		.word	832
+ 974 00d0 3B03      		.word	827
+ 975 00d2 3603      		.word	822
+ 976 00d4 3003      		.word	816
+ 977 00d6 2B03      		.word	811
+ 978 00d8 2603      		.word	806
+ 979 00da 2003      		.word	800
+ 980 00dc 1B03      		.word	795
+ 981 00de 1503      		.word	789
+ 982 00e0 0F03      		.word	783
+ 983 00e2 0A03      		.word	778
+ 984 00e4 0403      		.word	772
+ 985 00e6 FE02      		.word	766
+ 986 00e8 F802      		.word	760
+ 987 00ea F202      		.word	754
+ 988 00ec EC02      		.word	748
+ 989 00ee E602      		.word	742
+ 990 00f0 DF02      		.word	735
+ 991 00f2 D902      		.word	729
+ 992 00f4 D302      		.word	723
+ 993 00f6 CC02      		.word	716
+ 994 00f8 C602      		.word	710
+ 995 00fa BF02      		.word	703
+ 996 00fc B902      		.word	697
+ 997 00fe B202      		.word	690
+ 998 0100 AC02      		.word	684
+ 999 0102 A502      		.word	677
+ 1000 0104 9E02      		.word	670
+ 1001 0106 9702      		.word	663
+ 1002 0108 9102      		.word	657
+ 1003 010a 8A02      		.word	650
+ 1004 010c 8302      		.word	643
+ 1005 010e 7C02      		.word	636
+ 1006 0110 7502      		.word	629
+ 1007 0112 6E02      		.word	622
+ 1008 0114 6802      		.word	616
+ 1009 0116 6102      		.word	609
+ 1010 0118 5A02      		.word	602
+ 1011 011a 5302      		.word	595
+ 1012 011c 4C02      		.word	588
+ 1013 011e 4502      		.word	581
+ 1014 0120 3E02      		.word	574
+ 1015 0122 3702      		.word	567
+ 1016 0124 3002      		.word	560
+ 1017 0126 2902      		.word	553
+ 1018 0128 2202      		.word	546
+ 1019 012a 1B02      		.word	539
+ 1020 012c 1502      		.word	533
+ 1021 012e 0E02      		.word	526
+ 1022 0130 0702      		.word	519
+ 1023 0132 0002      		.word	512
+ 1024 0134 F901      		.word	505
+ 1025 0136 F201      		.word	498
+ 1026 0138 EC01      		.word	492
+ 1027 013a E501      		.word	485
+ 1028 013c DE01      		.word	478
+ 1029 013e D801      		.word	472
+ 1030 0140 D101      		.word	465
+ 1031 0142 CB01      		.word	459
+ 1032 0144 C401      		.word	452
+ 1033 0146 BE01      		.word	446
+ 1034 0148 B701      		.word	439
+ 1035 014a B101      		.word	433
+ 1036 014c AA01      		.word	426
+ 1037 014e A401      		.word	420
+ 1038 0150 9E01      		.word	414
+ 1039 0152 9801      		.word	408
+ 1040 0154 9201      		.word	402
+ 1041 0156 8C01      		.word	396
+ 1042 0158 8601      		.word	390
+ 1043 015a 8001      		.word	384
+ 1044 015c 7A01      		.word	378
+ 1045 015e 7401      		.word	372
+ 1046 0160 6E01      		.word	366
+ 1047 0162 6801      		.word	360
+ 1048 0164 6301      		.word	355
+ 1049 0166 5D01      		.word	349
+ 1050 0168 5801      		.word	344
+ 1051 016a 5201      		.word	338
+ 1052 016c 4D01      		.word	333
+ 1053 016e 4701      		.word	327
+ 1054 0170 4201      		.word	322
+ 1055 0172 3D01      		.word	317
+ 1056 0174 3801      		.word	312
+ 1057 0176 3301      		.word	307
+ 1058 0178 2E01      		.word	302
+ 1059 017a 2901      		.word	297
+ 1060 017c 2401      		.word	292
+ 1061 017e 1F01      		.word	287
+ 1062 0180 1A01      		.word	282
+ 1063 0182 1501      		.word	277
+ 1064 0184 1101      		.word	273
+ 1065 0186 0C01      		.word	268
+ 1066 0188 0801      		.word	264
+ 1067 018a 0301      		.word	259
+ 1068 018c FF00      		.word	255
+ 1069 018e FB00      		.word	251
+ 1070 0190 F600      		.word	246
+ 1071 0192 F200      		.word	242
+ 1072 0194 EE00      		.word	238
+ 1073 0196 EA00      		.word	234
+ 1074 0198 E600      		.word	230
+ 1075 019a E200      		.word	226
+ 1076 019c DE00      		.word	222
+ 1077 019e DB00      		.word	219
+ 1078 01a0 D700      		.word	215
+ 1079 01a2 D300      		.word	211
+ 1080 01a4 CF00      		.word	207
+ 1081 01a6 CC00      		.word	204
+ 1082 01a8 C800      		.word	200
+ 1083 01aa C500      		.word	197
+ 1084 01ac C200      		.word	194
+ 1085 01ae BE00      		.word	190
+ 1086 01b0 BB00      		.word	187
+ 1087               	.global	LIGHT_ADC
+ 1090               	LIGHT_ADC:
+ 1091 01b2 3500      		.word	53
+ 1092 01b4 6000      		.word	96
+ 1093 01b6 8000      		.word	128
+ 1094 01b8 B000      		.word	176
+ 1095 01ba 1D01      		.word	285
+ 1096 01bc 3D01      		.word	317
+ 1097 01be 5A01      		.word	346
+ 1098 01c0 7A01      		.word	378
+ 1099 01c2 9701      		.word	407
+ 1100 01c4 B901      		.word	441
+ 1101 01c6 DA01      		.word	474
+ 1102 01c8 F901      		.word	505
+ 1103 01ca 1602      		.word	534
+ 1104 01cc 4002      		.word	576
+ 1105 01ce 6D02      		.word	621
+ 1106 01d0 8202      		.word	642
+ 1107 01d2 A202      		.word	674
+ 1108 01d4 EF02      		.word	751
+ 1109 01d6 3203      		.word	818
+ 1110 01d8 B003      		.word	944
+ 1111 01da F203      		.word	1010
+ 1112               	.global	LIGHT_VOLTAGE
+ 1115               	LIGHT_VOLTAGE:
+ 1116 01dc 1D        		.byte	29
+ 1117 01dd 5A        		.byte	90
+ 1118 01de 34        		.byte	52
+ 1119 01df 40        		.byte	64
+ 1120 01e0 E1        		.byte	-31
+ 1121 01e1 7A        		.byte	122
+ 1122 01e2 34        		.byte	52
+ 1123 01e3 40        		.byte	64
+ 1124 01e4 6A        		.byte	106
+ 1125 01e5 BC        		.byte	-68
+ 1126 01e6 34        		.byte	52
+ 1127 01e7 40        		.byte	64
+ 1128 01e8 91        		.byte	-111
+ 1129 01e9 ED        		.byte	-19
+ 1130 01ea 34        		.byte	52
+ 1131 01eb 40        		.byte	64
+ 1132 01ec 7D        		.byte	125
+ 1133 01ed 3F        		.byte	63
+ 1134 01ee 35        		.byte	53
+ 1135 01ef 40        		.byte	64
+ 1136 01f0 A4        		.byte	-92
+ 1137 01f1 70        		.byte	112
+ 1138 01f2 35        		.byte	53
+ 1139 01f3 40        		.byte	64
+ 1140 01f4 2D        		.byte	45
+ 1141 01f5 B2        		.byte	-78
+ 1142 01f6 35        		.byte	53
+ 1143 01f7 40        		.byte	64
+ 1144 01f8 F2        		.byte	-14
+ 1145 01f9 D2        		.byte	-46
+ 1146 01fa 35        		.byte	53
+ 1147 01fb 40        		.byte	64
+ 1148 01fc B6        		.byte	-74
+ 1149 01fd F3        		.byte	-13
+ 1150 01fe 35        		.byte	53
+ 1151 01ff 40        		.byte	64
+ 1152 0200 3F        		.byte	63
+ 1153 0201 35        		.byte	53
+ 1154 0202 36        		.byte	54
+ 1155 0203 40        		.byte	64
+ 1156 0204 66        		.byte	102
+ 1157 0205 66        		.byte	102
+ 1158 0206 36        		.byte	54
+ 1159 0207 40        		.byte	64
+ 1160 0208 8D        		.byte	-115
+ 1161 0209 97        		.byte	-105
+ 1162 020a 36        		.byte	54
+ 1163 020b 40        		.byte	64
+ 1164 020c 17        		.byte	23
+ 1165 020d D9        		.byte	-39
+ 1166 020e 36        		.byte	54
+ 1167 020f 40        		.byte	64
+ 1168 0210 64        		.byte	100
+ 1169 0211 3B        		.byte	59
+ 1170 0212 37        		.byte	55
+ 1171 0213 40        		.byte	64
+ 1172 0214 EE        		.byte	-18
+ 1173 0215 7C        		.byte	124
+ 1174 0216 37        		.byte	55
+ 1175 0217 40        		.byte	64
+ 1176 0218 14        		.byte	20
+ 1177 0219 AE        		.byte	-82
+ 1178 021a 37        		.byte	55
+ 1179 021b 40        		.byte	64
+ 1180 021c 9E        		.byte	-98
+ 1181 021d EF        		.byte	-17
+ 1182 021e 37        		.byte	55
+ 1183 021f 40        		.byte	64
+ 1184 0220 B0        		.byte	-80
+ 1185 0221 72        		.byte	114
+ 1186 0222 38        		.byte	56
+ 1187 0223 40        		.byte	64
+ 1188 0224 E9        		.byte	-23
+ 1189 0225 26        		.byte	38
+ 1190 0226 39        		.byte	57
+ 1191 0227 40        		.byte	64
+ 1192 0228 21        		.byte	33
+ 1193 0229 B0        		.byte	-80
+ 1194 022a 3A        		.byte	58
+ 1195 022b 40        		.byte	64
+ 1196 022c 93        		.byte	-109
+ 1197 022d 18        		.byte	24
+ 1198 022e 3C        		.byte	60
+ 1199 022f 40        		.byte	64
+ 1200               	.global	Vref
+ 1201               		.section	.data.Vref,"aw",@progbits
+ 1204               	Vref:
+ 1205 0000 9A        		.byte	-102
+ 1206 0001 99        		.byte	-103
+ 1207 0002 39        		.byte	57
+ 1208 0003 40        		.byte	64
+ 1209               	.global	degree
+ 1210               		.section	.data.degree,"aw",@progbits
+ 1213               	degree:
+ 1214 0000 03        		.byte	3
+ 1215               		.section	.data.enter.1579,"aw",@progbits
+ 1218               	enter.1579:
+ 1219 0000 01        		.byte	1
+ 1220               		.section	.data.enter.1573,"aw",@progbits
+ 1223               	enter.1573:
+ 1224 0000 01        		.byte	1
+ 1225               		.section	.data.enter.1566,"aw",@progbits
+ 1228               	enter.1566:
+ 1229 0000 01        		.byte	1
+ 1294               	.Letext0:
 DEFINED SYMBOLS
-                            *ABS*:0000000000000000 ADC.c
-     /tmp/cc3oZZD3.s:2      *ABS*:000000000000003e __SP_H__
-     /tmp/cc3oZZD3.s:3      *ABS*:000000000000003d __SP_L__
-     /tmp/cc3oZZD3.s:4      *ABS*:000000000000003f __SREG__
-     /tmp/cc3oZZD3.s:5      *ABS*:0000000000000000 __tmp_reg__
-     /tmp/cc3oZZD3.s:6      *ABS*:0000000000000001 __zero_reg__
-     /tmp/cc3oZZD3.s:13     .text.ADC_read:0000000000000000 ADC_read
-     /tmp/cc3oZZD3.s:98     .text.ADC_init:0000000000000000 ADC_init
-     /tmp/cc3oZZD3.s:127    .text.ADC_periphery:0000000000000000 ADC_periphery
-     /tmp/cc3oZZD3.s:1008   .data.degree:0000000000000000 degree
-     /tmp/cc3oZZD3.s:1284   .progmem.data.TEMP_Celsius_neg:0000000000000000 TEMP_Celsius_neg
-     /tmp/cc3oZZD3.s:1304   .progmem.data.TEMP_Celsius_pos:0000000000000000 TEMP_Celsius_pos
-     /tmp/cc3oZZD3.s:1138   .progmem.data.TEMP_Fahrenheit_pos:0000000000000000 TEMP_Fahrenheit_pos
-     /tmp/cc3oZZD3.s:1112   .progmem.data.LIGHT_ADC:0000000000000000 LIGHT_ADC
-     /tmp/cc3oZZD3.s:1023   .progmem.data.LIGHT_VOLTAGE:0000000000000000 LIGHT_VOLTAGE
-     /tmp/cc3oZZD3.s:1014   .data.Vref:0000000000000000 Vref
-     /tmp/cc3oZZD3.s:773    .text.TemperatureFunc:0000000000000000 TemperatureFunc
-     /tmp/cc3oZZD3.s:1002   .data.enter.1831:0000000000000000 enter.1831
-     /tmp/cc3oZZD3.s:858    .text.VoltageFunc:0000000000000000 VoltageFunc
-     /tmp/cc3oZZD3.s:997    .data.enter.1835:0000000000000000 enter.1835
-     /tmp/cc3oZZD3.s:925    .text.LightFunc:0000000000000000 LightFunc
-     /tmp/cc3oZZD3.s:992    .data.enter.1839:0000000000000000 enter.1839
+                            *ABS*:00000000 ADC.c
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:2      *ABS*:0000003f __SREG__
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:3      *ABS*:0000003e __SP_H__
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:4      *ABS*:0000003d __SP_L__
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:5      *ABS*:00000034 __CCP__
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:6      *ABS*:00000000 __tmp_reg__
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:7      *ABS*:00000001 __zero_reg__
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:19     .text.ADC_read:00000000 ADC_read
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:94     .text.ADC_init:00000000 ADC_init
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:116    .text.LightFunc:00000000 LightFunc
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:1218   .data.enter.1579:00000000 enter.1579
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:308    .text.ADC_periphery:00000000 ADC_periphery
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:170    .text.VoltageFunc:00000000 VoltageFunc
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:1223   .data.enter.1573:00000000 enter.1573
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:224    .text.TemperatureFunc:00000000 TemperatureFunc
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:1228   .data.enter.1566:00000000 enter.1566
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:1213   .data.degree:00000000 degree
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:926    .progmem.data:0000007a TEMP_Celsius_neg
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:861    .progmem.data:00000000 TEMP_Celsius_pos
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:945    .progmem.data:00000098 TEMP_Fahrenheit_pos
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:1090   .progmem.data:000001b2 LIGHT_ADC
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:1204   .data.Vref:00000000 Vref
+C:\Users\MainUser\AppData\Local\Temp/cc5JR3Vr.s:1115   .progmem.data:000001dc LIGHT_VOLTAGE
 
 UNDEFINED SYMBOLS
+Timer0_RegisterCallbackFunction
+LCD_UpdateRequired
+Timer0_RemoveCallbackFunction
+LCD_putc
+CHAR2BCD2
+CHAR2BCD3
 __floatsisf
 __mulsf3
 __fixunssfsi
 __subsf3
-LCD_putc
-CHAR2BCD2
-CHAR2BCD3
-Timer0_RegisterCallbackFunction
-LCD_UpdateRequired
-Timer0_RemoveCallbackFunction
 __do_copy_data

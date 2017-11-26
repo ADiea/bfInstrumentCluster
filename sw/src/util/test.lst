@@ -1,0 +1,484 @@
+   1               		.file	"test.c"
+   2               	__SREG__ = 0x3f
+   3               	__SP_H__ = 0x3e
+   4               	__SP_L__ = 0x3d
+   5               	__CCP__  = 0x34
+   6               	__tmp_reg__ = 0
+   7               	__zero_reg__ = 1
+  15               	.Ltext0:
+  16               		.section	.text.ErrorBeep,"ax",@progbits
+  17               	.global	ErrorBeep
+  19               	ErrorBeep:
+  20               	.LFB4:
+  21               	.LSM0:
+  22 0000 8F92      		push r8
+  23 0002 9F92      		push r9
+  24 0004 BF92      		push r11
+  25 0006 CF92      		push r12
+  26 0008 DF92      		push r13
+  27 000a EF92      		push r14
+  28 000c FF92      		push r15
+  29 000e 0F93      		push r16
+  30 0010 1F93      		push r17
+  31               	/* prologue: function */
+  32               	/* frame size = 0 */
+  33               	.LSM1:
+  34 0012 20E8      		ldi r18,lo8(128)
+  35 0014 822E      		mov r8,r18
+  36 0016 912C      		mov r9,__zero_reg__
+  37 0018 80E8      		ldi r24,lo8(-128)
+  38 001a F401      		movw r30,r8
+  39 001c 8083      		st Z,r24
+  40               	.LSM2:
+  41 001e 01E8      		ldi r16,lo8(129)
+  42 0020 10E0      		ldi r17,hi8(129)
+  43 0022 81E1      		ldi r24,lo8(17)
+  44 0024 F801      		movw r30,r16
+  45 0026 8083      		st Z,r24
+  46               	.LSM3:
+  47 0028 8081      		ld r24,Z
+  48 002a 8160      		ori r24,lo8(1)
+  49 002c 8083      		st Z,r24
+  50               	.LSM4:
+  51 002e 1092 8900 		sts 137,__zero_reg__
+  52               	.LSM5:
+  53 0032 80E5      		ldi r24,lo8(80)
+  54 0034 8093 8800 		sts 136,r24
+  55               	.LSM6:
+  56 0038 97E8      		ldi r25,lo8(135)
+  57 003a C92E      		mov r12,r25
+  58 003c D12C      		mov r13,__zero_reg__
+  59 003e BB24      		clr r11
+  60 0040 B394      		inc r11
+  61 0042 F601      		movw r30,r12
+  62 0044 B082      		st Z,r11
+  63               	.LSM7:
+  64 0046 86E8      		ldi r24,lo8(134)
+  65 0048 E82E      		mov r14,r24
+  66 004a F12C      		mov r15,__zero_reg__
+  67 004c 8FE3      		ldi r24,lo8(63)
+  68 004e F701      		movw r30,r14
+  69 0050 8083      		st Z,r24
+  70               	.LSM8:
+  71 0052 82E3      		ldi r24,lo8(50)
+  72 0054 90E0      		ldi r25,hi8(50)
+  73 0056 0E94 0000 		call Delay
+  74               	.LSM9:
+  75 005a F601      		movw r30,r12
+  76 005c B082      		st Z,r11
+  77               	.LSM10:
+  78 005e 8EED      		ldi r24,lo8(-34)
+  79 0060 F701      		movw r30,r14
+  80 0062 8083      		st Z,r24
+  81               	.LSM11:
+  82 0064 8CE2      		ldi r24,lo8(300)
+  83 0066 91E0      		ldi r25,hi8(300)
+  84 0068 0E94 0000 		call Delay
+  85               	.LSM12:
+  86 006c F401      		movw r30,r8
+  87 006e 1082      		st Z,__zero_reg__
+  88               	.LSM13:
+  89 0070 F801      		movw r30,r16
+  90 0072 1082      		st Z,__zero_reg__
+  91               	/* epilogue start */
+  92               	.LSM14:
+  93 0074 1F91      		pop r17
+  94 0076 0F91      		pop r16
+  95 0078 FF90      		pop r15
+  96 007a EF90      		pop r14
+  97 007c DF90      		pop r13
+  98 007e CF90      		pop r12
+  99 0080 BF90      		pop r11
+ 100 0082 9F90      		pop r9
+ 101 0084 8F90      		pop r8
+ 102 0086 0895      		ret
+ 103               	.LFE4:
+ 105               		.section	.text.TestWaitEnter,"ax",@progbits
+ 107               	TestWaitEnter:
+ 108               	.LFB2:
+ 109               	.LSM15:
+ 110               	/* prologue: function */
+ 111               	/* frame size = 0 */
+ 112               	.L4:
+ 113               	.LSM16:
+ 114 0000 0E94 0000 		call getkey
+ 115               	.LSM17:
+ 116 0004 8130      		cpi r24,lo8(1)
+ 117 0006 01F4      		brne .L4
+ 118               	/* epilogue start */
+ 119               	.LSM18:
+ 120 0008 0895      		ret
+ 121               	.LFE2:
+ 123               		.section	.text.Test,"ax",@progbits
+ 124               	.global	Test
+ 126               	Test:
+ 127               	.LFB3:
+ 128               	.LSM19:
+ 129 0000 1F93      		push r17
+ 130 0002 CF93      		push r28
+ 131 0004 DF93      		push r29
+ 132               	/* prologue: function */
+ 133               	/* frame size = 0 */
+ 134               	.LSM20:
+ 135 0006 1092 7000 		sts 112,__zero_reg__
+ 136               	.LSM21:
+ 137 000a 80E0      		ldi r24,lo8(__c.1486)
+ 138 000c 90E0      		ldi r25,hi8(__c.1486)
+ 139 000e 60E0      		ldi r22,lo8(0)
+ 140 0010 0E94 0000 		call LCD_puts_f
+ 141               	.LSM22:
+ 142 0014 0E94 0000 		call TestWaitEnter
+ 143               	.LSM23:
+ 144 0018 80E0      		ldi r24,lo8(__c.1488)
+ 145 001a 90E0      		ldi r25,hi8(__c.1488)
+ 146 001c 60E0      		ldi r22,lo8(0)
+ 147 001e 0E94 0000 		call LCD_puts_f
+ 148               	.L8:
+ 149               	.LSM24:
+ 150 0022 0E94 0000 		call getkey
+ 151               	.LSM25:
+ 152 0026 8330      		cpi r24,lo8(3)
+ 153 0028 01F4      		brne .L8
+ 154               	.LSM26:
+ 155 002a 80E0      		ldi r24,lo8(__c.1493)
+ 156 002c 90E0      		ldi r25,hi8(__c.1493)
+ 157 002e 60E0      		ldi r22,lo8(0)
+ 158 0030 0E94 0000 		call LCD_puts_f
+ 159               	.L9:
+ 160               	.LSM27:
+ 161 0034 0E94 0000 		call getkey
+ 162               	.LSM28:
+ 163 0038 8430      		cpi r24,lo8(4)
+ 164 003a 01F4      		brne .L9
+ 165               	.LSM29:
+ 166 003c 80E0      		ldi r24,lo8(__c.1498)
+ 167 003e 90E0      		ldi r25,hi8(__c.1498)
+ 168 0040 60E0      		ldi r22,lo8(0)
+ 169 0042 0E94 0000 		call LCD_puts_f
+ 170               	.L10:
+ 171               	.LSM30:
+ 172 0046 0E94 0000 		call getkey
+ 173               	.LSM31:
+ 174 004a 8230      		cpi r24,lo8(2)
+ 175 004c 01F4      		brne .L10
+ 176               	.LSM32:
+ 177 004e 80E0      		ldi r24,lo8(__c.1503)
+ 178 0050 90E0      		ldi r25,hi8(__c.1503)
+ 179 0052 60E0      		ldi r22,lo8(0)
+ 180 0054 0E94 0000 		call LCD_puts_f
+ 181               	.L11:
+ 182               	.LSM33:
+ 183 0058 0E94 0000 		call getkey
+ 184               	.LSM34:
+ 185 005c 8530      		cpi r24,lo8(5)
+ 186 005e 01F4      		brne .L11
+ 187               	.LSM35:
+ 188 0060 80E0      		ldi r24,lo8(__c.1508)
+ 189 0062 90E0      		ldi r25,hi8(__c.1508)
+ 190 0064 60E0      		ldi r22,lo8(0)
+ 191 0066 0E94 0000 		call LCD_puts_f
+ 192               	.LSM36:
+ 193 006a 0E94 0000 		call TestWaitEnter
+ 194               	.LSM37:
+ 195 006e 80E8      		ldi r24,lo8(-128)
+ 196 0070 8093 8000 		sts 128,r24
+ 197               	.LSM38:
+ 198 0074 81E1      		ldi r24,lo8(17)
+ 199 0076 8093 8100 		sts 129,r24
+ 200               	.LSM39:
+ 201 007a 8091 8100 		lds r24,129
+ 202 007e 8160      		ori r24,lo8(1)
+ 203 0080 8093 8100 		sts 129,r24
+ 204               	.LSM40:
+ 205 0084 1092 8900 		sts 137,__zero_reg__
+ 206               	.LSM41:
+ 207 0088 80E5      		ldi r24,lo8(80)
+ 208 008a 8093 8800 		sts 136,r24
+ 209 008e 18EC      		ldi r17,lo8(-56)
+ 210               	.L12:
+ 211               	.LSM42:
+ 212 0090 1092 8700 		sts 135,__zero_reg__
+ 213               	.LSM43:
+ 214 0094 1093 8600 		sts 134,r17
+ 215               	.LSM44:
+ 216 0098 8EE1      		ldi r24,lo8(30)
+ 217 009a 90E0      		ldi r25,hi8(30)
+ 218 009c 0E94 0000 		call Delay
+ 219 00a0 1550      		subi r17,lo8(-(-5))
+ 220               	.LSM45:
+ 221 00a2 1F35      		cpi r17,lo8(95)
+ 222 00a4 01F4      		brne .L12
+ 223               	.LSM46:
+ 224 00a6 1092 8000 		sts 128,__zero_reg__
+ 225               	.LSM47:
+ 226 00aa 1092 8100 		sts 129,__zero_reg__
+ 227               	.LSM48:
+ 228 00ae 80E0      		ldi r24,lo8(__c.1513)
+ 229 00b0 90E0      		ldi r25,hi8(__c.1513)
+ 230 00b2 60E0      		ldi r22,lo8(0)
+ 231 00b4 0E94 0000 		call LCD_puts_f
+ 232               	.L13:
+ 233               	.LSM49:
+ 234 00b8 1C9B      		sbis 35-32,4
+ 235 00ba 00C0      		rjmp .L13
+ 236               	.LSM50:
+ 237 00bc 0E94 0000 		call TestWaitEnter
+ 238               	.LSM51:
+ 239 00c0 8091 E400 		lds r24,228
+ 240 00c4 877F      		andi r24,lo8(-9)
+ 241 00c6 8093 E400 		sts 228,r24
+ 242 00ca ECEE      		ldi r30,lo8(236)
+ 243 00cc F0E0      		ldi r31,hi8(236)
+ 244               	.LSM52:
+ 245 00ce 8FEF      		ldi r24,lo8(-1)
+ 246               	.L14:
+ 247 00d0 8193      		st Z+,r24
+ 248               	.LSM53:
+ 249 00d2 91E0      		ldi r25,hi8(256)
+ 250 00d4 E030      		cpi r30,lo8(256)
+ 251 00d6 F907      		cpc r31,r25
+ 252 00d8 01F4      		brne .L14
+ 253               	.L26:
+ 254               	.LSM54:
+ 255 00da 1C9B      		sbis 35-32,4
+ 256 00dc 00C0      		rjmp .L26
+ 257               	.LSM55:
+ 258 00de 84E6      		ldi r24,lo8(100)
+ 259 00e0 90E0      		ldi r25,hi8(100)
+ 260 00e2 0E94 0000 		call Delay
+ 261               	.L16:
+ 262               	.LSM56:
+ 263 00e6 1C99      		sbic 35-32,4
+ 264 00e8 00C0      		rjmp .L16
+ 265               	.LSM57:
+ 266 00ea 8091 E400 		lds r24,228
+ 267 00ee 8860      		ori r24,lo8(8)
+ 268 00f0 8093 E400 		sts 228,r24
+ 269               	.LSM58:
+ 270 00f4 80E0      		ldi r24,lo8(0)
+ 271 00f6 0E94 0000 		call ADC_init
+ 272               	.LSM59:
+ 273 00fa 0E94 0000 		call ADC_read
+ 274               	.LSM60:
+ 275 00fe 845C      		subi r24,lo8(-(-452))
+ 276 0100 9140      		sbci r25,hi8(-(-452))
+ 277 0102 8738      		cpi r24,135
+ 278 0104 9105      		cpc r25,__zero_reg__
+ 279 0106 00F0      		brlo .L17
+ 280               	.LSM61:
+ 281 0108 80E0      		ldi r24,lo8(__c.1527)
+ 282 010a 90E0      		ldi r25,hi8(__c.1527)
+ 283 010c 60E0      		ldi r22,lo8(0)
+ 284 010e 0E94 0000 		call LCD_puts_f
+ 285               	.LSM62:
+ 286 0112 0E94 0000 		call ErrorBeep
+ 287               	.LSM63:
+ 288 0116 0E94 0000 		call TestWaitEnter
+ 289               	.LSM64:
+ 290 011a 0E94 0000 		call ADC_periphery
+ 291               	.LSM65:
+ 292 011e 81E0      		ldi r24,lo8(1)
+ 293 0120 60E0      		ldi r22,lo8(0)
+ 294 0122 0E94 0000 		call LCD_UpdateRequired
+ 295               	.LSM66:
+ 296 0126 0E94 0000 		call TestWaitEnter
+ 297               	.L17:
+ 298               	.LSM67:
+ 299 012a 81E0      		ldi r24,lo8(1)
+ 300 012c 0E94 0000 		call ADC_init
+ 301               	.LSM68:
+ 302 0130 0E94 0000 		call ADC_read
+ 303               	.LSM69:
+ 304 0134 8A52      		subi r24,lo8(-(-298))
+ 305 0136 9140      		sbci r25,hi8(-(-298))
+ 306 0138 4797      		sbiw r24,23
+ 307 013a 00F0      		brlo .L18
+ 308               	.LSM70:
+ 309 013c 80E0      		ldi r24,lo8(__c.1529)
+ 310 013e 90E0      		ldi r25,hi8(__c.1529)
+ 311 0140 60E0      		ldi r22,lo8(0)
+ 312 0142 0E94 0000 		call LCD_puts_f
+ 313               	.LSM71:
+ 314 0146 0E94 0000 		call ErrorBeep
+ 315               	.LSM72:
+ 316 014a 0E94 0000 		call TestWaitEnter
+ 317               	.LSM73:
+ 318 014e 0E94 0000 		call ADC_periphery
+ 319               	.LSM74:
+ 320 0152 81E0      		ldi r24,lo8(1)
+ 321 0154 60E0      		ldi r22,lo8(0)
+ 322 0156 0E94 0000 		call LCD_UpdateRequired
+ 323               	.LSM75:
+ 324 015a 0E94 0000 		call TestWaitEnter
+ 325               	.L18:
+ 326               	.LSM76:
+ 327 015e 80E0      		ldi r24,lo8(__c.1531)
+ 328 0160 90E0      		ldi r25,hi8(__c.1531)
+ 329 0162 60E0      		ldi r22,lo8(0)
+ 330 0164 0E94 0000 		call LCD_puts_f
+ 331               	.LSM77:
+ 332 0168 0E94 0000 		call TestWaitEnter
+ 333               	.LSM78:
+ 334 016c 82E0      		ldi r24,lo8(2)
+ 335 016e 0E94 0000 		call ADC_init
+ 336               	.L19:
+ 337               	.LSM79:
+ 338 0172 0E94 0000 		call ADC_read
+ 339               	.LSM80:
+ 340 0176 0E94 0000 		call ADC_periphery
+ 341               	.LSM81:
+ 342               	/* #APP */
+ 343               	 ;  206 "src/util/test.c" 1
+ 344 017a 0000      		nop
+ 345               	 ;  0 "" 2
+ 346               	.LSM82:
+ 347               	/* #NOAPP */
+ 348 017c 81E0      		ldi r24,lo8(1)
+ 349 017e 60E0      		ldi r22,lo8(0)
+ 350 0180 0E94 0000 		call LCD_UpdateRequired
+ 351               	.LSM83:
+ 352 0184 0E94 0000 		call getkey
+ 353               	.LSM84:
+ 354 0188 8130      		cpi r24,lo8(1)
+ 355 018a 01F4      		brne .L19
+ 356               	.LSM85:
+ 357 018c 289A      		sbi 37-32,0
+ 358               	.LSM86:
+ 359 018e 2898      		cbi 37-32,0
+ 360 0190 C0E0      		ldi r28,lo8(0)
+ 361 0192 D0E0      		ldi r29,hi8(0)
+ 362               	.L20:
+ 363               	.LSM87:
+ 364 0194 81E0      		ldi r24,lo8(1)
+ 365 0196 BE01      		movw r22,r28
+ 366 0198 4C2F      		mov r20,r28
+ 367 019a 0E94 0000 		call Buffer_Write_Byte
+ 368 019e 2196      		adiw r28,1
+ 369               	.LSM88:
+ 370 01a0 C233      		cpi r28,50
+ 371 01a2 D105      		cpc r29,__zero_reg__
+ 372 01a4 01F4      		brne .L20
+ 373               	.LSM89:
+ 374 01a6 81E0      		ldi r24,lo8(1)
+ 375 01a8 61E0      		ldi r22,lo8(1)
+ 376 01aa 70E0      		ldi r23,hi8(1)
+ 377 01ac 0E94 0000 		call Buffer_To_Page
+ 378               	.LSM90:
+ 379 01b0 289A      		sbi 37-32,0
+ 380               	.LSM91:
+ 381 01b2 2898      		cbi 37-32,0
+ 382               	.LSM92:
+ 383 01b4 81E0      		ldi r24,lo8(1)
+ 384 01b6 90E0      		ldi r25,hi8(1)
+ 385 01b8 60E0      		ldi r22,lo8(0)
+ 386 01ba 70E0      		ldi r23,hi8(0)
+ 387 01bc 0E94 0000 		call Cont_Flash_Read_Enable
+ 388 01c0 10E0      		ldi r17,lo8(0)
+ 389               	.LVL0:
+ 390               	.L23:
+ 391               	.LSM93:
+ 392 01c2 80E0      		ldi r24,lo8(0)
+ 393 01c4 0E94 0000 		call DF_SPI_RW
+ 394 01c8 1817      		cp r17,r24
+ 395 01ca 01F0      		breq .L21
+ 396               	.LSM94:
+ 397 01cc 80E0      		ldi r24,lo8(__c.1539)
+ 398 01ce 90E0      		ldi r25,hi8(__c.1539)
+ 399 01d0 60E0      		ldi r22,lo8(0)
+ 400 01d2 0E94 0000 		call LCD_puts_f
+ 401               	.LSM95:
+ 402 01d6 0E94 0000 		call ErrorBeep
+ 403               	.LSM96:
+ 404 01da 0E94 0000 		call TestWaitEnter
+ 405 01de 00C0      		rjmp .L22
+ 406               	.L21:
+ 407               	.LSM97:
+ 408 01e0 1F5F      		subi r17,lo8(-(1))
+ 409 01e2 1233      		cpi r17,lo8(50)
+ 410 01e4 01F4      		brne .L23
+ 411               	.L22:
+ 412               	.LSM98:
+ 413 01e6 289A      		sbi 37-32,0
+ 414               	.LSM99:
+ 415 01e8 88E1      		ldi r24,lo8(24)
+ 416 01ea 8093 6000 		sts 96,r24
+ 417               	.L24:
+ 418 01ee 00C0      		rjmp .L24
+ 419               	.LFE3:
+ 421               		.section	.progmem.data,"a",@progbits
+ 424               	__c.1539:
+ 425 0000 4572 726F 		.string	"Error DataFlash"
+ 425      7220 4461 
+ 425      7461 466C 
+ 425      6173 6800 
+ 428               	__c.1531:
+ 429 0010 4C69 6768 		.string	"Light"
+ 429      7400 
+ 432               	__c.1529:
+ 433 0016 4572 726F 		.string	"Error Voltage"
+ 433      7220 566F 
+ 433      6C74 6167 
+ 433      6500 
+ 436               	__c.1527:
+ 437 0024 4572 726F 		.string	"Error Temperature"
+ 437      7220 5465 
+ 437      6D70 6572 
+ 437      6174 7572 
+ 437      6500 
+ 440               	__c.1513:
+ 441 0036 4C43 4420 		.string	"LCD test"
+ 441      7465 7374 
+ 441      00
+ 444               	__c.1508:
+ 445 003f 536F 756E 		.string	"Sound"
+ 445      6400 
+ 448               	__c.1503:
+ 449 0045 446F 776E 		.string	"Down"
+ 449      00
+ 452               	__c.1498:
+ 453 004a 5269 6768 		.string	"Right"
+ 453      7400 
+ 456               	__c.1493:
+ 457 0050 5570 00   		.string	"Up"
+ 460               	__c.1488:
+ 461 0053 4C65 6674 		.string	"Left"
+ 461      00
+ 464               	__c.1486:
+ 465 0058 5465 7374 		.string	"Test"
+ 465      00
+ 506               	.Letext0:
+DEFINED SYMBOLS
+                            *ABS*:00000000 test.c
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:2      *ABS*:0000003f __SREG__
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:3      *ABS*:0000003e __SP_H__
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:4      *ABS*:0000003d __SP_L__
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:5      *ABS*:00000034 __CCP__
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:6      *ABS*:00000000 __tmp_reg__
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:7      *ABS*:00000001 __zero_reg__
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:19     .text.ErrorBeep:00000000 ErrorBeep
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:107    .text.TestWaitEnter:00000000 TestWaitEnter
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:126    .text.Test:00000000 Test
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:464    .progmem.data:00000058 __c.1486
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:460    .progmem.data:00000053 __c.1488
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:456    .progmem.data:00000050 __c.1493
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:452    .progmem.data:0000004a __c.1498
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:448    .progmem.data:00000045 __c.1503
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:444    .progmem.data:0000003f __c.1508
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:440    .progmem.data:00000036 __c.1513
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:436    .progmem.data:00000024 __c.1527
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:432    .progmem.data:00000016 __c.1529
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:428    .progmem.data:00000010 __c.1531
+C:\Users\MainUser\AppData\Local\Temp/cceuF9RO.s:424    .progmem.data:00000000 __c.1539
+
+UNDEFINED SYMBOLS
+Delay
+getkey
+LCD_puts_f
+ADC_init
+ADC_read
+ADC_periphery
+LCD_UpdateRequired
+Buffer_Write_Byte
+Buffer_To_Page
+Cont_Flash_Read_Enable
+DF_SPI_RW

@@ -13,7 +13,6 @@ char PowerSaveFunc(char input);
 char AutoPower(char input);
 char KeyClick(char input);
 void Delay(unsigned int millisec);
-char Revision(char input);
 void OSCCAL_calibration(void);
 
 #define BOOL    char

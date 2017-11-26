@@ -1,176 +1,67 @@
    1               		.file	"usart.c"
-   2               	__SP_H__ = 0x3e
-   3               	__SP_L__ = 0x3d
-   4               	__SREG__ = 0x3f
-   5               	__tmp_reg__ = 0
-   6               	__zero_reg__ = 1
-   7               		.text
-   8               	.Ltext0:
-   9               		.cfi_sections	.debug_frame
-  10               		.section	.text.USART_Init,"ax",@progbits
-  11               	.global	USART_Init
-  13               	USART_Init:
-  14               	.LFB0:
-  15               		.file 1 "src/drv/usart.c"
-   1:src/drv/usart.c **** //***************************************************************************
-   2:src/drv/usart.c **** //
-   3:src/drv/usart.c **** //  File........: usart.c
-   4:src/drv/usart.c **** //
-   5:src/drv/usart.c **** //  Author(s)...: ATMEL Norway
-   6:src/drv/usart.c **** //
-   7:src/drv/usart.c **** //  Target(s)...: ATmega169
-   8:src/drv/usart.c **** //
-   9:src/drv/usart.c **** //  Compiler....: avr-gcc / avr-libc
-  10:src/drv/usart.c **** //
-  11:src/drv/usart.c **** //  Description.: AVR Butterfly USART routines
-  12:src/drv/usart.c **** //
-  13:src/drv/usart.c **** //  Revisions...: 1.0
-  14:src/drv/usart.c **** //
-  15:src/drv/usart.c **** //  YYYYMMDD - VER. - COMMENT                                       - SIGN.
-  16:src/drv/usart.c **** //
-  17:src/drv/usart.c **** //  20030116 - 1.0  - Created                                       - LHM
-  18:src/drv/usart.c **** //  2004            - corrected comment (only receiver enabled)     - mt
-  19:src/drv/usart.c **** //  20070517        - option to enable transmit                     - mt
-  20:src/drv/usart.c **** //***************************************************************************
-  21:src/drv/usart.c **** 
-  22:src/drv/usart.c **** //mtA
-  23:src/drv/usart.c **** //#include <inavr.h>
-  24:src/drv/usart.c **** //#include "iom169.h"
-  25:src/drv/usart.c **** #include <avr/io.h>
-  26:src/drv/usart.c **** //mtE
-  27:src/drv/usart.c **** #include "main.h"
-  28:src/drv/usart.c **** #include "usart.h"
-  29:src/drv/usart.c **** 
-  30:src/drv/usart.c **** 
-  31:src/drv/usart.c **** /*****************************************************************************
-  32:src/drv/usart.c **** *
-  33:src/drv/usart.c **** *   Function name : USART_Init
-  34:src/drv/usart.c **** *
-  35:src/drv/usart.c **** *   Returns :       None
-  36:src/drv/usart.c **** *
-  37:src/drv/usart.c **** *   Parameters :    unsigned int baudrate
-  38:src/drv/usart.c **** *
-  39:src/drv/usart.c **** *   Purpose :       Initialize the USART
-  40:src/drv/usart.c **** *
-  41:src/drv/usart.c **** *****************************************************************************/
-  42:src/drv/usart.c **** void USART_Init(unsigned int baudrate)
-  43:src/drv/usart.c **** {
-  16               		.loc 1 43 0
-  17               		.cfi_startproc
-  18               	.LVL0:
-  19               	/* prologue: function */
-  20               	/* frame size = 0 */
-  21               	/* stack size = 0 */
-  22               	.L__stack_usage = 0
-  44:src/drv/usart.c ****     // Set baud rate
-  45:src/drv/usart.c ****     UBRRH = (unsigned char)(baudrate>>8);
-  23               		.loc 1 45 0
-  24 0000 292F      		mov r18,r25
-  25 0002 3327      		clr r19
-  26 0004 2093 C500 		sts 197,r18
-  46:src/drv/usart.c ****     UBRRL = (unsigned char)baudrate;
-  27               		.loc 1 46 0
-  28 0008 8093 C400 		sts 196,r24
-  47:src/drv/usart.c **** 
-  48:src/drv/usart.c ****     // Enable 2x speed
-  49:src/drv/usart.c ****     UCSRA = (1<<U2X);
-  29               		.loc 1 49 0
-  30 000c 82E0      		ldi r24,lo8(2)
-  31               	.LVL1:
-  32 000e 8093 C000 		sts 192,r24
-  50:src/drv/usart.c **** 
-  51:src/drv/usart.c **** #ifdef WITH_TRANSMIT
-  52:src/drv/usart.c ****     // enabled receive and transmit
-  53:src/drv/usart.c ****     UCSRB = (1<<RXEN)|(1<<TXEN)|(0<<RXCIE)|(0<<UDRIE);
-  54:src/drv/usart.c **** #else
-  55:src/drv/usart.c ****     // Enable receive. transmit stays disabled
-  56:src/drv/usart.c ****     // In the default BF demo-application no data gets 
-  57:src/drv/usart.c ****     // send (only receive in vcard).
-  58:src/drv/usart.c ****     UCSRB = (1<<RXEN)|(0<<TXEN)|(0<<RXCIE)|(0<<UDRIE);
-  33               		.loc 1 58 0
-  34 0012 80E1      		ldi r24,lo8(16)
-  35 0014 8093 C100 		sts 193,r24
-  59:src/drv/usart.c **** #endif
-  60:src/drv/usart.c **** 
-  61:src/drv/usart.c ****     // Async. mode, 8N1
-  62:src/drv/usart.c ****     UCSRC = (0<<UMSEL)|(0<<UPM0)|(0<<USBS)|(3<<UCSZ0)|(0<<UCPOL);
-  36               		.loc 1 62 0
-  37 0018 86E0      		ldi r24,lo8(6)
-  38 001a 8093 C200 		sts 194,r24
-  39 001e 0895      		ret
-  40               		.cfi_endproc
-  41               	.LFE0:
-  43               		.section	.text.Usart_Rx,"ax",@progbits
-  44               	.global	Usart_Rx
-  46               	Usart_Rx:
-  47               	.LFB1:
-  63:src/drv/usart.c **** }
-  64:src/drv/usart.c **** 
-  65:src/drv/usart.c **** 
-  66:src/drv/usart.c **** /*****************************************************************************
-  67:src/drv/usart.c **** *
-  68:src/drv/usart.c **** *   Function name : Usart_Tx
-  69:src/drv/usart.c **** *
-  70:src/drv/usart.c **** *   Returns :       None
-  71:src/drv/usart.c **** *
-  72:src/drv/usart.c **** *   Parameters :    char data: byte to send
-  73:src/drv/usart.c **** *
-  74:src/drv/usart.c **** *   Purpose :       Send one byte through the USART
-  75:src/drv/usart.c **** *
-  76:src/drv/usart.c **** *****************************************************************************/
-  77:src/drv/usart.c **** #ifdef WITH_TRANSMIT
-  78:src/drv/usart.c **** void Usart_Tx(char data)
-  79:src/drv/usart.c **** {
-  80:src/drv/usart.c ****     while (!(UCSRA & (1<<UDRE)));
-  81:src/drv/usart.c ****     UDR = data;
-  82:src/drv/usart.c **** }
-  83:src/drv/usart.c **** #endif
-  84:src/drv/usart.c **** 
-  85:src/drv/usart.c **** 
-  86:src/drv/usart.c **** /*****************************************************************************
-  87:src/drv/usart.c **** *
-  88:src/drv/usart.c **** *   Function name : Usart_Rx
-  89:src/drv/usart.c **** *
-  90:src/drv/usart.c **** *   Returns :       char: byte received
-  91:src/drv/usart.c **** *
-  92:src/drv/usart.c **** *   Parameters :    None
-  93:src/drv/usart.c **** *
-  94:src/drv/usart.c **** *   Purpose :       Receives one byte from the USART
-  95:src/drv/usart.c **** *
-  96:src/drv/usart.c **** *****************************************************************************/
-  97:src/drv/usart.c **** char Usart_Rx(void)
-  98:src/drv/usart.c **** {
-  48               		.loc 1 98 0
-  49               		.cfi_startproc
-  50               	/* prologue: function */
-  51               	/* frame size = 0 */
-  52               	/* stack size = 0 */
-  53               	.L__stack_usage = 0
-  54               	.L3:
-  99:src/drv/usart.c ****     while (!(UCSRA & (1<<RXC)));
-  55               		.loc 1 99 0 discriminator 1
+   2               	__SREG__ = 0x3f
+   3               	__SP_H__ = 0x3e
+   4               	__SP_L__ = 0x3d
+   5               	__CCP__  = 0x34
+   6               	__tmp_reg__ = 0
+   7               	__zero_reg__ = 1
+  15               	.Ltext0:
+  16               		.section	.text.USART_Init,"ax",@progbits
+  17               	.global	USART_Init
+  19               	USART_Init:
+  20               	.LFB2:
+  21               	.LSM0:
+  22               	.LVL0:
+  23               	/* prologue: function */
+  24               	/* frame size = 0 */
+  25               	.LSM1:
+  26 0000 292F      		mov r18,r25
+  27 0002 3327      		clr r19
+  28 0004 2093 C500 		sts 197,r18
+  29               	.LSM2:
+  30 0008 8093 C400 		sts 196,r24
+  31               	.LSM3:
+  32 000c 82E0      		ldi r24,lo8(2)
+  33               	.LVL1:
+  34 000e 8093 C000 		sts 192,r24
+  35               	.LSM4:
+  36 0012 80E1      		ldi r24,lo8(16)
+  37 0014 8093 C100 		sts 193,r24
+  38               	.LSM5:
+  39 0018 86E0      		ldi r24,lo8(6)
+  40 001a 8093 C200 		sts 194,r24
+  41               	/* epilogue start */
+  42               	.LSM6:
+  43 001e 0895      		ret
+  44               	.LFE2:
+  46               		.section	.text.Usart_Rx,"ax",@progbits
+  47               	.global	Usart_Rx
+  49               	Usart_Rx:
+  50               	.LFB3:
+  51               	.LSM7:
+  52               	/* prologue: function */
+  53               	/* frame size = 0 */
+  54               	.L4:
+  55               	.LSM8:
   56 0000 8091 C000 		lds r24,192
   57 0004 87FF      		sbrs r24,7
-  58 0006 00C0      		rjmp .L3
- 100:src/drv/usart.c ****     return UDR;
-  59               		.loc 1 100 0
+  58 0006 00C0      		rjmp .L4
+  59               	.LSM9:
   60 0008 8091 C600 		lds r24,198
- 101:src/drv/usart.c **** }
-  61               		.loc 1 101 0
-  62 000c 0895      		ret
-  63               		.cfi_endproc
-  64               	.LFE1:
-  66               		.text
-  67               	.Letext0:
-  68               		.file 2 "/usr/lib/avr/include/stdint.h"
+  61               	/* epilogue start */
+  62               	.LSM10:
+  63 000c 0895      		ret
+  64               	.LFE3:
+  98               	.Letext0:
 DEFINED SYMBOLS
-                            *ABS*:0000000000000000 usart.c
-     /tmp/ccchbYo8.s:2      *ABS*:000000000000003e __SP_H__
-     /tmp/ccchbYo8.s:3      *ABS*:000000000000003d __SP_L__
-     /tmp/ccchbYo8.s:4      *ABS*:000000000000003f __SREG__
-     /tmp/ccchbYo8.s:5      *ABS*:0000000000000000 __tmp_reg__
-     /tmp/ccchbYo8.s:6      *ABS*:0000000000000001 __zero_reg__
-     /tmp/ccchbYo8.s:13     .text.USART_Init:0000000000000000 USART_Init
-     /tmp/ccchbYo8.s:46     .text.Usart_Rx:0000000000000000 Usart_Rx
+                            *ABS*:00000000 usart.c
+C:\Users\MainUser\AppData\Local\Temp/ccHTJDvh.s:2      *ABS*:0000003f __SREG__
+C:\Users\MainUser\AppData\Local\Temp/ccHTJDvh.s:3      *ABS*:0000003e __SP_H__
+C:\Users\MainUser\AppData\Local\Temp/ccHTJDvh.s:4      *ABS*:0000003d __SP_L__
+C:\Users\MainUser\AppData\Local\Temp/ccHTJDvh.s:5      *ABS*:00000034 __CCP__
+C:\Users\MainUser\AppData\Local\Temp/ccHTJDvh.s:6      *ABS*:00000000 __tmp_reg__
+C:\Users\MainUser\AppData\Local\Temp/ccHTJDvh.s:7      *ABS*:00000001 __zero_reg__
+C:\Users\MainUser\AppData\Local\Temp/ccHTJDvh.s:19     .text.USART_Init:00000000 USART_Init
+C:\Users\MainUser\AppData\Local\Temp/ccHTJDvh.s:49     .text.Usart_Rx:00000000 Usart_Rx
 
 NO UNDEFINED SYMBOLS

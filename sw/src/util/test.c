@@ -238,12 +238,6 @@ void Test(void)
     DF_CS_inactive;
 
 
-
-//// //// //// //// Display version# //// //// //// ////  
-
-    i = Revision(1);
-    TestWaitEnter();
-
 //// //// //// //// RESET //// //// //// ////
 
 

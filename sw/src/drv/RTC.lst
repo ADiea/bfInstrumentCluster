@@ -1,2732 +1,1688 @@
    1               		.file	"RTC.c"
-   2               	__SP_H__ = 0x3e
-   3               	__SP_L__ = 0x3d
-   4               	__SREG__ = 0x3f
-   5               	__tmp_reg__ = 0
-   6               	__zero_reg__ = 1
-   7               		.text
-   8               	.Ltext0:
-   9               		.cfi_sections	.debug_frame
-  10               		.section	.text.RTC_init,"ax",@progbits
-  11               	.global	RTC_init
-  13               	RTC_init:
-  14               	.LFB1:
-  15               		.file 1 "src/drv/RTC.c"
-   1:src/drv/RTC.c **** //*****************************************************************************
-   2:src/drv/RTC.c **** //
-   3:src/drv/RTC.c **** //  File........: RTC.c
-   4:src/drv/RTC.c **** //
-   5:src/drv/RTC.c **** //  Author(s)...: ATMEL Norway
-   6:src/drv/RTC.c **** //
-   7:src/drv/RTC.c **** //  Target(s)...: ATmega169
-   8:src/drv/RTC.c **** //
-   9:src/drv/RTC.c **** //  Compiler....: AVR-GCC 4.1.1; avr-libc 1.4.5
-  10:src/drv/RTC.c **** //
-  11:src/drv/RTC.c **** //  Description.: Real Time Clock (RTC)
-  12:src/drv/RTC.c **** //
-  13:src/drv/RTC.c **** //  Revisions...: 1.0
-  14:src/drv/RTC.c **** //
-  15:src/drv/RTC.c **** //  YYYYMMDD - VER. - COMMENT                                       - SIGN.
-  16:src/drv/RTC.c **** //
-  17:src/drv/RTC.c **** //  20021015 - 1.0  - Created                                       - LHM
-  18:src/drv/RTC.c **** //  20031009          port to avr-gcc/avr-libc                      - M.Thomas
-  19:src/drv/RTC.c **** //  20051107          minior correction (volatiles)                 - mt
-  20:src/drv/RTC.c **** //  20070129          SIGNAL->ISR                                   - mt
-  21:src/drv/RTC.c **** //*****************************************************************************
-  22:src/drv/RTC.c **** 
-  23:src/drv/RTC.c **** //mtA
-  24:src/drv/RTC.c **** #include <stdint.h>
-  25:src/drv/RTC.c **** #include <avr/io.h>
-  26:src/drv/RTC.c **** #include <avr/interrupt.h>
-  27:src/drv/RTC.c **** #include <avr/pgmspace.h>
-  28:src/drv/RTC.c **** #include "button.h"
-  29:src/drv/RTC.c **** //mtE
-  30:src/drv/RTC.c **** #include "main.h"
-  31:src/drv/RTC.c **** #include "RTC.h"
-  32:src/drv/RTC.c **** #include "LCD_functions.h"
-  33:src/drv/RTC.c **** #include "BCD.h"
-  34:src/drv/RTC.c **** 
-  35:src/drv/RTC.c **** // mtA
-  36:src/drv/RTC.c **** //char gSECOND;
-  37:src/drv/RTC.c **** //char gMINUTE;
-  38:src/drv/RTC.c **** //char gHOUR;
-  39:src/drv/RTC.c **** //char gDAY;
-  40:src/drv/RTC.c **** //char gMONTH;
-  41:src/drv/RTC.c **** volatile uint8_t  gSECOND;
-  42:src/drv/RTC.c **** volatile uint8_t  gMINUTE;
-  43:src/drv/RTC.c **** volatile uint8_t  gHOUR;
-  44:src/drv/RTC.c **** volatile uint8_t  gDAY;
-  45:src/drv/RTC.c **** volatile uint8_t  gMONTH;
-  46:src/drv/RTC.c **** volatile uint16_t gYEAR;
-  47:src/drv/RTC.c **** 
-  48:src/drv/RTC.c **** //char gPowerSaveTimer = 0;
-  49:src/drv/RTC.c **** //char dateformat = 0;
-  50:src/drv/RTC.c **** volatile uint8_t gPowerSaveTimer = 0;
-  51:src/drv/RTC.c **** uint8_t dateformat = 0;
-  52:src/drv/RTC.c **** // mtE
-  53:src/drv/RTC.c **** 
-  54:src/drv/RTC.c **** // Lookup table holding the length of each mont. The first element is a dummy.
-  55:src/drv/RTC.c **** // mt this could be placed in progmem too, but the arrays are accessed quite
-  56:src/drv/RTC.c **** //    often - so leaving them in RAM is better...
-  57:src/drv/RTC.c **** char MonthLength[13] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-  58:src/drv/RTC.c **** 
-  59:src/drv/RTC.c **** char TBL_CLOCK_12[] =   // table used when displaying 12H clock  
-  60:src/drv/RTC.c **** {12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-  61:src/drv/RTC.c **** 
-  62:src/drv/RTC.c **** char clockformat = CLOCK_24;    // set initial clock format to 24H
-  63:src/drv/RTC.c **** 
-  64:src/drv/RTC.c **** // different date formates (text only)
-  65:src/drv/RTC.c **** // mtA
-  66:src/drv/RTC.c **** //__flash char EUROPEAN_DATE_TEXT[] =   "DDMMYY";
-  67:src/drv/RTC.c **** //__flash char AMERICAN_DATE_TEXT[] =   "MMDDYY";
-  68:src/drv/RTC.c **** //__flash char CANADIAN_DATE_TEXT[] =   "YYMMDD"; 
-  69:src/drv/RTC.c **** const char EUROPEAN_DATE_TEXT[] PROGMEM =   "DDMMYY";
-  70:src/drv/RTC.c **** const char AMERICAN_DATE_TEXT[] PROGMEM =   "MMDDYY";
-  71:src/drv/RTC.c **** const char CANADIAN_DATE_TEXT[] PROGMEM =   "YYMMDD"; 
-  72:src/drv/RTC.c **** // mtE
-  73:src/drv/RTC.c **** 
-  74:src/drv/RTC.c **** // different date formates, table for putting DD, MM and YY at the right place
-  75:src/drv/RTC.c **** // on the LCD
-  76:src/drv/RTC.c **** //mtA
-  77:src/drv/RTC.c **** //__flash char EUROPEAN_DATE_NR[] =   { 4, 5, 2, 3, 0, 1 };
-  78:src/drv/RTC.c **** //__flash char AMERICAN_DATE_NR[] =   { 4, 5, 0, 1, 2, 3 };
-  79:src/drv/RTC.c **** //__flash char CANADIAN_DATE_NR[] =   { 0, 1, 2, 3, 4, 5 }; 
-  80:src/drv/RTC.c **** const uint8_t EUROPEAN_DATE_NR[] PROGMEM =   { 4, 5, 2, 3, 0, 1 };
-  81:src/drv/RTC.c **** const uint8_t AMERICAN_DATE_NR[] PROGMEM =   { 4, 5, 0, 1, 2, 3 };
-  82:src/drv/RTC.c **** const uint8_t CANADIAN_DATE_NR[] PROGMEM =   { 0, 1, 2, 3, 4, 5 }; 
-  83:src/drv/RTC.c **** //mtE
-  84:src/drv/RTC.c **** 
-  85:src/drv/RTC.c **** //mtA
-  86:src/drv/RTC.c **** //__flash char __flash *DATEFORMAT_TEXT[] = {EUROPEAN_DATE_TEXT, AMERICAN_DATE_TEXT, CANADIAN_DATE_
-  87:src/drv/RTC.c **** //__flash char __flash *DATE_FORMAT_NR[] = {EUROPEAN_DATE_NR, AMERICAN_DATE_NR, CANADIAN_DATE_NR};
-  88:src/drv/RTC.c **** PGM_P DATEFORMAT_TEXT[] = {EUROPEAN_DATE_TEXT, AMERICAN_DATE_TEXT, CANADIAN_DATE_TEXT};
-  89:src/drv/RTC.c **** const uint8_t* const DATE_FORMAT_NR[] PROGMEM = {EUROPEAN_DATE_NR, AMERICAN_DATE_NR, CANADIAN_DATE_
-  90:src/drv/RTC.c **** //mtE
-  91:src/drv/RTC.c **** 
-  92:src/drv/RTC.c **** 
-  93:src/drv/RTC.c **** 
-  94:src/drv/RTC.c **** 
-  95:src/drv/RTC.c **** /******************************************************************************
-  96:src/drv/RTC.c **** *
-  97:src/drv/RTC.c **** *   Function name:  RTC_init
-  98:src/drv/RTC.c **** *
-  99:src/drv/RTC.c **** *   returns:        none
- 100:src/drv/RTC.c **** *
- 101:src/drv/RTC.c **** *   parameters:     none
- 102:src/drv/RTC.c **** *
- 103:src/drv/RTC.c **** *   Purpose:        Start Timer/Counter2 in asynchronous operation using a
- 104:src/drv/RTC.c **** *                   32.768kHz crystal.
- 105:src/drv/RTC.c **** *
- 106:src/drv/RTC.c **** *******************************************************************************/
- 107:src/drv/RTC.c **** void RTC_init(void)
- 108:src/drv/RTC.c **** {
-  16               		.loc 1 108 0
-  17               		.cfi_startproc
-  18               	/* prologue: function */
-  19               	/* frame size = 0 */
-  20               	/* stack size = 0 */
-  21               	.L__stack_usage = 0
- 109:src/drv/RTC.c ****     Delay(1000);            // wait for 1 sec to let the Xtal stabilize after a power-on,
-  22               		.loc 1 109 0
-  23 0000 88EE      		ldi r24,lo8(-24)
-  24 0002 93E0      		ldi r25,lo8(3)
-  25 0004 0E94 0000 		call Delay
-  26               	.LVL0:
- 110:src/drv/RTC.c **** 
- 111:src/drv/RTC.c ****     cli(); // mt __disable_interrupt();  // disabel global interrupt
-  27               		.loc 1 111 0
-  28               	/* #APP */
-  29               	 ;  111 "src/drv/RTC.c" 1
-  30 0008 F894      		cli
-  31               	 ;  0 "" 2
- 112:src/drv/RTC.c **** 
- 113:src/drv/RTC.c ****     cbiBF(TIMSK2, TOIE2);             // disable OCIE2A and TOIE2
-  32               		.loc 1 113 0
-  33               	/* #NOAPP */
-  34 000a 8091 7000 		lds r24,112
-  35 000e 8E7F      		andi r24,lo8(-2)
-  36 0010 8093 7000 		sts 112,r24
- 114:src/drv/RTC.c **** 
- 115:src/drv/RTC.c ****     ASSR = (1<<AS2);        // select asynchronous operation of Timer2
-  37               		.loc 1 115 0
-  38 0014 88E0      		ldi r24,lo8(8)
-  39 0016 8093 B600 		sts 182,r24
- 116:src/drv/RTC.c **** 
- 117:src/drv/RTC.c ****     TCNT2 = 0;              // clear TCNT2A
-  40               		.loc 1 117 0
-  41 001a 1092 B200 		sts 178,__zero_reg__
- 118:src/drv/RTC.c ****     TCCR2A |= (1<<CS22) | (1<<CS20);             // select precaler: 32.768 kHz / 128 = 1 sec betwe
-  42               		.loc 1 118 0
-  43 001e 8091 B000 		lds r24,176
-  44 0022 8560      		ori r24,lo8(5)
-  45 0024 8093 B000 		sts 176,r24
-  46               	.L2:
- 119:src/drv/RTC.c **** 
- 120:src/drv/RTC.c ****     while((ASSR & 0x01) | (ASSR & 0x04));       // wait for TCN2UB and TCR2UB to be cleared
-  47               		.loc 1 120 0 discriminator 1
-  48 0028 8091 B600 		lds r24,182
-  49 002c 9091 B600 		lds r25,182
-  50 0030 9470      		andi r25,lo8(4)
-  51 0032 8170      		andi r24,lo8(1)
-  52 0034 892B      		or r24,r25
-  53 0036 01F4      		brne .L2
- 121:src/drv/RTC.c **** 
- 122:src/drv/RTC.c ****     TIFR2 = 0xFF;           // clear interrupt-flags
-  54               		.loc 1 122 0
-  55 0038 8FEF      		ldi r24,lo8(-1)
-  56 003a 87BB      		out 0x17,r24
- 123:src/drv/RTC.c ****     sbiBF(TIMSK2, TOIE2);     // enable Timer2 overflow interrupt
-  57               		.loc 1 123 0
-  58 003c 8091 7000 		lds r24,112
-  59 0040 8160      		ori r24,lo8(1)
-  60 0042 8093 7000 		sts 112,r24
- 124:src/drv/RTC.c **** 
- 125:src/drv/RTC.c ****     sei(); // mt __enable_interrupt();                 // enable global interrupt
-  61               		.loc 1 125 0
-  62               	/* #APP */
-  63               	 ;  125 "src/drv/RTC.c" 1
-  64 0046 7894      		sei
-  65               	 ;  0 "" 2
- 126:src/drv/RTC.c **** 
- 127:src/drv/RTC.c ****     // initial time and date setting
- 128:src/drv/RTC.c ****     gSECOND  = 0;
-  66               		.loc 1 128 0
-  67               	/* #NOAPP */
-  68 0048 1092 0000 		sts gSECOND,__zero_reg__
- 129:src/drv/RTC.c ****     gMINUTE  = 0;
-  69               		.loc 1 129 0
-  70 004c 1092 0000 		sts gMINUTE,__zero_reg__
- 130:src/drv/RTC.c ****     gHOUR    = 12;
-  71               		.loc 1 130 0
-  72 0050 8CE0      		ldi r24,lo8(12)
-  73 0052 8093 0000 		sts gHOUR,r24
- 131:src/drv/RTC.c ****     // mt release timestamp
- 132:src/drv/RTC.c ****     gDAY     = 12;
-  74               		.loc 1 132 0
-  75 0056 8093 0000 		sts gDAY,r24
- 133:src/drv/RTC.c ****     gMONTH   = 3;
-  76               		.loc 1 133 0
-  77 005a 83E0      		ldi r24,lo8(3)
-  78 005c 8093 0000 		sts gMONTH,r24
- 134:src/drv/RTC.c ****     gYEAR    = 9;
-  79               		.loc 1 134 0
-  80 0060 89E0      		ldi r24,lo8(9)
-  81 0062 90E0      		ldi r25,0
-  82 0064 9093 0000 		sts gYEAR+1,r25
-  83 0068 8093 0000 		sts gYEAR,r24
-  84 006c 0895      		ret
-  85               		.cfi_endproc
-  86               	.LFE1:
-  88               		.section	.text.ShowClock,"ax",@progbits
-  89               	.global	ShowClock
-  91               	ShowClock:
-  92               	.LFB2:
- 135:src/drv/RTC.c **** }
- 136:src/drv/RTC.c **** 
- 137:src/drv/RTC.c **** 
- 138:src/drv/RTC.c **** /*****************************************************************************
- 139:src/drv/RTC.c **** *
- 140:src/drv/RTC.c **** *   Function name : ShowClock
- 141:src/drv/RTC.c **** *
- 142:src/drv/RTC.c **** *   Returns :       char ST_state (to the state-machine)
- 143:src/drv/RTC.c **** *
- 144:src/drv/RTC.c **** *   Parameters :    char input (from joystick)
- 145:src/drv/RTC.c **** *
- 146:src/drv/RTC.c **** *   Purpose :       Shows the clock on the LCD
- 147:src/drv/RTC.c **** *
- 148:src/drv/RTC.c **** *****************************************************************************/
- 149:src/drv/RTC.c **** char ShowClock(char input)
- 150:src/drv/RTC.c **** {
-  93               		.loc 1 150 0
-  94               		.cfi_startproc
-  95               	.LVL1:
-  96 0000 DF92      		push r13
-  97               	.LCFI0:
-  98               		.cfi_def_cfa_offset 3
-  99               		.cfi_offset 13, -2
- 100 0002 EF92      		push r14
- 101               	.LCFI1:
- 102               		.cfi_def_cfa_offset 4
- 103               		.cfi_offset 14, -3
- 104 0004 FF92      		push r15
- 105               	.LCFI2:
- 106               		.cfi_def_cfa_offset 5
- 107               		.cfi_offset 15, -4
- 108 0006 0F93      		push r16
- 109               	.LCFI3:
- 110               		.cfi_def_cfa_offset 6
- 111               		.cfi_offset 16, -5
- 112 0008 1F93      		push r17
- 113               	.LCFI4:
- 114               		.cfi_def_cfa_offset 7
- 115               		.cfi_offset 17, -6
- 116 000a CF93      		push r28
- 117               	.LCFI5:
- 118               		.cfi_def_cfa_offset 8
- 119               		.cfi_offset 28, -7
- 120 000c DF93      		push r29
- 121               	.LCFI6:
- 122               		.cfi_def_cfa_offset 9
- 123               		.cfi_offset 29, -8
- 124               	/* prologue: function */
- 125               	/* frame size = 0 */
- 126               	/* stack size = 7 */
- 127               	.L__stack_usage = 7
- 128 000e E82E      		mov r14,r24
- 151:src/drv/RTC.c ****     //char HH, HL, MH, ML, SH, SL;
- 152:src/drv/RTC.c ****     uint8_t HH, HL, MH, ML, SH, SL;
- 153:src/drv/RTC.c **** 
- 154:src/drv/RTC.c ****     if (clockformat == CLOCK_12)    // if 12H clock
- 129               		.loc 1 154 0
- 130 0010 8091 0000 		lds r24,clockformat
- 131               	.LVL2:
- 132 0014 8111      		cpse r24,__zero_reg__
- 133 0016 00C0      		rjmp .L6
- 155:src/drv/RTC.c ****         HH = CHAR2BCD2(TBL_CLOCK_12[gHOUR]);   
- 134               		.loc 1 155 0
- 135 0018 E091 0000 		lds r30,gHOUR
- 136 001c F0E0      		ldi r31,0
- 137 001e E050      		subi r30,lo8(-(TBL_CLOCK_12))
- 138 0020 F040      		sbci r31,hi8(-(TBL_CLOCK_12))
- 139 0022 8081      		ld r24,Z
- 140 0024 00C0      		rjmp .L11
- 141               	.L6:
- 156:src/drv/RTC.c ****     else
- 157:src/drv/RTC.c ****         HH = CHAR2BCD2(gHOUR);
- 142               		.loc 1 157 0
- 143 0026 8091 0000 		lds r24,gHOUR
- 144               	.L11:
- 145 002a 0E94 0000 		call CHAR2BCD2
- 146               	.LVL3:
- 147 002e C82F      		mov r28,r24
- 148               	.LVL4:
- 158:src/drv/RTC.c ****         
- 159:src/drv/RTC.c ****     HL = (HH & 0x0F) + '0';
- 160:src/drv/RTC.c ****     HH = (HH >> 4) + '0';
- 149               		.loc 1 160 0
- 150 0030 D82E      		mov r13,r24
- 151 0032 D294      		swap r13
- 152 0034 8FE0      		ldi r24,lo8(15)
- 153               	.LVL5:
- 154 0036 D822      		and r13,r24
- 155               	.LVL6:
- 161:src/drv/RTC.c **** 
- 162:src/drv/RTC.c ****     MH = CHAR2BCD2(gMINUTE);
- 156               		.loc 1 162 0
- 157 0038 8091 0000 		lds r24,gMINUTE
- 158 003c 0E94 0000 		call CHAR2BCD2
- 159               	.LVL7:
- 160 0040 182F      		mov r17,r24
- 161               	.LVL8:
- 163:src/drv/RTC.c ****     ML = (MH & 0x0F) + '0';
- 164:src/drv/RTC.c ****     MH = (MH >> 4) + '0';
- 162               		.loc 1 164 0
- 163 0042 F82E      		mov r15,r24
- 164 0044 F294      		swap r15
- 165 0046 9FE0      		ldi r25,lo8(15)
- 166 0048 F922      		and r15,r25
- 167               	.LVL9:
- 165:src/drv/RTC.c **** 
- 166:src/drv/RTC.c ****     SH = CHAR2BCD2(gSECOND);
- 168               		.loc 1 166 0
- 169 004a 8091 0000 		lds r24,gSECOND
- 170 004e 0E94 0000 		call CHAR2BCD2
- 171               	.LVL10:
- 172 0052 D82F      		mov r29,r24
- 173               	.LVL11:
- 167:src/drv/RTC.c ****     SL = (SH & 0x0F) + '0';
- 168:src/drv/RTC.c ****     SH = (SH >> 4) + '0';
- 174               		.loc 1 168 0
- 175 0054 082F      		mov r16,r24
- 176 0056 0295      		swap r16
- 177 0058 0F70      		andi r16,lo8(15)
- 178               	.LVL12:
- 160:src/drv/RTC.c **** 
- 179               		.loc 1 160 0
- 180 005a 60E3      		ldi r22,lo8(48)
- 181 005c 6D0D      		add r22,r13
- 182               	.LVL13:
- 169:src/drv/RTC.c **** 
- 170:src/drv/RTC.c ****     LCD_putc(0, HH);
- 183               		.loc 1 170 0
- 184 005e 80E0      		ldi r24,0
- 185               	.LVL14:
- 186 0060 0E94 0000 		call LCD_putc
- 187               	.LVL15:
- 159:src/drv/RTC.c ****     HH = (HH >> 4) + '0';
- 188               		.loc 1 159 0
- 189 0064 CF70      		andi r28,lo8(15)
- 190               	.LVL16:
- 191 0066 60E3      		ldi r22,lo8(48)
- 192 0068 6C0F      		add r22,r28
- 193               	.LVL17:
- 171:src/drv/RTC.c ****     LCD_putc(1, HL);
- 194               		.loc 1 171 0
- 195 006a 81E0      		ldi r24,lo8(1)
- 196 006c 0E94 0000 		call LCD_putc
- 197               	.LVL18:
- 164:src/drv/RTC.c **** 
- 198               		.loc 1 164 0
- 199 0070 60E3      		ldi r22,lo8(48)
- 200 0072 6F0D      		add r22,r15
- 201               	.LVL19:
- 172:src/drv/RTC.c ****     LCD_putc(2, MH);
- 202               		.loc 1 172 0
- 203 0074 82E0      		ldi r24,lo8(2)
- 204 0076 0E94 0000 		call LCD_putc
- 205               	.LVL20:
- 163:src/drv/RTC.c ****     MH = (MH >> 4) + '0';
- 206               		.loc 1 163 0
- 207 007a 1F70      		andi r17,lo8(15)
- 208               	.LVL21:
- 209 007c 60E3      		ldi r22,lo8(48)
- 210 007e 610F      		add r22,r17
- 211               	.LVL22:
- 173:src/drv/RTC.c ****     LCD_putc(3, ML);
- 212               		.loc 1 173 0
- 213 0080 83E0      		ldi r24,lo8(3)
- 214 0082 0E94 0000 		call LCD_putc
- 215               	.LVL23:
- 168:src/drv/RTC.c **** 
- 216               		.loc 1 168 0
- 217 0086 60E3      		ldi r22,lo8(48)
- 218 0088 600F      		add r22,r16
- 219               	.LVL24:
- 174:src/drv/RTC.c ****     LCD_putc(4, SH);
- 220               		.loc 1 174 0
- 221 008a 84E0      		ldi r24,lo8(4)
- 222 008c 0E94 0000 		call LCD_putc
- 223               	.LVL25:
- 167:src/drv/RTC.c ****     SH = (SH >> 4) + '0';
- 224               		.loc 1 167 0
- 225 0090 6D2F      		mov r22,r29
- 226 0092 6F70      		andi r22,lo8(15)
- 227 0094 605D      		subi r22,lo8(-(48))
- 228               	.LVL26:
- 175:src/drv/RTC.c ****     LCD_putc(5, SL);
- 229               		.loc 1 175 0
- 230 0096 85E0      		ldi r24,lo8(5)
- 231 0098 0E94 0000 		call LCD_putc
- 232               	.LVL27:
- 176:src/drv/RTC.c ****     LCD_putc(6, '\0');
- 233               		.loc 1 176 0
- 234 009c 60E0      		ldi r22,0
- 235 009e 86E0      		ldi r24,lo8(6)
- 236 00a0 0E94 0000 		call LCD_putc
- 237               	.LVL28:
- 177:src/drv/RTC.c **** 
- 178:src/drv/RTC.c ****     LCD_Colon(1);
- 238               		.loc 1 178 0
- 239 00a4 81E0      		ldi r24,lo8(1)
- 240 00a6 0E94 0000 		call LCD_Colon
- 241               	.LVL29:
- 179:src/drv/RTC.c **** 
- 180:src/drv/RTC.c ****     LCD_UpdateRequired(TRUE, 0);
- 242               		.loc 1 180 0
- 243 00aa 60E0      		ldi r22,0
- 244 00ac 81E0      		ldi r24,lo8(1)
- 245 00ae 0E94 0000 		call LCD_UpdateRequired
- 246               	.LVL30:
- 181:src/drv/RTC.c **** 
- 182:src/drv/RTC.c ****     if (input == KEY_PREV)
- 247               		.loc 1 182 0
- 248 00b2 83E0      		ldi r24,lo8(3)
- 249 00b4 E816      		cp r14,r24
- 250 00b6 01F0      		breq .L9
- 183:src/drv/RTC.c ****         return ST_TIME_CLOCK;
- 184:src/drv/RTC.c ****     else if (input == KEY_NEXT)
- 251               		.loc 1 184 0
- 252 00b8 82E0      		ldi r24,lo8(2)
- 253 00ba E816      		cp r14,r24
- 254 00bc 01F0      		breq .L10
- 185:src/drv/RTC.c ****         return ST_TIME_CLOCK_ADJUST;
- 186:src/drv/RTC.c ****       
- 187:src/drv/RTC.c ****     return ST_TIME_CLOCK_FUNC;
- 255               		.loc 1 187 0
- 256 00be 86E1      		ldi r24,lo8(22)
- 257 00c0 00C0      		rjmp .L8
- 258               	.L9:
- 183:src/drv/RTC.c ****         return ST_TIME_CLOCK;
- 259               		.loc 1 183 0
- 260 00c2 85E1      		ldi r24,lo8(21)
- 261 00c4 00C0      		rjmp .L8
- 262               	.L10:
- 185:src/drv/RTC.c ****         return ST_TIME_CLOCK_ADJUST;
- 263               		.loc 1 185 0
- 264 00c6 87E1      		ldi r24,lo8(23)
- 265               	.L8:
- 266               	/* epilogue start */
- 188:src/drv/RTC.c **** }
- 267               		.loc 1 188 0
- 268 00c8 DF91      		pop r29
- 269               	.LVL31:
- 270 00ca CF91      		pop r28
- 271 00cc 1F91      		pop r17
- 272 00ce 0F91      		pop r16
- 273               	.LVL32:
- 274 00d0 FF90      		pop r15
- 275               	.LVL33:
- 276 00d2 EF90      		pop r14
- 277               	.LVL34:
- 278 00d4 DF90      		pop r13
- 279               	.LVL35:
- 280 00d6 0895      		ret
- 281               		.cfi_endproc
- 282               	.LFE2:
- 284               		.section	.text.SetClock,"ax",@progbits
- 285               	.global	SetClock
- 287               	SetClock:
- 288               	.LFB3:
- 189:src/drv/RTC.c **** 
- 190:src/drv/RTC.c **** #define HOUR       0
- 191:src/drv/RTC.c **** #define MINUTE     1
- 192:src/drv/RTC.c **** #define SECOND     2
- 193:src/drv/RTC.c **** 
- 194:src/drv/RTC.c **** 
- 195:src/drv/RTC.c **** /*****************************************************************************
- 196:src/drv/RTC.c **** *
- 197:src/drv/RTC.c **** *   Function name : SetClock
- 198:src/drv/RTC.c **** *
- 199:src/drv/RTC.c **** *   Returns :       char ST_state (to the state-machine)
- 200:src/drv/RTC.c **** *
- 201:src/drv/RTC.c **** *   Parameters :    char input (from joystick)
- 202:src/drv/RTC.c **** *
- 203:src/drv/RTC.c **** *   Purpose :       Adjusts the clock
- 204:src/drv/RTC.c **** *
- 205:src/drv/RTC.c **** *****************************************************************************/
- 206:src/drv/RTC.c **** char SetClock(char input)
- 207:src/drv/RTC.c **** {
- 289               		.loc 1 207 0
- 290               		.cfi_startproc
- 291               	.LVL36:
- 292 0000 DF92      		push r13
- 293               	.LCFI7:
- 294               		.cfi_def_cfa_offset 3
- 295               		.cfi_offset 13, -2
- 296 0002 EF92      		push r14
- 297               	.LCFI8:
- 298               		.cfi_def_cfa_offset 4
- 299               		.cfi_offset 14, -3
- 300 0004 FF92      		push r15
- 301               	.LCFI9:
- 302               		.cfi_def_cfa_offset 5
- 303               		.cfi_offset 15, -4
- 304 0006 0F93      		push r16
- 305               	.LCFI10:
- 306               		.cfi_def_cfa_offset 6
- 307               		.cfi_offset 16, -5
- 308 0008 1F93      		push r17
- 309               	.LCFI11:
- 310               		.cfi_def_cfa_offset 7
- 311               		.cfi_offset 17, -6
- 312 000a CF93      		push r28
- 313               	.LCFI12:
- 314               		.cfi_def_cfa_offset 8
- 315               		.cfi_offset 28, -7
- 316 000c DF93      		push r29
- 317               	.LCFI13:
- 318               		.cfi_def_cfa_offset 9
- 319               		.cfi_offset 29, -8
- 320               	/* prologue: function */
- 321               	/* frame size = 0 */
- 322               	/* stack size = 7 */
- 323               	.L__stack_usage = 7
- 324 000e 082F      		mov r16,r24
- 208:src/drv/RTC.c ****     static char enter_function = 1;
- 209:src/drv/RTC.c ****     // mtA
- 210:src/drv/RTC.c ****     // static char time[3];    // table holding the temporary clock setting
- 211:src/drv/RTC.c ****     // static char mode = HOUR;
- 212:src/drv/RTC.c ****     // char HH, HL, MH, ML, SH, SL;
- 213:src/drv/RTC.c ****     static uint8_t time[3];
- 214:src/drv/RTC.c ****     static uint8_t mode = HOUR;
- 215:src/drv/RTC.c ****     uint8_t HH, HL, MH, ML, SH, SL;
- 216:src/drv/RTC.c ****     // mtE
- 217:src/drv/RTC.c **** 
- 218:src/drv/RTC.c ****     if (enter_function)
- 325               		.loc 1 218 0
- 326 0010 8091 0000 		lds r24,enter_function.1783
- 327               	.LVL37:
- 328 0014 8823      		tst r24
- 329 0016 01F0      		breq .L13
- 219:src/drv/RTC.c ****     {
- 220:src/drv/RTC.c ****         time[HOUR] = gHOUR;
- 330               		.loc 1 220 0
- 331 0018 8091 0000 		lds r24,gHOUR
- 332 001c 8093 0000 		sts time.1784,r24
- 221:src/drv/RTC.c ****         time[MINUTE] = gMINUTE;
- 333               		.loc 1 221 0
- 334 0020 8091 0000 		lds r24,gMINUTE
- 335 0024 8093 0000 		sts time.1784+1,r24
- 222:src/drv/RTC.c ****         time[SECOND] = gSECOND;
- 336               		.loc 1 222 0
- 337 0028 8091 0000 		lds r24,gSECOND
- 338 002c 8093 0000 		sts time.1784+2,r24
- 339               	.L13:
- 223:src/drv/RTC.c ****     }
- 224:src/drv/RTC.c **** 
- 225:src/drv/RTC.c ****     if (clockformat == CLOCK_12)    // if 12H clock
- 340               		.loc 1 225 0
- 341 0030 8091 0000 		lds r24,clockformat
- 342 0034 8111      		cpse r24,__zero_reg__
- 343 0036 00C0      		rjmp .L14
- 226:src/drv/RTC.c ****         HH = CHAR2BCD2(TBL_CLOCK_12[time[HOUR]]);
- 344               		.loc 1 226 0
- 345 0038 E091 0000 		lds r30,time.1784
- 346 003c F0E0      		ldi r31,0
- 347 003e E050      		subi r30,lo8(-(TBL_CLOCK_12))
- 348 0040 F040      		sbci r31,hi8(-(TBL_CLOCK_12))
- 349 0042 8081      		ld r24,Z
- 350 0044 00C0      		rjmp .L49
- 351               	.L14:
- 227:src/drv/RTC.c ****     else
- 228:src/drv/RTC.c ****         HH = CHAR2BCD2(time[HOUR]);
- 352               		.loc 1 228 0
- 353 0046 8091 0000 		lds r24,time.1784
- 354               	.L49:
- 355 004a 0E94 0000 		call CHAR2BCD2
- 356               	.LVL38:
- 229:src/drv/RTC.c ****         
- 230:src/drv/RTC.c ****     HL = (HH & 0x0F) + '0';
- 357               		.loc 1 230 0
- 358 004e 682F      		mov r22,r24
- 359 0050 6F70      		andi r22,lo8(15)
- 360 0052 90E3      		ldi r25,lo8(48)
- 361 0054 D92E      		mov r13,r25
- 362 0056 D60E      		add r13,r22
- 363               	.LVL39:
- 231:src/drv/RTC.c ****     HH = (HH >> 4) + '0';
- 364               		.loc 1 231 0
- 365 0058 C82F      		mov r28,r24
- 366 005a C295      		swap r28
- 367 005c CF70      		andi r28,lo8(15)
- 368               	.LVL40:
- 232:src/drv/RTC.c **** 
- 233:src/drv/RTC.c ****     MH = CHAR2BCD2(time[MINUTE]);
- 369               		.loc 1 233 0
- 370 005e 8091 0000 		lds r24,time.1784+1
- 371 0062 0E94 0000 		call CHAR2BCD2
- 372               	.LVL41:
- 234:src/drv/RTC.c ****     ML = (MH & 0x0F) + '0';
- 373               		.loc 1 234 0
- 374 0066 682F      		mov r22,r24
- 375 0068 6F70      		andi r22,lo8(15)
- 376 006a 20E3      		ldi r18,lo8(48)
- 377 006c E22E      		mov r14,r18
- 378 006e E60E      		add r14,r22
- 379               	.LVL42:
- 235:src/drv/RTC.c ****     MH = (MH >> 4) + '0';
- 380               		.loc 1 235 0
- 381 0070 182F      		mov r17,r24
- 382 0072 1295      		swap r17
- 383 0074 1F70      		andi r17,lo8(15)
- 384 0076 105D      		subi r17,lo8(-(48))
- 385               	.LVL43:
- 236:src/drv/RTC.c **** 
- 237:src/drv/RTC.c ****     SH = CHAR2BCD2(time[SECOND]);
- 386               		.loc 1 237 0
- 387 0078 8091 0000 		lds r24,time.1784+2
- 388 007c 0E94 0000 		call CHAR2BCD2
- 389               	.LVL44:
- 238:src/drv/RTC.c ****     SL = (SH & 0x0F) + '0';
- 390               		.loc 1 238 0
- 391 0080 682F      		mov r22,r24
- 392 0082 6F70      		andi r22,lo8(15)
- 393 0084 30E3      		ldi r19,lo8(48)
- 394 0086 F32E      		mov r15,r19
- 395 0088 F60E      		add r15,r22
- 396               	.LVL45:
- 239:src/drv/RTC.c ****     SH = (SH >> 4) + '0';
- 397               		.loc 1 239 0
- 398 008a 982F      		mov r25,r24
- 399 008c 9295      		swap r25
- 400 008e 9F70      		andi r25,lo8(15)
- 401 0090 D0E3      		ldi r29,lo8(48)
- 402 0092 D90F      		add r29,r25
- 403               	.LVL46:
- 231:src/drv/RTC.c **** 
- 404               		.loc 1 231 0
- 405 0094 C05D      		subi r28,lo8(-(48))
- 406               	.LVL47:
- 240:src/drv/RTC.c **** 
- 241:src/drv/RTC.c ****     LCD_putc(0, HH | ((mode == HOUR) ? 0x80 : 0x00));
- 407               		.loc 1 241 0
- 408 0096 8091 0000 		lds r24,mode.1785
- 409 009a 8823      		tst r24
- 410 009c 01F0      		breq .L37
- 411 009e 60E0      		ldi r22,0
- 412 00a0 00C0      		rjmp .L16
- 413               	.L37:
- 414 00a2 60E8      		ldi r22,lo8(-128)
- 415               	.L16:
- 416               		.loc 1 241 0 is_stmt 0 discriminator 4
- 417 00a4 6C2B      		or r22,r28
- 418 00a6 80E0      		ldi r24,0
- 419 00a8 0E94 0000 		call LCD_putc
- 420               	.LVL48:
- 242:src/drv/RTC.c ****     LCD_putc(1, HL | ((mode == HOUR) ? 0x80 : 0x00));
- 421               		.loc 1 242 0 is_stmt 1 discriminator 4
- 422 00ac 8091 0000 		lds r24,mode.1785
- 423 00b0 8823      		tst r24
- 424 00b2 01F0      		breq .L38
- 425               		.loc 1 242 0 is_stmt 0
- 426 00b4 60E0      		ldi r22,0
- 427 00b6 00C0      		rjmp .L17
- 428               	.L38:
- 429 00b8 60E8      		ldi r22,lo8(-128)
- 430               	.L17:
- 431               		.loc 1 242 0 discriminator 4
- 432 00ba 6D29      		or r22,r13
- 433 00bc 81E0      		ldi r24,lo8(1)
- 434 00be 0E94 0000 		call LCD_putc
- 435               	.LVL49:
- 243:src/drv/RTC.c ****     LCD_putc(2, MH | ((mode == MINUTE) ? 0x80 : 0x00));
- 436               		.loc 1 243 0 is_stmt 1 discriminator 4
- 437 00c2 8091 0000 		lds r24,mode.1785
- 438 00c6 8130      		cpi r24,lo8(1)
- 439 00c8 01F0      		breq .L39
- 440               		.loc 1 243 0 is_stmt 0
- 441 00ca 60E0      		ldi r22,0
- 442 00cc 00C0      		rjmp .L18
- 443               	.L39:
- 444 00ce 60E8      		ldi r22,lo8(-128)
- 445               	.L18:
- 446               		.loc 1 243 0 discriminator 4
- 447 00d0 612B      		or r22,r17
- 448 00d2 82E0      		ldi r24,lo8(2)
- 449 00d4 0E94 0000 		call LCD_putc
- 450               	.LVL50:
- 244:src/drv/RTC.c ****     LCD_putc(3, ML | ((mode == MINUTE) ? 0x80 : 0x00));
- 451               		.loc 1 244 0 is_stmt 1 discriminator 4
- 452 00d8 8091 0000 		lds r24,mode.1785
- 453 00dc 8130      		cpi r24,lo8(1)
- 454 00de 01F0      		breq .L40
- 455               		.loc 1 244 0 is_stmt 0
- 456 00e0 60E0      		ldi r22,0
- 457 00e2 00C0      		rjmp .L19
- 458               	.L40:
- 459 00e4 60E8      		ldi r22,lo8(-128)
- 460               	.L19:
- 461               		.loc 1 244 0 discriminator 4
- 462 00e6 6E29      		or r22,r14
- 463 00e8 83E0      		ldi r24,lo8(3)
- 464 00ea 0E94 0000 		call LCD_putc
- 465               	.LVL51:
- 245:src/drv/RTC.c ****     LCD_putc(4, SH | ((mode == SECOND) ? 0x80 : 0x00));
- 466               		.loc 1 245 0 is_stmt 1 discriminator 4
- 467 00ee 8091 0000 		lds r24,mode.1785
- 468 00f2 8230      		cpi r24,lo8(2)
- 469 00f4 01F0      		breq .L41
- 470               		.loc 1 245 0 is_stmt 0
- 471 00f6 60E0      		ldi r22,0
- 472 00f8 00C0      		rjmp .L20
- 473               	.L41:
- 474 00fa 60E8      		ldi r22,lo8(-128)
- 475               	.L20:
- 476               		.loc 1 245 0 discriminator 4
- 477 00fc 6D2B      		or r22,r29
- 478 00fe 84E0      		ldi r24,lo8(4)
- 479 0100 0E94 0000 		call LCD_putc
- 480               	.LVL52:
- 246:src/drv/RTC.c ****     LCD_putc(5, SL | ((mode == SECOND) ? 0x80 : 0x00));
- 481               		.loc 1 246 0 is_stmt 1 discriminator 4
- 482 0104 8091 0000 		lds r24,mode.1785
- 483 0108 8230      		cpi r24,lo8(2)
- 484 010a 01F0      		breq .L42
- 485               		.loc 1 246 0 is_stmt 0
- 486 010c 60E0      		ldi r22,0
- 487 010e 00C0      		rjmp .L21
- 488               	.L42:
- 489 0110 60E8      		ldi r22,lo8(-128)
- 490               	.L21:
- 491               		.loc 1 246 0 discriminator 4
- 492 0112 6F29      		or r22,r15
- 493 0114 85E0      		ldi r24,lo8(5)
- 494 0116 0E94 0000 		call LCD_putc
- 495               	.LVL53:
- 247:src/drv/RTC.c ****     LCD_putc(6, '\0');
- 496               		.loc 1 247 0 is_stmt 1 discriminator 4
- 497 011a 60E0      		ldi r22,0
- 498 011c 86E0      		ldi r24,lo8(6)
- 499 011e 0E94 0000 		call LCD_putc
- 500               	.LVL54:
- 248:src/drv/RTC.c **** 
- 249:src/drv/RTC.c ****     LCD_Colon(1);
- 501               		.loc 1 249 0 discriminator 4
- 502 0122 81E0      		ldi r24,lo8(1)
- 503 0124 0E94 0000 		call LCD_Colon
- 504               	.LVL55:
- 250:src/drv/RTC.c **** 
- 251:src/drv/RTC.c ****     if (input != KEY_NULL)
- 505               		.loc 1 251 0 discriminator 4
- 506 0128 0111      		cpse r16,__zero_reg__
- 252:src/drv/RTC.c ****         LCD_FlashReset();
- 507               		.loc 1 252 0
- 508 012a 0E94 0000 		call LCD_FlashReset
- 509               	.LVL56:
- 510               	.L22:
- 253:src/drv/RTC.c **** 
- 254:src/drv/RTC.c ****     LCD_UpdateRequired(TRUE, 0);
- 511               		.loc 1 254 0
- 512 012e 60E0      		ldi r22,0
- 513 0130 81E0      		ldi r24,lo8(1)
- 514 0132 0E94 0000 		call LCD_UpdateRequired
- 515               	.LVL57:
- 255:src/drv/RTC.c ****     
- 256:src/drv/RTC.c ****     enter_function = 1;
- 516               		.loc 1 256 0
- 517 0136 81E0      		ldi r24,lo8(1)
- 518 0138 8093 0000 		sts enter_function.1783,r24
- 257:src/drv/RTC.c **** 
- 258:src/drv/RTC.c ****     // Increment/decrement hours, minutes or seconds
- 259:src/drv/RTC.c ****     if (input == KEY_PLUS)
- 519               		.loc 1 259 0
- 520 013c 0430      		cpi r16,lo8(4)
- 521 013e 01F4      		brne .L23
- 260:src/drv/RTC.c ****         time[mode]++;
- 522               		.loc 1 260 0
- 523 0140 E091 0000 		lds r30,mode.1785
- 524 0144 F0E0      		ldi r31,0
- 525 0146 E050      		subi r30,lo8(-(time.1784))
- 526 0148 F040      		sbci r31,hi8(-(time.1784))
- 527 014a 8081      		ld r24,Z
- 528 014c 8F5F      		subi r24,lo8(-(1))
- 529 014e 00C0      		rjmp .L51
- 530               	.L23:
- 261:src/drv/RTC.c ****     else if (input == KEY_MINUS)
- 531               		.loc 1 261 0
- 532 0150 0530      		cpi r16,lo8(5)
- 533 0152 01F4      		brne .L25
- 262:src/drv/RTC.c ****         time[mode]--;
- 534               		.loc 1 262 0
- 535 0154 E091 0000 		lds r30,mode.1785
- 536 0158 F0E0      		ldi r31,0
- 537 015a E050      		subi r30,lo8(-(time.1784))
- 538 015c F040      		sbci r31,hi8(-(time.1784))
- 539 015e 8081      		ld r24,Z
- 540 0160 8150      		subi r24,lo8(-(-1))
- 541               	.L51:
- 542 0162 8083      		st Z,r24
- 543 0164 00C0      		rjmp .L24
- 544               	.L25:
- 263:src/drv/RTC.c ****     else if (input == KEY_PREV)
- 545               		.loc 1 263 0
- 546 0166 0330      		cpi r16,lo8(3)
- 547 0168 01F4      		brne .L26
- 264:src/drv/RTC.c ****     {
- 265:src/drv/RTC.c ****         if (mode == HOUR)
- 548               		.loc 1 265 0
- 549 016a 8091 0000 		lds r24,mode.1785
- 550 016e 8111      		cpse r24,__zero_reg__
- 551 0170 00C0      		rjmp .L27
- 266:src/drv/RTC.c ****             mode = SECOND;
- 552               		.loc 1 266 0
- 553 0172 82E0      		ldi r24,lo8(2)
- 554 0174 00C0      		rjmp .L50
- 555               	.L27:
- 267:src/drv/RTC.c ****         else
- 268:src/drv/RTC.c ****             mode--;
- 556               		.loc 1 268 0
- 557 0176 8150      		subi r24,lo8(-(-1))
- 558 0178 00C0      		rjmp .L50
- 559               	.L26:
- 269:src/drv/RTC.c ****     }
- 270:src/drv/RTC.c ****     else if (input == KEY_NEXT)
- 560               		.loc 1 270 0
- 561 017a 0230      		cpi r16,lo8(2)
- 562 017c 01F4      		brne .L28
- 271:src/drv/RTC.c ****     {
- 272:src/drv/RTC.c ****         if (mode == SECOND)
- 563               		.loc 1 272 0
- 564 017e 8091 0000 		lds r24,mode.1785
- 565 0182 8230      		cpi r24,lo8(2)
- 566 0184 01F4      		brne .L29
- 273:src/drv/RTC.c ****             mode = HOUR;
- 567               		.loc 1 273 0
- 568 0186 1092 0000 		sts mode.1785,__zero_reg__
- 569 018a 00C0      		rjmp .L24
- 570               	.L29:
- 274:src/drv/RTC.c ****         else
- 275:src/drv/RTC.c ****             mode++;
- 571               		.loc 1 275 0
- 572 018c 8F5F      		subi r24,lo8(-(1))
- 573               	.L50:
- 574 018e 8093 0000 		sts mode.1785,r24
- 575 0192 00C0      		rjmp .L24
- 576               	.L28:
- 276:src/drv/RTC.c ****     }
- 277:src/drv/RTC.c ****     else if (input == KEY_ENTER)
- 577               		.loc 1 277 0
- 578 0194 0130      		cpi r16,lo8(1)
- 579 0196 01F4      		brne .L24
- 278:src/drv/RTC.c ****     {
- 279:src/drv/RTC.c ****         // store the temporary adjusted values to the global variables
- 280:src/drv/RTC.c ****         cli(); // mt __disable_interrupt();
- 580               		.loc 1 280 0
- 581               	/* #APP */
- 582               	 ;  280 "src/drv/RTC.c" 1
- 583 0198 F894      		cli
- 584               	 ;  0 "" 2
- 281:src/drv/RTC.c ****         gHOUR = time[HOUR];
- 585               		.loc 1 281 0
- 586               	/* #NOAPP */
- 587 019a 8091 0000 		lds r24,time.1784
- 588 019e 8093 0000 		sts gHOUR,r24
- 282:src/drv/RTC.c ****         gMINUTE = time[MINUTE];
- 589               		.loc 1 282 0
- 590 01a2 8091 0000 		lds r24,time.1784+1
- 591 01a6 8093 0000 		sts gMINUTE,r24
- 283:src/drv/RTC.c ****         gSECOND = time[SECOND];
- 592               		.loc 1 283 0
- 593 01aa 8091 0000 		lds r24,time.1784+2
- 594 01ae 8093 0000 		sts gSECOND,r24
- 284:src/drv/RTC.c ****         sei(); // mt __enable_interrupt();
- 595               		.loc 1 284 0
- 596               	/* #APP */
- 597               	 ;  284 "src/drv/RTC.c" 1
- 598 01b2 7894      		sei
- 599               	 ;  0 "" 2
- 285:src/drv/RTC.c ****         mode = HOUR;
- 600               		.loc 1 285 0
- 601               	/* #NOAPP */
- 602 01b4 1092 0000 		sts mode.1785,__zero_reg__
- 286:src/drv/RTC.c ****         return ST_TIME_CLOCK_FUNC;
- 603               		.loc 1 286 0
- 604 01b8 86E1      		ldi r24,lo8(22)
- 605 01ba 00C0      		rjmp .L30
- 606               	.L24:
- 287:src/drv/RTC.c ****     }
- 288:src/drv/RTC.c **** 
- 289:src/drv/RTC.c ****     /* OPTIMIZE: Can be solved by using a modulo operation */
- 290:src/drv/RTC.c ****     if (time[HOUR] == 255)
- 607               		.loc 1 290 0
- 608 01bc 8091 0000 		lds r24,time.1784
- 609 01c0 8F3F      		cpi r24,lo8(-1)
- 610 01c2 01F4      		brne .L31
- 291:src/drv/RTC.c ****         time[HOUR] = 23;
- 611               		.loc 1 291 0
- 612 01c4 87E1      		ldi r24,lo8(23)
- 613 01c6 8093 0000 		sts time.1784,r24
- 614               	.L31:
- 292:src/drv/RTC.c ****     if (time[HOUR] > 23)
- 615               		.loc 1 292 0
- 616 01ca 8091 0000 		lds r24,time.1784
- 617 01ce 8831      		cpi r24,lo8(24)
- 618 01d0 00F0      		brlo .L32
- 293:src/drv/RTC.c ****         time[HOUR] = 0;
- 619               		.loc 1 293 0
- 620 01d2 1092 0000 		sts time.1784,__zero_reg__
- 621               	.L32:
- 294:src/drv/RTC.c **** 
- 295:src/drv/RTC.c ****     if (time[MINUTE] == 255)
- 622               		.loc 1 295 0
- 623 01d6 8091 0000 		lds r24,time.1784+1
- 624 01da 8F3F      		cpi r24,lo8(-1)
- 625 01dc 01F4      		brne .L33
- 296:src/drv/RTC.c ****         time[MINUTE] = 59;
- 626               		.loc 1 296 0
- 627 01de 8BE3      		ldi r24,lo8(59)
- 628 01e0 8093 0000 		sts time.1784+1,r24
- 629               	.L33:
- 297:src/drv/RTC.c ****     if (time[MINUTE] > 59)
- 630               		.loc 1 297 0
- 631 01e4 8091 0000 		lds r24,time.1784+1
- 632 01e8 8C33      		cpi r24,lo8(60)
- 633 01ea 00F0      		brlo .L34
- 298:src/drv/RTC.c ****         time[MINUTE] = 0;
- 634               		.loc 1 298 0
- 635 01ec 1092 0000 		sts time.1784+1,__zero_reg__
- 636               	.L34:
- 299:src/drv/RTC.c **** 
- 300:src/drv/RTC.c ****     if (time[SECOND] == 255)
- 637               		.loc 1 300 0
- 638 01f0 8091 0000 		lds r24,time.1784+2
- 639 01f4 8F3F      		cpi r24,lo8(-1)
- 640 01f6 01F4      		brne .L35
- 301:src/drv/RTC.c ****         time[SECOND] = 59;
- 641               		.loc 1 301 0
- 642 01f8 8BE3      		ldi r24,lo8(59)
- 643 01fa 8093 0000 		sts time.1784+2,r24
- 644               	.L35:
- 302:src/drv/RTC.c ****     if (time[SECOND] > 59)
- 645               		.loc 1 302 0
- 646 01fe 8091 0000 		lds r24,time.1784+2
- 647 0202 8C33      		cpi r24,lo8(60)
- 648 0204 00F0      		brlo .L36
- 303:src/drv/RTC.c ****         time[SECOND] = 0;
- 649               		.loc 1 303 0
- 650 0206 1092 0000 		sts time.1784+2,__zero_reg__
- 651               	.L36:
- 304:src/drv/RTC.c **** 
- 305:src/drv/RTC.c ****     enter_function = 0;
- 652               		.loc 1 305 0
- 653 020a 1092 0000 		sts enter_function.1783,__zero_reg__
- 306:src/drv/RTC.c ****     return ST_TIME_CLOCK_ADJUST_FUNC;
- 654               		.loc 1 306 0
- 655 020e 88E1      		ldi r24,lo8(24)
- 656               	.L30:
- 657               	/* epilogue start */
- 307:src/drv/RTC.c **** }
- 658               		.loc 1 307 0
- 659 0210 DF91      		pop r29
- 660               	.LVL58:
- 661 0212 CF91      		pop r28
- 662               	.LVL59:
- 663 0214 1F91      		pop r17
- 664               	.LVL60:
- 665 0216 0F91      		pop r16
- 666               	.LVL61:
- 667 0218 FF90      		pop r15
- 668               	.LVL62:
- 669 021a EF90      		pop r14
- 670               	.LVL63:
- 671 021c DF90      		pop r13
- 672               	.LVL64:
- 673 021e 0895      		ret
- 674               		.cfi_endproc
- 675               	.LFE3:
- 677               		.section	.text.SetClockFormat,"ax",@progbits
- 678               	.global	SetClockFormat
- 680               	SetClockFormat:
- 681               	.LFB4:
- 308:src/drv/RTC.c **** 
- 309:src/drv/RTC.c **** 
- 310:src/drv/RTC.c **** 
- 311:src/drv/RTC.c **** 
- 312:src/drv/RTC.c **** /*****************************************************************************
- 313:src/drv/RTC.c **** *
- 314:src/drv/RTC.c **** *   Function name : SetClockFormat
- 315:src/drv/RTC.c **** *
- 316:src/drv/RTC.c **** *   Returns :       char ST_state (to the state-machine)
- 317:src/drv/RTC.c **** *
- 318:src/drv/RTC.c **** *   Parameters :    char input (from joystick)
- 319:src/drv/RTC.c **** *
- 320:src/drv/RTC.c **** *   Purpose :       Adjusts the Clockformat
- 321:src/drv/RTC.c **** *
- 322:src/drv/RTC.c **** *****************************************************************************/
- 323:src/drv/RTC.c **** char SetClockFormat(char input)
- 324:src/drv/RTC.c **** {
- 682               		.loc 1 324 0
- 683               		.cfi_startproc
- 684               	.LVL65:
- 685 0000 CF93      		push r28
- 686               	.LCFI14:
- 687               		.cfi_def_cfa_offset 3
- 688               		.cfi_offset 28, -2
- 689               	/* prologue: function */
- 690               	/* frame size = 0 */
- 691               	/* stack size = 1 */
- 692               	.L__stack_usage = 1
- 693 0002 C82F      		mov r28,r24
- 325:src/drv/RTC.c ****     static char enter = 1;
- 326:src/drv/RTC.c ****     
- 327:src/drv/RTC.c ****     if(enter)
- 694               		.loc 1 327 0
- 695 0004 8091 0000 		lds r24,enter.1795
- 696               	.LVL66:
- 697 0008 8823      		tst r24
- 698 000a 01F0      		breq .L53
- 328:src/drv/RTC.c ****     {
- 329:src/drv/RTC.c ****         enter = 0;
- 699               		.loc 1 329 0
- 700 000c 1092 0000 		sts enter.1795,__zero_reg__
- 330:src/drv/RTC.c ****         
- 331:src/drv/RTC.c ****         if(clockformat == CLOCK_24)
- 701               		.loc 1 331 0
- 702 0010 8091 0000 		lds r24,clockformat
- 332:src/drv/RTC.c ****             LCD_puts_f(PSTR("24H"), 1);	 // mt LCD_puts("24H", 1);            
- 703               		.loc 1 332 0
- 704 0014 61E0      		ldi r22,lo8(1)
- 331:src/drv/RTC.c ****             LCD_puts_f(PSTR("24H"), 1);	 // mt LCD_puts("24H", 1);            
- 705               		.loc 1 331 0
- 706 0016 8130      		cpi r24,lo8(1)
- 707 0018 01F4      		brne .L54
- 708               		.loc 1 332 0
- 709 001a 80E0      		ldi r24,lo8(__c.1796)
- 710 001c 90E0      		ldi r25,hi8(__c.1796)
- 711 001e 00C0      		rjmp .L64
- 712               	.L54:
- 333:src/drv/RTC.c ****         else
- 334:src/drv/RTC.c ****             LCD_puts_f(PSTR("12H"), 1);	// mt LCD_puts("12H", 1);		
- 713               		.loc 1 334 0
- 714 0020 80E0      		ldi r24,lo8(__c.1798)
- 715 0022 90E0      		ldi r25,hi8(__c.1798)
- 716               	.L64:
- 717 0024 0E94 0000 		call LCD_puts_f
- 718               	.LVL67:
- 719               	.L53:
- 335:src/drv/RTC.c **** 
- 336:src/drv/RTC.c ****     }
- 337:src/drv/RTC.c ****     if (input == KEY_PLUS)
- 720               		.loc 1 337 0
- 721 0028 C430      		cpi r28,lo8(4)
- 722 002a 01F4      		brne .L55
- 338:src/drv/RTC.c ****     {
- 339:src/drv/RTC.c ****         if(clockformat == CLOCK_24)
- 723               		.loc 1 339 0
- 724 002c 8091 0000 		lds r24,clockformat
- 725 0030 8130      		cpi r24,lo8(1)
- 726 0032 01F4      		brne .L56
- 340:src/drv/RTC.c ****         {
- 341:src/drv/RTC.c ****             clockformat = CLOCK_12;
- 727               		.loc 1 341 0
- 728 0034 1092 0000 		sts clockformat,__zero_reg__
- 342:src/drv/RTC.c ****             LCD_puts_f(PSTR("12H"), 1); // mt LCD_puts("12H", 1);
- 729               		.loc 1 342 0
- 730 0038 61E0      		ldi r22,lo8(1)
- 731 003a 80E0      		ldi r24,lo8(__c.1800)
- 732 003c 90E0      		ldi r25,hi8(__c.1800)
- 733 003e 00C0      		rjmp .L65
- 734               	.L56:
- 343:src/drv/RTC.c ****         }
- 344:src/drv/RTC.c ****         else
- 345:src/drv/RTC.c ****         {
- 346:src/drv/RTC.c ****             clockformat = CLOCK_24;
- 735               		.loc 1 346 0
- 736 0040 81E0      		ldi r24,lo8(1)
- 737 0042 8093 0000 		sts clockformat,r24
- 347:src/drv/RTC.c ****             LCD_puts_f(PSTR("24H"), 1); // mt LCD_puts("24H", 1);            
- 738               		.loc 1 347 0
- 739 0046 61E0      		ldi r22,lo8(1)
- 740 0048 80E0      		ldi r24,lo8(__c.1802)
- 741 004a 90E0      		ldi r25,hi8(__c.1802)
- 742 004c 00C0      		rjmp .L65
- 743               	.L55:
- 348:src/drv/RTC.c ****         }
- 349:src/drv/RTC.c ****     }
- 350:src/drv/RTC.c ****     else if (input == KEY_MINUS)
- 744               		.loc 1 350 0
- 745 004e C530      		cpi r28,lo8(5)
- 746 0050 01F4      		brne .L58
- 351:src/drv/RTC.c ****     {
- 352:src/drv/RTC.c ****         if(clockformat == CLOCK_12)
- 747               		.loc 1 352 0
- 748 0052 8091 0000 		lds r24,clockformat
- 749 0056 8111      		cpse r24,__zero_reg__
- 750 0058 00C0      		rjmp .L59
- 353:src/drv/RTC.c ****         {
- 354:src/drv/RTC.c ****             clockformat = CLOCK_24;
- 751               		.loc 1 354 0
- 752 005a 81E0      		ldi r24,lo8(1)
- 753 005c 8093 0000 		sts clockformat,r24
- 355:src/drv/RTC.c ****             LCD_puts_f(PSTR("24H"), 1);	// mt LCD_puts("24H", 1);
- 754               		.loc 1 355 0
- 755 0060 61E0      		ldi r22,lo8(1)
- 756 0062 80E0      		ldi r24,lo8(__c.1804)
- 757 0064 90E0      		ldi r25,hi8(__c.1804)
- 758 0066 00C0      		rjmp .L65
- 759               	.L59:
- 356:src/drv/RTC.c ****         }
- 357:src/drv/RTC.c ****         else
- 358:src/drv/RTC.c ****         {
- 359:src/drv/RTC.c ****             clockformat = CLOCK_12;
- 760               		.loc 1 359 0
- 761 0068 1092 0000 		sts clockformat,__zero_reg__
- 360:src/drv/RTC.c ****             LCD_puts_f(PSTR("12H"), 1);   // mt LCD_puts("12H", 1);            
- 762               		.loc 1 360 0
- 763 006c 61E0      		ldi r22,lo8(1)
- 764 006e 80E0      		ldi r24,lo8(__c.1806)
- 765 0070 90E0      		ldi r25,hi8(__c.1806)
- 766               	.L65:
- 767 0072 0E94 0000 		call LCD_puts_f
- 768               	.LVL68:
- 769 0076 00C0      		rjmp .L60
- 770               	.L58:
- 361:src/drv/RTC.c ****         }
- 362:src/drv/RTC.c ****     }
- 363:src/drv/RTC.c ****     else if (input == KEY_ENTER)    
- 771               		.loc 1 363 0
- 772 0078 C130      		cpi r28,lo8(1)
- 773 007a 01F4      		brne .L60
- 364:src/drv/RTC.c ****     {
- 365:src/drv/RTC.c ****         enter = 1;
- 774               		.loc 1 365 0
- 775 007c C093 0000 		sts enter.1795,r28
- 366:src/drv/RTC.c ****         return ST_TIME_CLOCK_FUNC;
- 776               		.loc 1 366 0
- 777 0080 86E1      		ldi r24,lo8(22)
- 778 0082 00C0      		rjmp .L57
- 779               	.L60:
- 367:src/drv/RTC.c ****     }        
- 368:src/drv/RTC.c ****     return ST_TIME_CLOCKFORMAT_ADJUST_FUNC;
- 780               		.loc 1 368 0
- 781 0084 84E2      		ldi r24,lo8(36)
- 782               	.L57:
- 783               	/* epilogue start */
- 369:src/drv/RTC.c **** }
- 784               		.loc 1 369 0
- 785 0086 CF91      		pop r28
- 786               	.LVL69:
- 787 0088 0895      		ret
- 788               		.cfi_endproc
- 789               	.LFE4:
- 791               		.section	.text.ShowDate,"ax",@progbits
- 792               	.global	ShowDate
- 794               	ShowDate:
- 795               	.LFB5:
- 370:src/drv/RTC.c **** 
- 371:src/drv/RTC.c **** 
- 372:src/drv/RTC.c **** 
- 373:src/drv/RTC.c **** 
- 374:src/drv/RTC.c **** /*****************************************************************************
- 375:src/drv/RTC.c **** *
- 376:src/drv/RTC.c **** *   Function name : ShowDate
- 377:src/drv/RTC.c **** *
- 378:src/drv/RTC.c **** *   Returns :       char ST_state (to the state-machine)
- 379:src/drv/RTC.c **** *
- 380:src/drv/RTC.c **** *   Parameters :    char input (from joystick)
- 381:src/drv/RTC.c **** *
- 382:src/drv/RTC.c **** *   Purpose :       Shows the date on the LCD
- 383:src/drv/RTC.c **** *
- 384:src/drv/RTC.c **** *****************************************************************************/
- 385:src/drv/RTC.c **** char ShowDate(char input)
- 386:src/drv/RTC.c **** {
- 796               		.loc 1 386 0
- 797               		.cfi_startproc
- 798               	.LVL70:
- 799 0000 AF92      		push r10
- 800               	.LCFI15:
- 801               		.cfi_def_cfa_offset 3
- 802               		.cfi_offset 10, -2
- 803 0002 BF92      		push r11
- 804               	.LCFI16:
- 805               		.cfi_def_cfa_offset 4
- 806               		.cfi_offset 11, -3
- 807 0004 CF92      		push r12
- 808               	.LCFI17:
- 809               		.cfi_def_cfa_offset 5
- 810               		.cfi_offset 12, -4
- 811 0006 DF92      		push r13
- 812               	.LCFI18:
- 813               		.cfi_def_cfa_offset 6
- 814               		.cfi_offset 13, -5
- 815 0008 EF92      		push r14
- 816               	.LCFI19:
- 817               		.cfi_def_cfa_offset 7
- 818               		.cfi_offset 14, -6
- 819 000a FF92      		push r15
- 820               	.LCFI20:
- 821               		.cfi_def_cfa_offset 8
- 822               		.cfi_offset 15, -7
- 823 000c 0F93      		push r16
- 824               	.LCFI21:
- 825               		.cfi_def_cfa_offset 9
- 826               		.cfi_offset 16, -8
- 827 000e 1F93      		push r17
- 828               	.LCFI22:
- 829               		.cfi_def_cfa_offset 10
- 830               		.cfi_offset 17, -9
- 831 0010 CF93      		push r28
- 832               	.LCFI23:
- 833               		.cfi_def_cfa_offset 11
- 834               		.cfi_offset 28, -10
- 835 0012 DF93      		push r29
- 836               	.LCFI24:
- 837               		.cfi_def_cfa_offset 12
- 838               		.cfi_offset 29, -11
- 839 0014 1F92      		push __zero_reg__
- 840               	.LCFI25:
- 841               		.cfi_def_cfa_offset 13
- 842 0016 CDB7      		in r28,__SP_L__
- 843 0018 DEB7      		in r29,__SP_H__
- 844               	.LCFI26:
- 845               		.cfi_def_cfa_register 28
- 846               	/* prologue: function */
- 847               	/* frame size = 1 */
- 848               	/* stack size = 11 */
- 849               	.L__stack_usage = 11
- 850 001a 982F      		mov r25,r24
- 387:src/drv/RTC.c ****     char YH, YL, MH, ML, DH, DL;
- 388:src/drv/RTC.c **** 
- 389:src/drv/RTC.c ****     YH = CHAR2BCD2(gYEAR);
- 851               		.loc 1 389 0
- 852 001c 2091 0000 		lds r18,gYEAR
- 853 0020 3091 0000 		lds r19,gYEAR+1
- 854 0024 822F      		mov r24,r18
- 855               	.LVL71:
- 856 0026 9983      		std Y+1,r25
- 857 0028 0E94 0000 		call CHAR2BCD2
- 858               	.LVL72:
- 859 002c F82E      		mov r15,r24
- 860               	.LVL73:
- 390:src/drv/RTC.c ****     YL = (YH & 0x0F) + '0';
- 391:src/drv/RTC.c ****     YH = (YH >> 4) + '0';
- 861               		.loc 1 391 0
- 862 002e C82E      		mov r12,r24
- 863 0030 C294      		swap r12
- 864 0032 8FE0      		ldi r24,lo8(15)
- 865 0034 C822      		and r12,r24
- 866               	.LVL74:
- 392:src/drv/RTC.c **** 
- 393:src/drv/RTC.c ****     MH = CHAR2BCD2(gMONTH);
- 867               		.loc 1 393 0
- 868 0036 8091 0000 		lds r24,gMONTH
- 869 003a 0E94 0000 		call CHAR2BCD2
- 870               	.LVL75:
- 871 003e 082F      		mov r16,r24
- 872               	.LVL76:
- 394:src/drv/RTC.c ****     ML = (MH & 0x0F) + '0';
- 395:src/drv/RTC.c ****     MH = (MH >> 4) + '0';
- 873               		.loc 1 395 0
- 874 0040 D82E      		mov r13,r24
- 875 0042 D294      		swap r13
- 876 0044 9FE0      		ldi r25,lo8(15)
- 877 0046 D922      		and r13,r25
- 878               	.LVL77:
- 396:src/drv/RTC.c **** 
- 397:src/drv/RTC.c ****     DH = CHAR2BCD2(gDAY);
- 879               		.loc 1 397 0
- 880 0048 8091 0000 		lds r24,gDAY
- 881 004c 0E94 0000 		call CHAR2BCD2
- 882               	.LVL78:
- 883 0050 182F      		mov r17,r24
- 884               	.LVL79:
- 398:src/drv/RTC.c ****     DL = (DH & 0x0F) + '0';
- 399:src/drv/RTC.c ****     DH = (DH >> 4) + '0';
- 885               		.loc 1 399 0
- 886 0052 E82E      		mov r14,r24
- 887 0054 E294      		swap r14
- 888 0056 2FE0      		ldi r18,lo8(15)
- 889 0058 E222      		and r14,r18
- 890               	.LVL80:
- 891               	.LBB2:
- 400:src/drv/RTC.c **** 
- 401:src/drv/RTC.c ****     // mtA
- 402:src/drv/RTC.c **** 	/*
- 403:src/drv/RTC.c ****     LCD_putc( *(DATE_FORMAT_NR[dateformat] + 0), YH);
- 404:src/drv/RTC.c ****     LCD_putc( *(DATE_FORMAT_NR[dateformat] + 1), YL);
- 405:src/drv/RTC.c ****     LCD_putc( *(DATE_FORMAT_NR[dateformat] + 2), MH);
- 406:src/drv/RTC.c ****     LCD_putc( *(DATE_FORMAT_NR[dateformat] + 3), ML);
- 407:src/drv/RTC.c ****     LCD_putc( *(DATE_FORMAT_NR[dateformat] + 4), DH);
- 408:src/drv/RTC.c ****     LCD_putc( *(DATE_FORMAT_NR[dateformat] + 5), DL);
- 409:src/drv/RTC.c **** 	*/
- 410:src/drv/RTC.c ****    	uint8_t *pDateFormatNr = (uint8_t*)pgm_read_word(&DATE_FORMAT_NR[dateformat]);
- 892               		.loc 1 410 0
- 893 005a 2091 0000 		lds r18,dateformat
- 894 005e 30E0      		ldi r19,0
- 895 0060 220F      		lsl r18
- 896 0062 331F      		rol r19
- 897 0064 2050      		subi r18,lo8(-(DATE_FORMAT_NR))
- 898 0066 3040      		sbci r19,hi8(-(DATE_FORMAT_NR))
- 899               	.LVL81:
- 900 0068 F901      		movw r30,r18
- 901               	/* #APP */
- 902               	 ;  410 "src/drv/RTC.c" 1
- 903 006a A590      		lpm r10, Z+
- 904 006c B490      		lpm r11, Z
- 905               		
- 906               	 ;  0 "" 2
- 907               	.LVL82:
- 908               	/* #NOAPP */
- 909               	.LBE2:
- 910               	.LBB3:
- 411:src/drv/RTC.c ****     LCD_putc( pgm_read_byte(pDateFormatNr++), YH);
- 911               		.loc 1 411 0
- 912 006e F501      		movw r30,r10
- 913               	/* #APP */
- 914               	 ;  411 "src/drv/RTC.c" 1
- 915 0070 8491      		lpm r24, Z
- 916               		
- 917               	 ;  0 "" 2
- 918               	.LVL83:
- 919               	/* #NOAPP */
- 920               	.LBE3:
- 391:src/drv/RTC.c **** 
- 921               		.loc 1 391 0
- 922 0072 60E3      		ldi r22,lo8(48)
- 923 0074 6C0D      		add r22,r12
- 924               	.LVL84:
- 925               		.loc 1 411 0
- 926 0076 0E94 0000 		call LCD_putc
- 927               	.LVL85:
- 928               	.LBB4:
- 929 007a F501      		movw r30,r10
- 930 007c 3196      		adiw r30,1
- 931               	.LVL86:
- 932               	.LBE4:
- 933               	.LBB5:
- 412:src/drv/RTC.c ****     LCD_putc( pgm_read_byte(pDateFormatNr++), YL);
- 934               		.loc 1 412 0
- 935               	/* #APP */
- 936               	 ;  412 "src/drv/RTC.c" 1
- 937 007e 8491      		lpm r24, Z
- 938               		
- 939               	 ;  0 "" 2
- 940               	.LVL87:
- 941               	/* #NOAPP */
- 942               	.LBE5:
- 390:src/drv/RTC.c ****     YH = (YH >> 4) + '0';
- 943               		.loc 1 390 0
- 944 0080 6F2D      		mov r22,r15
- 945 0082 6F70      		andi r22,lo8(15)
- 946 0084 605D      		subi r22,lo8(-(48))
- 947               	.LVL88:
- 948               		.loc 1 412 0
- 949 0086 0E94 0000 		call LCD_putc
- 950               	.LVL89:
- 951               	.LBB6:
- 952 008a F501      		movw r30,r10
- 953 008c 3296      		adiw r30,2
- 954               	.LVL90:
- 955               	.LBE6:
- 956               	.LBB7:
- 413:src/drv/RTC.c ****     LCD_putc( pgm_read_byte(pDateFormatNr++), MH);
- 957               		.loc 1 413 0
- 958               	/* #APP */
- 959               	 ;  413 "src/drv/RTC.c" 1
- 960 008e 8491      		lpm r24, Z
- 961               		
- 962               	 ;  0 "" 2
- 963               	.LVL91:
- 964               	/* #NOAPP */
- 965               	.LBE7:
- 395:src/drv/RTC.c **** 
- 966               		.loc 1 395 0
- 967 0090 60E3      		ldi r22,lo8(48)
- 968 0092 6D0D      		add r22,r13
- 969               	.LVL92:
- 970               		.loc 1 413 0
- 971 0094 0E94 0000 		call LCD_putc
- 972               	.LVL93:
- 973               	.LBB8:
- 974 0098 F501      		movw r30,r10
- 975 009a 3396      		adiw r30,3
- 976               	.LVL94:
- 977               	.LBE8:
- 978               	.LBB9:
- 414:src/drv/RTC.c ****     LCD_putc( pgm_read_byte(pDateFormatNr++), ML);
- 979               		.loc 1 414 0
- 980               	/* #APP */
- 981               	 ;  414 "src/drv/RTC.c" 1
- 982 009c 8491      		lpm r24, Z
- 983               		
- 984               	 ;  0 "" 2
- 985               	.LVL95:
- 986               	/* #NOAPP */
- 987               	.LBE9:
- 394:src/drv/RTC.c ****     MH = (MH >> 4) + '0';
- 988               		.loc 1 394 0
- 989 009e 0F70      		andi r16,lo8(15)
- 990               	.LVL96:
- 991 00a0 60E3      		ldi r22,lo8(48)
- 992 00a2 600F      		add r22,r16
- 993               	.LVL97:
- 994               		.loc 1 414 0
- 995 00a4 0E94 0000 		call LCD_putc
- 996               	.LVL98:
- 997               	.LBB10:
- 998 00a8 F501      		movw r30,r10
- 999 00aa 3496      		adiw r30,4
- 1000               	.LVL99:
- 1001               	.LBE10:
- 1002               	.LBB11:
- 415:src/drv/RTC.c **** 	LCD_putc( pgm_read_byte(pDateFormatNr++), DH);
- 1003               		.loc 1 415 0
- 1004               	/* #APP */
- 1005               	 ;  415 "src/drv/RTC.c" 1
- 1006 00ac 8491      		lpm r24, Z
- 1007               		
- 1008               	 ;  0 "" 2
- 1009               	.LVL100:
- 1010               	/* #NOAPP */
- 1011               	.LBE11:
- 399:src/drv/RTC.c **** 
- 1012               		.loc 1 399 0
- 1013 00ae 60E3      		ldi r22,lo8(48)
- 1014 00b0 6E0D      		add r22,r14
- 1015               	.LVL101:
- 1016               		.loc 1 415 0
- 1017 00b2 0E94 0000 		call LCD_putc
- 1018               	.LVL102:
- 1019               	.LBB12:
- 1020 00b6 F501      		movw r30,r10
- 1021 00b8 3596      		adiw r30,5
- 1022               	.LVL103:
- 1023               	.LBE12:
- 1024               	.LBB13:
- 416:src/drv/RTC.c ****     LCD_putc( pgm_read_byte(pDateFormatNr), DL);
- 1025               		.loc 1 416 0
- 1026               	/* #APP */
- 1027               	 ;  416 "src/drv/RTC.c" 1
- 1028 00ba 8491      		lpm r24, Z
- 1029               		
- 1030               	 ;  0 "" 2
- 1031               	.LVL104:
- 1032               	/* #NOAPP */
- 1033               	.LBE13:
- 398:src/drv/RTC.c ****     DH = (DH >> 4) + '0';
- 1034               		.loc 1 398 0
- 1035 00bc 612F      		mov r22,r17
- 1036 00be 6F70      		andi r22,lo8(15)
- 1037 00c0 605D      		subi r22,lo8(-(48))
- 1038               	.LVL105:
- 1039               		.loc 1 416 0
- 1040 00c2 0E94 0000 		call LCD_putc
- 1041               	.LVL106:
- 417:src/drv/RTC.c ****     // mtE
- 418:src/drv/RTC.c **** 
- 419:src/drv/RTC.c ****     LCD_putc(6, '\0');
- 1042               		.loc 1 419 0
- 1043 00c6 60E0      		ldi r22,0
- 1044 00c8 86E0      		ldi r24,lo8(6)
- 1045 00ca 0E94 0000 		call LCD_putc
- 1046               	.LVL107:
- 420:src/drv/RTC.c **** 
- 421:src/drv/RTC.c ****     LCD_Colon(1);
- 1047               		.loc 1 421 0
- 1048 00ce 81E0      		ldi r24,lo8(1)
- 1049 00d0 0E94 0000 		call LCD_Colon
- 1050               	.LVL108:
- 422:src/drv/RTC.c **** 
- 423:src/drv/RTC.c ****     LCD_UpdateRequired(TRUE, 0);
- 1051               		.loc 1 423 0
- 1052 00d4 60E0      		ldi r22,0
- 1053 00d6 81E0      		ldi r24,lo8(1)
- 1054 00d8 0E94 0000 		call LCD_UpdateRequired
- 1055               	.LVL109:
- 424:src/drv/RTC.c **** 
- 425:src/drv/RTC.c **** 
- 426:src/drv/RTC.c ****     if (input == KEY_PREV)
- 1056               		.loc 1 426 0
- 1057 00dc 9981      		ldd r25,Y+1
- 1058 00de 9330      		cpi r25,lo8(3)
- 1059 00e0 01F0      		breq .L68
- 427:src/drv/RTC.c ****         return ST_TIME_DATE;
- 428:src/drv/RTC.c ****     else if (input == KEY_NEXT)
- 1060               		.loc 1 428 0
- 1061 00e2 9230      		cpi r25,lo8(2)
- 1062 00e4 01F0      		breq .L69
- 429:src/drv/RTC.c ****         return ST_TIME_DATE_ADJUST;
- 430:src/drv/RTC.c ****     else   
- 431:src/drv/RTC.c ****         return ST_TIME_DATE_FUNC;
- 1063               		.loc 1 431 0
- 1064 00e6 8CE1      		ldi r24,lo8(28)
- 1065 00e8 00C0      		rjmp .L67
- 1066               	.L68:
- 427:src/drv/RTC.c ****         return ST_TIME_DATE;
- 1067               		.loc 1 427 0
- 1068 00ea 8BE1      		ldi r24,lo8(27)
- 1069 00ec 00C0      		rjmp .L67
- 1070               	.L69:
- 429:src/drv/RTC.c ****         return ST_TIME_DATE_ADJUST;
- 1071               		.loc 1 429 0
- 1072 00ee 8DE1      		ldi r24,lo8(29)
- 1073               	.L67:
- 1074               	/* epilogue start */
- 432:src/drv/RTC.c **** }
- 1075               		.loc 1 432 0
- 1076 00f0 0F90      		pop __tmp_reg__
- 1077 00f2 DF91      		pop r29
- 1078 00f4 CF91      		pop r28
- 1079 00f6 1F91      		pop r17
- 1080               	.LVL110:
- 1081 00f8 0F91      		pop r16
- 1082 00fa FF90      		pop r15
- 1083               	.LVL111:
- 1084 00fc EF90      		pop r14
- 1085               	.LVL112:
- 1086 00fe DF90      		pop r13
- 1087               	.LVL113:
- 1088 0100 CF90      		pop r12
- 1089               	.LVL114:
- 1090 0102 BF90      		pop r11
- 1091 0104 AF90      		pop r10
- 1092               	.LVL115:
- 1093 0106 0895      		ret
- 1094               		.cfi_endproc
- 1095               	.LFE5:
- 1097               		.section	.text.SetDate,"ax",@progbits
- 1098               	.global	SetDate
- 1100               	SetDate:
- 1101               	.LFB6:
- 433:src/drv/RTC.c **** 
- 434:src/drv/RTC.c **** #define YEAR        0
- 435:src/drv/RTC.c **** #define MONTH       1
- 436:src/drv/RTC.c **** #define DAY         2
- 437:src/drv/RTC.c **** 
- 438:src/drv/RTC.c **** 
- 439:src/drv/RTC.c **** /*****************************************************************************
- 440:src/drv/RTC.c **** *
- 441:src/drv/RTC.c **** *   Function name : SetDate
- 442:src/drv/RTC.c **** *
- 443:src/drv/RTC.c **** *   Returns :       char ST_state (to the state-machine)
- 444:src/drv/RTC.c **** *
- 445:src/drv/RTC.c **** *   Parameters :    char input (from joystick)
- 446:src/drv/RTC.c **** *
- 447:src/drv/RTC.c **** *   Purpose :       Adjusts the date
- 448:src/drv/RTC.c **** *
- 449:src/drv/RTC.c **** *****************************************************************************/
- 450:src/drv/RTC.c **** char SetDate(char input)
- 451:src/drv/RTC.c **** {
- 1102               		.loc 1 451 0
- 1103               		.cfi_startproc
- 1104               	.LVL116:
- 1105 0000 1F93      		push r17
- 1106               	.LCFI27:
- 1107               		.cfi_def_cfa_offset 3
- 1108               		.cfi_offset 17, -2
- 1109 0002 CF93      		push r28
- 1110               	.LCFI28:
- 1111               		.cfi_def_cfa_offset 4
- 1112               		.cfi_offset 28, -3
- 1113 0004 DF93      		push r29
- 1114               	.LCFI29:
- 1115               		.cfi_def_cfa_offset 5
- 1116               		.cfi_offset 29, -4
- 1117               	/* prologue: function */
- 1118               	/* frame size = 0 */
- 1119               	/* stack size = 3 */
- 1120               	.L__stack_usage = 3
- 1121 0006 C82F      		mov r28,r24
- 452:src/drv/RTC.c **** 	static char enter_function = 1;
- 453:src/drv/RTC.c **** 	// mtA
- 454:src/drv/RTC.c **** 	// static char date[3];    // table holding the temporary date setting
- 455:src/drv/RTC.c **** 	// static char mode = DAY;
- 456:src/drv/RTC.c **** 	// char YH, YL, MH, ML, DH, DL;
- 457:src/drv/RTC.c **** 	// char MonthLength_temp;
- 458:src/drv/RTC.c **** 	// char LeapMonth;
- 459:src/drv/RTC.c **** 	static uint8_t date[3];    // table holding the temporary date setting
- 460:src/drv/RTC.c **** 	static uint8_t mode = DAY;
- 461:src/drv/RTC.c **** 	uint8_t YH, YL, MH, ML, DH, DL;
- 462:src/drv/RTC.c **** 	uint8_t MonthLength_temp;
- 463:src/drv/RTC.c **** 	uint8_t LeapMonth;
- 464:src/drv/RTC.c **** 	// mtE
- 465:src/drv/RTC.c **** 
- 466:src/drv/RTC.c ****     if (enter_function)
- 1122               		.loc 1 466 0
- 1123 0008 8091 0000 		lds r24,enter_function.1842
- 1124               	.LVL117:
- 1125 000c 8823      		tst r24
- 1126 000e 01F0      		breq .L71
- 467:src/drv/RTC.c ****     {
- 468:src/drv/RTC.c ****         date[YEAR] = gYEAR;
- 1127               		.loc 1 468 0
- 1128 0010 8091 0000 		lds r24,gYEAR
- 1129 0014 9091 0000 		lds r25,gYEAR+1
- 1130 0018 8093 0000 		sts date.1843,r24
- 469:src/drv/RTC.c ****         date[MONTH] = gMONTH;
- 1131               		.loc 1 469 0
- 1132 001c 8091 0000 		lds r24,gMONTH
- 1133 0020 8093 0000 		sts date.1843+1,r24
- 470:src/drv/RTC.c ****         date[DAY] = gDAY;
- 1134               		.loc 1 470 0
- 1135 0024 8091 0000 		lds r24,gDAY
- 1136 0028 8093 0000 		sts date.1843+2,r24
- 1137               	.L71:
- 471:src/drv/RTC.c ****     }
- 472:src/drv/RTC.c **** 
- 473:src/drv/RTC.c ****     if (mode == YEAR)
- 1138               		.loc 1 473 0
- 1139 002c 8091 0000 		lds r24,mode.1844
- 1140 0030 8111      		cpse r24,__zero_reg__
- 1141 0032 00C0      		rjmp .L72
- 474:src/drv/RTC.c ****     {
- 475:src/drv/RTC.c ****         YH = CHAR2BCD2(date[YEAR]);
- 1142               		.loc 1 475 0
- 1143 0034 8091 0000 		lds r24,date.1843
- 1144 0038 0E94 0000 		call CHAR2BCD2
- 1145               	.LVL118:
- 1146 003c D82F      		mov r29,r24
- 1147               	.LVL119:
- 476:src/drv/RTC.c ****         YL = (YH & 0x0F) + '0';
- 477:src/drv/RTC.c ****         YH = (YH >> 4) + '0';
- 1148               		.loc 1 477 0
- 1149 003e 182F      		mov r17,r24
- 1150 0040 1295      		swap r17
- 1151 0042 1F70      		andi r17,lo8(15)
- 1152               	.LVL120:
- 478:src/drv/RTC.c ****         
- 479:src/drv/RTC.c ****         LCD_putc( 0, ' ');
- 1153               		.loc 1 479 0
- 1154 0044 60E2      		ldi r22,lo8(32)
- 1155 0046 80E0      		ldi r24,0
- 1156               	.LVL121:
- 1157 0048 0E94 0000 		call LCD_putc
- 1158               	.LVL122:
- 480:src/drv/RTC.c ****         LCD_putc( 1, ' ');   
- 1159               		.loc 1 480 0
- 1160 004c 60E2      		ldi r22,lo8(32)
- 1161 004e 81E0      		ldi r24,lo8(1)
- 1162 0050 0E94 0000 		call LCD_putc
- 1163               	.LVL123:
- 481:src/drv/RTC.c ****         LCD_putc( 2, 'Y');
- 1164               		.loc 1 481 0
- 1165 0054 69E5      		ldi r22,lo8(89)
- 1166 0056 82E0      		ldi r24,lo8(2)
- 1167 0058 0E94 0000 		call LCD_putc
- 1168               	.LVL124:
- 482:src/drv/RTC.c ****         LCD_putc( 3, 'Y');        
- 1169               		.loc 1 482 0
- 1170 005c 69E5      		ldi r22,lo8(89)
- 1171 005e 00C0      		rjmp .L100
- 1172               	.LVL125:
- 1173               	.L72:
- 483:src/drv/RTC.c ****         LCD_putc( 4, YH);
- 484:src/drv/RTC.c ****         LCD_putc( 5, YL);
- 485:src/drv/RTC.c ****     }
- 486:src/drv/RTC.c ****     else if (mode == MONTH)
- 1174               		.loc 1 486 0
- 1175 0060 8130      		cpi r24,lo8(1)
- 1176 0062 01F4      		brne .L74
- 487:src/drv/RTC.c ****     {
- 488:src/drv/RTC.c ****         MH = CHAR2BCD2(date[MONTH]);
- 1177               		.loc 1 488 0
- 1178 0064 8091 0000 		lds r24,date.1843+1
- 1179 0068 0E94 0000 		call CHAR2BCD2
- 1180               	.LVL126:
- 1181 006c D82F      		mov r29,r24
- 1182               	.LVL127:
- 489:src/drv/RTC.c ****         ML = (MH & 0x0F) + '0';
- 490:src/drv/RTC.c ****         MH = (MH >> 4) + '0';
- 1183               		.loc 1 490 0
- 1184 006e 182F      		mov r17,r24
- 1185 0070 1295      		swap r17
- 1186 0072 1F70      		andi r17,lo8(15)
- 1187               	.LVL128:
- 491:src/drv/RTC.c **** 
- 492:src/drv/RTC.c ****         LCD_putc( 0, ' ');
- 1188               		.loc 1 492 0
- 1189 0074 60E2      		ldi r22,lo8(32)
- 1190 0076 80E0      		ldi r24,0
- 1191               	.LVL129:
- 1192 0078 0E94 0000 		call LCD_putc
- 1193               	.LVL130:
- 493:src/drv/RTC.c ****         LCD_putc( 1, ' ');   
- 1194               		.loc 1 493 0
- 1195 007c 60E2      		ldi r22,lo8(32)
- 1196 007e 81E0      		ldi r24,lo8(1)
- 1197 0080 0E94 0000 		call LCD_putc
- 1198               	.LVL131:
- 494:src/drv/RTC.c ****         LCD_putc( 2, 'M');
- 1199               		.loc 1 494 0
- 1200 0084 6DE4      		ldi r22,lo8(77)
- 1201 0086 82E0      		ldi r24,lo8(2)
- 1202 0088 0E94 0000 		call LCD_putc
- 1203               	.LVL132:
- 495:src/drv/RTC.c ****         LCD_putc( 3, 'M');        
- 1204               		.loc 1 495 0
- 1205 008c 6DE4      		ldi r22,lo8(77)
- 1206 008e 00C0      		rjmp .L100
- 1207               	.LVL133:
- 1208               	.L74:
- 496:src/drv/RTC.c ****         LCD_putc( 4, MH);
- 497:src/drv/RTC.c ****         LCD_putc( 5, ML);
- 498:src/drv/RTC.c ****     }
- 499:src/drv/RTC.c ****     else if (mode == DAY)
- 1209               		.loc 1 499 0
- 1210 0090 8230      		cpi r24,lo8(2)
- 1211 0092 01F4      		brne .L73
- 500:src/drv/RTC.c ****     {
- 501:src/drv/RTC.c ****         DH = CHAR2BCD2(date[DAY]);
- 1212               		.loc 1 501 0
- 1213 0094 8091 0000 		lds r24,date.1843+2
- 1214 0098 0E94 0000 		call CHAR2BCD2
- 1215               	.LVL134:
- 1216 009c D82F      		mov r29,r24
- 1217               	.LVL135:
- 502:src/drv/RTC.c ****         DL = (DH & 0x0F) + '0';
- 503:src/drv/RTC.c ****         DH = (DH >> 4) + '0';
- 1218               		.loc 1 503 0
- 1219 009e 182F      		mov r17,r24
- 1220 00a0 1295      		swap r17
- 1221 00a2 1F70      		andi r17,lo8(15)
- 1222               	.LVL136:
- 504:src/drv/RTC.c **** 
- 505:src/drv/RTC.c ****         LCD_putc( 0, ' ');
- 1223               		.loc 1 505 0
- 1224 00a4 60E2      		ldi r22,lo8(32)
- 1225 00a6 80E0      		ldi r24,0
- 1226               	.LVL137:
- 1227 00a8 0E94 0000 		call LCD_putc
- 1228               	.LVL138:
- 506:src/drv/RTC.c ****         LCD_putc( 1, ' ');   
- 1229               		.loc 1 506 0
- 1230 00ac 60E2      		ldi r22,lo8(32)
- 1231 00ae 81E0      		ldi r24,lo8(1)
- 1232 00b0 0E94 0000 		call LCD_putc
- 1233               	.LVL139:
- 507:src/drv/RTC.c ****         LCD_putc( 2, 'D');
- 1234               		.loc 1 507 0
- 1235 00b4 64E4      		ldi r22,lo8(68)
- 1236 00b6 82E0      		ldi r24,lo8(2)
- 1237 00b8 0E94 0000 		call LCD_putc
- 1238               	.LVL140:
- 508:src/drv/RTC.c ****         LCD_putc( 3, 'D');        
- 1239               		.loc 1 508 0
- 1240 00bc 64E4      		ldi r22,lo8(68)
- 1241               	.LVL141:
- 1242               	.L100:
- 1243 00be 83E0      		ldi r24,lo8(3)
- 1244 00c0 0E94 0000 		call LCD_putc
- 1245               	.LVL142:
- 503:src/drv/RTC.c **** 
- 1246               		.loc 1 503 0
- 1247 00c4 60E3      		ldi r22,lo8(48)
- 1248 00c6 610F      		add r22,r17
- 509:src/drv/RTC.c ****         LCD_putc( 4, DH);
- 1249               		.loc 1 509 0
- 1250 00c8 84E0      		ldi r24,lo8(4)
- 1251 00ca 0E94 0000 		call LCD_putc
- 1252               	.LVL143:
- 502:src/drv/RTC.c ****         DH = (DH >> 4) + '0';
- 1253               		.loc 1 502 0
- 1254 00ce 6D2F      		mov r22,r29
- 1255 00d0 6F70      		andi r22,lo8(15)
- 1256 00d2 605D      		subi r22,lo8(-(48))
- 510:src/drv/RTC.c ****         LCD_putc( 5, DL);
- 1257               		.loc 1 510 0
- 1258 00d4 85E0      		ldi r24,lo8(5)
- 1259 00d6 0E94 0000 		call LCD_putc
- 1260               	.LVL144:
- 1261               	.L73:
- 511:src/drv/RTC.c ****     }
- 512:src/drv/RTC.c **** 
- 513:src/drv/RTC.c ****     LCD_putc(6, '\0');
- 1262               		.loc 1 513 0
- 1263 00da 60E0      		ldi r22,0
- 1264 00dc 86E0      		ldi r24,lo8(6)
- 1265 00de 0E94 0000 		call LCD_putc
- 1266               	.LVL145:
- 514:src/drv/RTC.c **** 
- 515:src/drv/RTC.c ****     LCD_Colon(0);
- 1267               		.loc 1 515 0
- 1268 00e2 80E0      		ldi r24,0
- 1269 00e4 0E94 0000 		call LCD_Colon
- 1270               	.LVL146:
- 516:src/drv/RTC.c **** 
- 517:src/drv/RTC.c ****     if (input != KEY_NULL)
- 1271               		.loc 1 517 0
- 1272 00e8 C111      		cpse r28,__zero_reg__
- 518:src/drv/RTC.c ****         LCD_FlashReset();
- 1273               		.loc 1 518 0
- 1274 00ea 0E94 0000 		call LCD_FlashReset
- 1275               	.LVL147:
- 1276               	.L75:
- 519:src/drv/RTC.c **** 
- 520:src/drv/RTC.c ****     LCD_UpdateRequired(TRUE, 0);
- 1277               		.loc 1 520 0
- 1278 00ee 60E0      		ldi r22,0
- 1279 00f0 81E0      		ldi r24,lo8(1)
- 1280 00f2 0E94 0000 		call LCD_UpdateRequired
- 1281               	.LVL148:
- 521:src/drv/RTC.c **** 
- 522:src/drv/RTC.c **** 
- 523:src/drv/RTC.c ****     enter_function = 1;
- 1282               		.loc 1 523 0
- 1283 00f6 81E0      		ldi r24,lo8(1)
- 1284 00f8 8093 0000 		sts enter_function.1842,r24
- 524:src/drv/RTC.c **** 
- 525:src/drv/RTC.c ****     // Increment/decrement years, months or days
- 526:src/drv/RTC.c ****     if (input == KEY_PLUS)
- 1285               		.loc 1 526 0
- 1286 00fc C430      		cpi r28,lo8(4)
- 1287 00fe 01F4      		brne .L76
- 527:src/drv/RTC.c ****         date[mode]++;
- 1288               		.loc 1 527 0
- 1289 0100 E091 0000 		lds r30,mode.1844
- 1290 0104 F0E0      		ldi r31,0
- 1291 0106 E050      		subi r30,lo8(-(date.1843))
- 1292 0108 F040      		sbci r31,hi8(-(date.1843))
- 1293 010a 8081      		ld r24,Z
- 1294 010c 8F5F      		subi r24,lo8(-(1))
- 1295 010e 00C0      		rjmp .L102
- 1296               	.L76:
- 528:src/drv/RTC.c ****     else if (input == KEY_MINUS)
- 1297               		.loc 1 528 0
- 1298 0110 C530      		cpi r28,lo8(5)
- 1299 0112 01F4      		brne .L78
- 529:src/drv/RTC.c ****         date[mode]--;
- 1300               		.loc 1 529 0
- 1301 0114 E091 0000 		lds r30,mode.1844
- 1302 0118 F0E0      		ldi r31,0
- 1303 011a E050      		subi r30,lo8(-(date.1843))
- 1304 011c F040      		sbci r31,hi8(-(date.1843))
- 1305 011e 8081      		ld r24,Z
- 1306 0120 8150      		subi r24,lo8(-(-1))
- 1307               	.L102:
- 1308 0122 8083      		st Z,r24
- 1309 0124 00C0      		rjmp .L77
- 1310               	.L78:
- 530:src/drv/RTC.c ****     else if (input == KEY_PREV)
- 1311               		.loc 1 530 0
- 1312 0126 C330      		cpi r28,lo8(3)
- 1313 0128 01F4      		brne .L79
- 531:src/drv/RTC.c ****     {
- 532:src/drv/RTC.c ****         if (mode == YEAR)
- 1314               		.loc 1 532 0
- 1315 012a 8091 0000 		lds r24,mode.1844
- 1316 012e 8111      		cpse r24,__zero_reg__
- 1317 0130 00C0      		rjmp .L80
- 533:src/drv/RTC.c ****             mode = DAY;
- 1318               		.loc 1 533 0
- 1319 0132 82E0      		ldi r24,lo8(2)
- 1320 0134 00C0      		rjmp .L101
- 1321               	.L80:
- 534:src/drv/RTC.c ****         else
- 535:src/drv/RTC.c ****             mode--;
- 1322               		.loc 1 535 0
- 1323 0136 8150      		subi r24,lo8(-(-1))
- 1324 0138 00C0      		rjmp .L101
- 1325               	.L79:
- 536:src/drv/RTC.c ****     }
- 537:src/drv/RTC.c ****     else if (input == KEY_NEXT)
- 1326               		.loc 1 537 0
- 1327 013a C230      		cpi r28,lo8(2)
- 1328 013c 01F4      		brne .L81
- 538:src/drv/RTC.c ****     {
- 539:src/drv/RTC.c ****         if (mode == DAY)
- 1329               		.loc 1 539 0
- 1330 013e 8091 0000 		lds r24,mode.1844
- 1331 0142 8230      		cpi r24,lo8(2)
- 1332 0144 01F4      		brne .L82
- 540:src/drv/RTC.c ****             mode = YEAR;
- 1333               		.loc 1 540 0
- 1334 0146 1092 0000 		sts mode.1844,__zero_reg__
- 1335 014a 00C0      		rjmp .L77
- 1336               	.L82:
- 541:src/drv/RTC.c ****         else
- 542:src/drv/RTC.c ****             mode++;
- 1337               		.loc 1 542 0
- 1338 014c 8F5F      		subi r24,lo8(-(1))
- 1339               	.L101:
- 1340 014e 8093 0000 		sts mode.1844,r24
- 1341 0152 00C0      		rjmp .L77
- 1342               	.L81:
- 543:src/drv/RTC.c ****     }
- 544:src/drv/RTC.c ****     else if (input == KEY_ENTER)
- 1343               		.loc 1 544 0
- 1344 0154 C130      		cpi r28,lo8(1)
- 1345 0156 01F4      		brne .L77
- 545:src/drv/RTC.c ****     {
- 546:src/drv/RTC.c ****         // store the temporary adjusted values to the global variables
- 547:src/drv/RTC.c ****         cli(); // mt __disable_interrupt();
- 1346               		.loc 1 547 0
- 1347               	/* #APP */
- 1348               	 ;  547 "src/drv/RTC.c" 1
- 1349 0158 F894      		cli
- 1350               	 ;  0 "" 2
- 548:src/drv/RTC.c ****         gYEAR = date[YEAR];
- 1351               		.loc 1 548 0
- 1352               	/* #NOAPP */
- 1353 015a 8091 0000 		lds r24,date.1843
- 1354 015e 90E0      		ldi r25,0
- 1355 0160 9093 0000 		sts gYEAR+1,r25
- 1356 0164 8093 0000 		sts gYEAR,r24
- 549:src/drv/RTC.c ****         gMONTH = date[MONTH];
- 1357               		.loc 1 549 0
- 1358 0168 8091 0000 		lds r24,date.1843+1
- 1359 016c 8093 0000 		sts gMONTH,r24
- 550:src/drv/RTC.c ****         gDAY = date[DAY];
- 1360               		.loc 1 550 0
- 1361 0170 8091 0000 		lds r24,date.1843+2
- 1362 0174 8093 0000 		sts gDAY,r24
- 551:src/drv/RTC.c ****         sei(); // mt __enable_interrupt();
- 1363               		.loc 1 551 0
- 1364               	/* #APP */
- 1365               	 ;  551 "src/drv/RTC.c" 1
- 1366 0178 7894      		sei
- 1367               	 ;  0 "" 2
- 552:src/drv/RTC.c ****         mode = YEAR;
- 1368               		.loc 1 552 0
- 1369               	/* #NOAPP */
- 1370 017a 1092 0000 		sts mode.1844,__zero_reg__
- 553:src/drv/RTC.c ****         return ST_TIME_DATE_FUNC;
- 1371               		.loc 1 553 0
- 1372 017e 8CE1      		ldi r24,lo8(28)
- 1373 0180 00C0      		rjmp .L99
- 1374               	.L77:
- 554:src/drv/RTC.c ****     }
- 555:src/drv/RTC.c **** 
- 556:src/drv/RTC.c ****     /* OPTIMIZE: Can be solved by using a modulo operation */
- 557:src/drv/RTC.c ****     if (date[YEAR] == 255)
- 1375               		.loc 1 557 0
- 1376 0182 8091 0000 		lds r24,date.1843
- 1377 0186 8F3F      		cpi r24,lo8(-1)
- 1378 0188 01F4      		brne .L84
- 558:src/drv/RTC.c ****         date[YEAR] = 99;
- 1379               		.loc 1 558 0
- 1380 018a 83E6      		ldi r24,lo8(99)
- 1381 018c 8093 0000 		sts date.1843,r24
- 1382               	.L84:
- 559:src/drv/RTC.c ****     if (date[YEAR] > 99)
- 1383               		.loc 1 559 0
- 1384 0190 8091 0000 		lds r24,date.1843
- 1385 0194 8436      		cpi r24,lo8(100)
- 1386 0196 00F0      		brlo .L85
- 560:src/drv/RTC.c ****         date[YEAR] = 0;
- 1387               		.loc 1 560 0
- 1388 0198 1092 0000 		sts date.1843,__zero_reg__
- 1389               	.L85:
- 561:src/drv/RTC.c **** 
- 562:src/drv/RTC.c ****     if (date[MONTH] == 0)
- 1390               		.loc 1 562 0
- 1391 019c 8091 0000 		lds r24,date.1843+1
- 1392 01a0 8111      		cpse r24,__zero_reg__
- 1393 01a2 00C0      		rjmp .L86
- 563:src/drv/RTC.c ****         date[MONTH] = 12;
- 1394               		.loc 1 563 0
- 1395 01a4 8CE0      		ldi r24,lo8(12)
- 1396 01a6 8093 0000 		sts date.1843+1,r24
- 1397               	.L86:
- 564:src/drv/RTC.c ****     if (date[MONTH] > 12)
- 1398               		.loc 1 564 0
- 1399 01aa 8091 0000 		lds r24,date.1843+1
- 1400 01ae 8D30      		cpi r24,lo8(13)
- 1401 01b0 00F0      		brlo .L87
- 565:src/drv/RTC.c ****         date[MONTH] = 1;
- 1402               		.loc 1 565 0
- 1403 01b2 81E0      		ldi r24,lo8(1)
- 1404 01b4 8093 0000 		sts date.1843+1,r24
- 1405               	.L87:
- 566:src/drv/RTC.c **** 
- 567:src/drv/RTC.c ****     // Check for leap year, if month == February
- 568:src/drv/RTC.c ****     if (gMONTH == 2)
- 1406               		.loc 1 568 0
- 1407 01b8 8091 0000 		lds r24,gMONTH
- 1408 01bc 8230      		cpi r24,lo8(2)
- 1409 01be 01F4      		brne .L88
- 569:src/drv/RTC.c ****         if (!(gYEAR & 0x0003))              // if (gYEAR%4 == 0)
- 1410               		.loc 1 569 0
- 1411 01c0 8091 0000 		lds r24,gYEAR
- 1412 01c4 9091 0000 		lds r25,gYEAR+1
- 1413 01c8 8370      		andi r24,3
- 1414 01ca 9927      		clr r25
- 1415 01cc 892B      		or r24,r25
- 1416 01ce 01F4      		brne .L88
- 570:src/drv/RTC.c ****             if (gYEAR%100 == 0)
- 1417               		.loc 1 570 0
- 1418 01d0 8091 0000 		lds r24,gYEAR
- 1419 01d4 9091 0000 		lds r25,gYEAR+1
- 1420 01d8 64E6      		ldi r22,lo8(100)
- 1421 01da 70E0      		ldi r23,0
- 1422 01dc 0E94 0000 		call __udivmodhi4
- 1423 01e0 892B      		or r24,r25
- 1424 01e2 01F4      		brne .L92
- 571:src/drv/RTC.c ****                 if (gYEAR%400 == 0)
- 1425               		.loc 1 571 0
- 1426 01e4 8091 0000 		lds r24,gYEAR
- 1427 01e8 9091 0000 		lds r25,gYEAR+1
- 1428 01ec 60E9      		ldi r22,lo8(-112)
- 1429 01ee 71E0      		ldi r23,lo8(1)
- 1430 01f0 0E94 0000 		call __udivmodhi4
- 1431 01f4 892B      		or r24,r25
- 1432 01f6 01F4      		brne .L88
- 1433               	.L92:
- 572:src/drv/RTC.c ****                     LeapMonth = 1;
- 573:src/drv/RTC.c ****                 else
- 574:src/drv/RTC.c ****                     LeapMonth = 0;
- 575:src/drv/RTC.c ****             else
- 576:src/drv/RTC.c ****                 LeapMonth = 1;
- 577:src/drv/RTC.c ****         else
- 578:src/drv/RTC.c ****             LeapMonth = 0;
- 579:src/drv/RTC.c ****     else
- 580:src/drv/RTC.c ****         LeapMonth = 0;
- 581:src/drv/RTC.c **** 
- 582:src/drv/RTC.c ****     if (LeapMonth)
- 583:src/drv/RTC.c ****         MonthLength_temp = 29;
- 1434               		.loc 1 583 0
- 1435 01f8 8DE1      		ldi r24,lo8(29)
- 1436               	.L89:
- 1437               	.LVL149:
- 584:src/drv/RTC.c ****     else
- 585:src/drv/RTC.c ****         MonthLength_temp = MonthLength[date[MONTH]];
- 586:src/drv/RTC.c ****     
- 587:src/drv/RTC.c ****     if (date[DAY] == 0)
- 1438               		.loc 1 587 0
- 1439 01fa 9091 0000 		lds r25,date.1843+2
- 1440 01fe 9111      		cpse r25,__zero_reg__
- 1441 0200 00C0      		rjmp .L90
- 588:src/drv/RTC.c ****         date[DAY] = MonthLength_temp;
- 1442               		.loc 1 588 0
- 1443 0202 8093 0000 		sts date.1843+2,r24
- 1444               	.L90:
- 589:src/drv/RTC.c ****     if (date[DAY] > MonthLength_temp)
- 1445               		.loc 1 589 0
- 1446 0206 9091 0000 		lds r25,date.1843+2
- 1447 020a 8917      		cp r24,r25
- 1448 020c 00F4      		brsh .L91
- 590:src/drv/RTC.c ****         date[DAY] = 1;
- 1449               		.loc 1 590 0
- 1450 020e 81E0      		ldi r24,lo8(1)
- 1451               	.LVL150:
- 1452 0210 8093 0000 		sts date.1843+2,r24
- 1453               	.L91:
- 591:src/drv/RTC.c **** 
- 592:src/drv/RTC.c ****     enter_function = 0;
- 1454               		.loc 1 592 0
- 1455 0214 1092 0000 		sts enter_function.1842,__zero_reg__
- 593:src/drv/RTC.c ****     
- 594:src/drv/RTC.c ****     return ST_TIME_DATE_ADJUST_FUNC;
- 1456               		.loc 1 594 0
- 1457 0218 8EE1      		ldi r24,lo8(30)
- 1458 021a 00C0      		rjmp .L99
- 1459               	.L88:
- 1460               	.LVL151:
- 585:src/drv/RTC.c ****     
- 1461               		.loc 1 585 0
- 1462 021c E091 0000 		lds r30,date.1843+1
- 1463 0220 F0E0      		ldi r31,0
- 1464 0222 E050      		subi r30,lo8(-(MonthLength))
- 1465 0224 F040      		sbci r31,hi8(-(MonthLength))
- 1466 0226 8081      		ld r24,Z
- 1467               	.LVL152:
- 1468 0228 00C0      		rjmp .L89
- 1469               	.LVL153:
- 1470               	.L99:
- 1471               	/* epilogue start */
- 595:src/drv/RTC.c **** }
- 1472               		.loc 1 595 0
- 1473 022a DF91      		pop r29
- 1474 022c CF91      		pop r28
- 1475               	.LVL154:
- 1476 022e 1F91      		pop r17
- 1477 0230 0895      		ret
- 1478               		.cfi_endproc
- 1479               	.LFE6:
- 1481               		.section	.text.SetDateFormat,"ax",@progbits
- 1482               	.global	SetDateFormat
- 1484               	SetDateFormat:
- 1485               	.LFB7:
- 596:src/drv/RTC.c **** 
- 597:src/drv/RTC.c **** 
- 598:src/drv/RTC.c **** 
- 599:src/drv/RTC.c **** 
- 600:src/drv/RTC.c **** /*****************************************************************************
- 601:src/drv/RTC.c **** *
- 602:src/drv/RTC.c **** *   Function name : SetDateFormat
- 603:src/drv/RTC.c **** *
- 604:src/drv/RTC.c **** *   Returns :       char ST_state (to the state-machine)
- 605:src/drv/RTC.c **** *
- 606:src/drv/RTC.c **** *   Parameters :    char input (from joystick)
- 607:src/drv/RTC.c **** *
- 608:src/drv/RTC.c **** *   Purpose :       Adjusts the Dateformat
- 609:src/drv/RTC.c **** *
- 610:src/drv/RTC.c **** *****************************************************************************/
- 611:src/drv/RTC.c **** char SetDateFormat(char input)
- 612:src/drv/RTC.c **** {
- 1486               		.loc 1 612 0
- 1487               		.cfi_startproc
- 1488               	.LVL155:
- 1489 0000 CF93      		push r28
- 1490               	.LCFI30:
- 1491               		.cfi_def_cfa_offset 3
- 1492               		.cfi_offset 28, -2
- 1493               	/* prologue: function */
- 1494               	/* frame size = 0 */
- 1495               	/* stack size = 1 */
- 1496               	.L__stack_usage = 1
- 1497 0002 C82F      		mov r28,r24
- 613:src/drv/RTC.c ****     static char enter = 1;
- 614:src/drv/RTC.c **** 
- 615:src/drv/RTC.c ****     if(enter)
- 1498               		.loc 1 615 0
- 1499 0004 8091 0000 		lds r24,enter.1856
- 1500               	.LVL156:
- 1501 0008 8823      		tst r24
- 1502 000a 01F0      		breq .L104
- 616:src/drv/RTC.c ****     {
- 617:src/drv/RTC.c ****         enter = 0;
- 1503               		.loc 1 617 0
- 1504 000c 1092 0000 		sts enter.1856,__zero_reg__
- 618:src/drv/RTC.c **** 
- 619:src/drv/RTC.c ****         LCD_puts_f(DATEFORMAT_TEXT[dateformat], 1);
- 1505               		.loc 1 619 0
- 1506 0010 E091 0000 		lds r30,dateformat
- 1507 0014 F0E0      		ldi r31,0
- 1508 0016 EE0F      		lsl r30
- 1509 0018 FF1F      		rol r31
- 1510 001a E050      		subi r30,lo8(-(DATEFORMAT_TEXT))
- 1511 001c F040      		sbci r31,hi8(-(DATEFORMAT_TEXT))
- 1512 001e 61E0      		ldi r22,lo8(1)
- 1513 0020 8081      		ld r24,Z
- 1514 0022 9181      		ldd r25,Z+1
- 1515 0024 0E94 0000 		call LCD_puts_f
- 1516               	.LVL157:
- 1517               	.L104:
- 620:src/drv/RTC.c ****     }
- 621:src/drv/RTC.c ****     if (input == KEY_PLUS)
- 1518               		.loc 1 621 0
- 1519 0028 C430      		cpi r28,lo8(4)
- 1520 002a 01F4      		brne .L105
- 622:src/drv/RTC.c ****     {
- 623:src/drv/RTC.c ****         if(dateformat >= 2)
- 1521               		.loc 1 623 0
- 1522 002c 8091 0000 		lds r24,dateformat
- 1523 0030 8230      		cpi r24,lo8(2)
- 1524 0032 00F0      		brlo .L106
- 624:src/drv/RTC.c ****             dateformat = 0;
- 1525               		.loc 1 624 0
- 1526 0034 1092 0000 		sts dateformat,__zero_reg__
- 1527 0038 00C0      		rjmp .L107
- 1528               	.L106:
- 625:src/drv/RTC.c ****         else
- 626:src/drv/RTC.c ****             dateformat++;
- 1529               		.loc 1 626 0
- 1530 003a 8F5F      		subi r24,lo8(-(1))
- 1531               	.L117:
- 1532 003c 8093 0000 		sts dateformat,r24
- 1533               	.L107:
- 627:src/drv/RTC.c **** 
- 628:src/drv/RTC.c ****         LCD_puts_f(DATEFORMAT_TEXT[dateformat], 1);        
- 1534               		.loc 1 628 0
- 1535 0040 E091 0000 		lds r30,dateformat
- 1536 0044 F0E0      		ldi r31,0
- 1537 0046 EE0F      		lsl r30
- 1538 0048 FF1F      		rol r31
- 1539 004a E050      		subi r30,lo8(-(DATEFORMAT_TEXT))
- 1540 004c F040      		sbci r31,hi8(-(DATEFORMAT_TEXT))
- 1541 004e 61E0      		ldi r22,lo8(1)
- 1542 0050 8081      		ld r24,Z
- 1543 0052 9181      		ldd r25,Z+1
- 1544 0054 0E94 0000 		call LCD_puts_f
- 1545               	.LVL158:
- 1546 0058 00C0      		rjmp .L112
- 1547               	.L105:
- 629:src/drv/RTC.c ****     }
- 630:src/drv/RTC.c ****     else if (input == KEY_MINUS)
- 1548               		.loc 1 630 0
- 1549 005a C530      		cpi r28,lo8(5)
- 1550 005c 01F4      		brne .L109
- 631:src/drv/RTC.c ****     {
- 632:src/drv/RTC.c ****         if(dateformat == 0)
- 1551               		.loc 1 632 0
- 1552 005e 8091 0000 		lds r24,dateformat
- 1553 0062 8111      		cpse r24,__zero_reg__
- 1554 0064 00C0      		rjmp .L110
- 633:src/drv/RTC.c ****             dateformat = 2;
- 1555               		.loc 1 633 0
- 1556 0066 82E0      		ldi r24,lo8(2)
- 1557 0068 00C0      		rjmp .L117
- 1558               	.L110:
- 634:src/drv/RTC.c ****         else
- 635:src/drv/RTC.c ****             dateformat--;
- 1559               		.loc 1 635 0
- 1560 006a 8150      		subi r24,lo8(-(-1))
- 1561 006c 00C0      		rjmp .L117
- 1562               	.L109:
- 636:src/drv/RTC.c ****             
- 637:src/drv/RTC.c ****         LCD_puts_f(DATEFORMAT_TEXT[dateformat], 1);            
- 638:src/drv/RTC.c ****     }
- 639:src/drv/RTC.c ****     else if (input == KEY_ENTER)    
- 1563               		.loc 1 639 0
- 1564 006e C130      		cpi r28,lo8(1)
- 1565 0070 01F4      		brne .L112
- 640:src/drv/RTC.c ****     {
- 641:src/drv/RTC.c ****         enter = 1;
- 1566               		.loc 1 641 0
- 1567 0072 C093 0000 		sts enter.1856,r28
- 642:src/drv/RTC.c ****         return ST_TIME_DATE_FUNC;
- 1568               		.loc 1 642 0
- 1569 0076 8CE1      		ldi r24,lo8(28)
- 1570 0078 00C0      		rjmp .L108
- 1571               	.L112:
- 643:src/drv/RTC.c ****     }        
- 644:src/drv/RTC.c ****     return ST_TIME_DATEFORMAT_ADJUST_FUNC;
- 1572               		.loc 1 644 0
- 1573 007a 80E2      		ldi r24,lo8(32)
- 1574               	.L108:
- 1575               	/* epilogue start */
- 645:src/drv/RTC.c **** }
- 1576               		.loc 1 645 0
- 1577 007c CF91      		pop r28
- 1578               	.LVL159:
- 1579 007e 0895      		ret
- 1580               		.cfi_endproc
- 1581               	.LFE7:
- 1583               		.section	.text.__vector_5,"ax",@progbits
- 1584               	.global	__vector_5
- 1586               	__vector_5:
- 1587               	.LFB8:
- 646:src/drv/RTC.c **** 
- 647:src/drv/RTC.c **** /******************************************************************************
- 648:src/drv/RTC.c **** *
- 649:src/drv/RTC.c **** *   Timer/Counter2 Overflow Interrupt Routine
- 650:src/drv/RTC.c **** *
- 651:src/drv/RTC.c **** *   Purpose: Increment the real-time clock
- 652:src/drv/RTC.c **** *            The interrupt occurs once a second (running from the 32kHz crystal)
- 653:src/drv/RTC.c **** *
- 654:src/drv/RTC.c **** *******************************************************************************/
- 655:src/drv/RTC.c **** // mtA
- 656:src/drv/RTC.c **** // #pragma vector = TIMER2_OVF_vect
- 657:src/drv/RTC.c **** // __interrupt void TIMER2_OVF_interrupt(void)
- 658:src/drv/RTC.c **** // SIGNAL(SIG_OVERFLOW2)
- 659:src/drv/RTC.c **** ISR(TIMER2_OVF_vect)
- 660:src/drv/RTC.c **** // mtE
- 661:src/drv/RTC.c **** {
- 1588               		.loc 1 661 0
- 1589               		.cfi_startproc
- 1590 0000 1F92      		push r1
- 1591               	.LCFI31:
- 1592               		.cfi_def_cfa_offset 3
- 1593               		.cfi_offset 1, -2
- 1594 0002 0F92      		push r0
- 1595               	.LCFI32:
- 1596               		.cfi_def_cfa_offset 4
- 1597               		.cfi_offset 0, -3
- 1598 0004 0FB6      		in r0,__SREG__
- 1599 0006 0F92      		push r0
- 1600 0008 1124      		clr __zero_reg__
- 1601 000a 2F93      		push r18
- 1602               	.LCFI33:
- 1603               		.cfi_def_cfa_offset 5
- 1604               		.cfi_offset 18, -4
- 1605 000c 3F93      		push r19
- 1606               	.LCFI34:
- 1607               		.cfi_def_cfa_offset 6
- 1608               		.cfi_offset 19, -5
- 1609 000e 4F93      		push r20
- 1610               	.LCFI35:
- 1611               		.cfi_def_cfa_offset 7
- 1612               		.cfi_offset 20, -6
- 1613 0010 5F93      		push r21
- 1614               	.LCFI36:
- 1615               		.cfi_def_cfa_offset 8
- 1616               		.cfi_offset 21, -7
- 1617 0012 6F93      		push r22
- 1618               	.LCFI37:
- 1619               		.cfi_def_cfa_offset 9
- 1620               		.cfi_offset 22, -8
- 1621 0014 7F93      		push r23
- 1622               	.LCFI38:
- 1623               		.cfi_def_cfa_offset 10
- 1624               		.cfi_offset 23, -9
- 1625 0016 8F93      		push r24
- 1626               	.LCFI39:
- 1627               		.cfi_def_cfa_offset 11
- 1628               		.cfi_offset 24, -10
- 1629 0018 9F93      		push r25
- 1630               	.LCFI40:
- 1631               		.cfi_def_cfa_offset 12
- 1632               		.cfi_offset 25, -11
- 1633 001a AF93      		push r26
- 1634               	.LCFI41:
- 1635               		.cfi_def_cfa_offset 13
- 1636               		.cfi_offset 26, -12
- 1637 001c BF93      		push r27
- 1638               	.LCFI42:
- 1639               		.cfi_def_cfa_offset 14
- 1640               		.cfi_offset 27, -13
- 1641 001e EF93      		push r30
- 1642               	.LCFI43:
- 1643               		.cfi_def_cfa_offset 15
- 1644               		.cfi_offset 30, -14
- 1645 0020 FF93      		push r31
- 1646               	.LCFI44:
- 1647               		.cfi_def_cfa_offset 16
- 1648               		.cfi_offset 31, -15
- 1649               	/* prologue: Signal */
- 1650               	/* frame size = 0 */
- 1651               	/* stack size = 15 */
- 1652               	.L__stack_usage = 15
- 662:src/drv/RTC.c ****     static char LeapMonth;
- 663:src/drv/RTC.c **** 
- 664:src/drv/RTC.c ****     gSECOND++;               // increment second
- 1653               		.loc 1 664 0
- 1654 0022 8091 0000 		lds r24,gSECOND
- 1655 0026 8F5F      		subi r24,lo8(-(1))
- 1656 0028 8093 0000 		sts gSECOND,r24
- 665:src/drv/RTC.c **** 
- 666:src/drv/RTC.c ****     if (gSECOND == 60)
- 1657               		.loc 1 666 0
- 1658 002c 8091 0000 		lds r24,gSECOND
- 1659 0030 8C33      		cpi r24,lo8(60)
- 1660 0032 01F0      		breq .+2
- 1661 0034 00C0      		rjmp .L118
- 667:src/drv/RTC.c ****     {
- 668:src/drv/RTC.c ****         gSECOND = 0;
- 1662               		.loc 1 668 0
- 1663 0036 1092 0000 		sts gSECOND,__zero_reg__
- 669:src/drv/RTC.c ****         gMINUTE++;
- 1664               		.loc 1 669 0
- 1665 003a 8091 0000 		lds r24,gMINUTE
- 1666 003e 8F5F      		subi r24,lo8(-(1))
- 1667 0040 8093 0000 		sts gMINUTE,r24
- 670:src/drv/RTC.c ****         
- 671:src/drv/RTC.c ****         gPowerSaveTimer++;
- 1668               		.loc 1 671 0
- 1669 0044 8091 0000 		lds r24,gPowerSaveTimer
- 1670 0048 8F5F      		subi r24,lo8(-(1))
- 1671 004a 8093 0000 		sts gPowerSaveTimer,r24
- 672:src/drv/RTC.c ****         
- 673:src/drv/RTC.c ****         if (gMINUTE > 59)
- 1672               		.loc 1 673 0
- 1673 004e 8091 0000 		lds r24,gMINUTE
- 1674 0052 8C33      		cpi r24,lo8(60)
- 1675 0054 00F4      		brsh .+2
- 1676 0056 00C0      		rjmp .L118
- 674:src/drv/RTC.c ****         {
- 675:src/drv/RTC.c ****             gMINUTE = 0;
- 1677               		.loc 1 675 0
- 1678 0058 1092 0000 		sts gMINUTE,__zero_reg__
- 676:src/drv/RTC.c ****             gHOUR++;
- 1679               		.loc 1 676 0
- 1680 005c 8091 0000 		lds r24,gHOUR
- 1681 0060 8F5F      		subi r24,lo8(-(1))
- 1682 0062 8093 0000 		sts gHOUR,r24
- 677:src/drv/RTC.c ****             
- 678:src/drv/RTC.c ****             if (gHOUR > 23)
- 1683               		.loc 1 678 0
- 1684 0066 8091 0000 		lds r24,gHOUR
- 1685 006a 8831      		cpi r24,lo8(24)
- 1686 006c 00F4      		brsh .+2
- 1687 006e 00C0      		rjmp .L118
- 679:src/drv/RTC.c ****             {
- 680:src/drv/RTC.c ****                 
- 681:src/drv/RTC.c ****                 gHOUR = 0;
- 1688               		.loc 1 681 0
- 1689 0070 1092 0000 		sts gHOUR,__zero_reg__
- 682:src/drv/RTC.c ****                 gDAY++;
- 1690               		.loc 1 682 0
- 1691 0074 8091 0000 		lds r24,gDAY
- 1692 0078 8F5F      		subi r24,lo8(-(1))
- 1693 007a 8093 0000 		sts gDAY,r24
- 683:src/drv/RTC.c **** 
- 684:src/drv/RTC.c ****                 // Check for leap year if month == February
- 685:src/drv/RTC.c ****                 if (gMONTH == 2)
- 1694               		.loc 1 685 0
- 1695 007e 8091 0000 		lds r24,gMONTH
- 1696 0082 8230      		cpi r24,lo8(2)
- 1697 0084 01F4      		brne .L122
- 686:src/drv/RTC.c ****                     if (!(gYEAR & 0x0003))              // if (gYEAR%4 == 0)
- 1698               		.loc 1 686 0
- 1699 0086 8091 0000 		lds r24,gYEAR
- 1700 008a 9091 0000 		lds r25,gYEAR+1
- 1701 008e 8370      		andi r24,3
- 1702 0090 9927      		clr r25
- 1703 0092 892B      		or r24,r25
- 1704 0094 01F4      		brne .L122
- 687:src/drv/RTC.c ****                         if (gYEAR%100 == 0)
- 1705               		.loc 1 687 0
- 1706 0096 8091 0000 		lds r24,gYEAR
- 1707 009a 9091 0000 		lds r25,gYEAR+1
- 1708 009e 64E6      		ldi r22,lo8(100)
- 1709 00a0 70E0      		ldi r23,0
- 1710 00a2 0E94 0000 		call __udivmodhi4
- 1711 00a6 892B      		or r24,r25
- 1712 00a8 01F4      		brne .L123
- 688:src/drv/RTC.c ****                             if (gYEAR%400 == 0)
- 1713               		.loc 1 688 0
- 1714 00aa 8091 0000 		lds r24,gYEAR
- 1715 00ae 9091 0000 		lds r25,gYEAR+1
- 1716 00b2 60E9      		ldi r22,lo8(-112)
- 1717 00b4 71E0      		ldi r23,lo8(1)
- 1718 00b6 0E94 0000 		call __udivmodhi4
- 1719 00ba 892B      		or r24,r25
- 1720 00bc 01F4      		brne .L122
- 1721               	.L123:
- 689:src/drv/RTC.c ****                                 LeapMonth = 1;
- 1722               		.loc 1 689 0
- 1723 00be 81E0      		ldi r24,lo8(1)
- 1724 00c0 8093 0000 		sts LeapMonth.1862,r24
- 1725 00c4 00C0      		rjmp .L124
- 1726               	.L122:
- 690:src/drv/RTC.c ****                             else
- 691:src/drv/RTC.c ****                                 LeapMonth = 0;
- 1727               		.loc 1 691 0
- 1728 00c6 1092 0000 		sts LeapMonth.1862,__zero_reg__
- 1729               	.L124:
- 692:src/drv/RTC.c ****                         else
- 693:src/drv/RTC.c ****                             LeapMonth = 1;
- 694:src/drv/RTC.c ****                     else
- 695:src/drv/RTC.c ****                         LeapMonth = 0;
- 696:src/drv/RTC.c ****                 else
- 697:src/drv/RTC.c ****                     LeapMonth = 0;
- 698:src/drv/RTC.c **** 
- 699:src/drv/RTC.c ****                 // Now, we can check for month length
- 700:src/drv/RTC.c ****                 if (gDAY > (MonthLength[gMONTH] + LeapMonth))
- 1730               		.loc 1 700 0
- 1731 00ca 2091 0000 		lds r18,gDAY
- 1732 00ce E091 0000 		lds r30,gMONTH
- 1733 00d2 30E0      		ldi r19,0
- 1734 00d4 F0E0      		ldi r31,0
- 1735 00d6 E050      		subi r30,lo8(-(MonthLength))
- 1736 00d8 F040      		sbci r31,hi8(-(MonthLength))
- 1737 00da 4081      		ld r20,Z
- 1738 00dc 8091 0000 		lds r24,LeapMonth.1862
- 1739 00e0 90E0      		ldi r25,0
- 1740 00e2 840F      		add r24,r20
- 1741 00e4 911D      		adc r25,__zero_reg__
- 1742 00e6 8217      		cp r24,r18
- 1743 00e8 9307      		cpc r25,r19
- 1744 00ea 04F4      		brge .L118
- 701:src/drv/RTC.c ****                 {
- 702:src/drv/RTC.c ****                     gDAY = 1;
- 1745               		.loc 1 702 0
- 1746 00ec 91E0      		ldi r25,lo8(1)
- 1747 00ee 9093 0000 		sts gDAY,r25
- 703:src/drv/RTC.c ****                     gMONTH++;
- 1748               		.loc 1 703 0
- 1749 00f2 8091 0000 		lds r24,gMONTH
- 1750 00f6 8F5F      		subi r24,lo8(-(1))
- 1751 00f8 8093 0000 		sts gMONTH,r24
- 704:src/drv/RTC.c **** 
- 705:src/drv/RTC.c ****                     if (gMONTH > 12)
- 1752               		.loc 1 705 0
- 1753 00fc 8091 0000 		lds r24,gMONTH
- 1754 0100 8D30      		cpi r24,lo8(13)
- 1755 0102 00F0      		brlo .L118
- 706:src/drv/RTC.c ****                     {
- 707:src/drv/RTC.c ****                         gMONTH = 1;
- 1756               		.loc 1 707 0
- 1757 0104 9093 0000 		sts gMONTH,r25
- 708:src/drv/RTC.c ****                         gYEAR++;
- 1758               		.loc 1 708 0
- 1759 0108 8091 0000 		lds r24,gYEAR
- 1760 010c 9091 0000 		lds r25,gYEAR+1
- 1761 0110 0196      		adiw r24,1
- 1762 0112 9093 0000 		sts gYEAR+1,r25
- 1763 0116 8093 0000 		sts gYEAR,r24
- 1764               	.L118:
- 1765               	/* epilogue start */
- 709:src/drv/RTC.c ****                     }
- 710:src/drv/RTC.c ****                 }
- 711:src/drv/RTC.c ****             }
- 712:src/drv/RTC.c ****         }
- 713:src/drv/RTC.c ****     }
- 714:src/drv/RTC.c **** }
- 1766               		.loc 1 714 0
- 1767 011a FF91      		pop r31
- 1768 011c EF91      		pop r30
- 1769 011e BF91      		pop r27
- 1770 0120 AF91      		pop r26
- 1771 0122 9F91      		pop r25
- 1772 0124 8F91      		pop r24
- 1773 0126 7F91      		pop r23
- 1774 0128 6F91      		pop r22
- 1775 012a 5F91      		pop r21
- 1776 012c 4F91      		pop r20
- 1777 012e 3F91      		pop r19
- 1778 0130 2F91      		pop r18
- 1779 0132 0F90      		pop r0
- 1780 0134 0FBE      		out __SREG__,r0
- 1781 0136 0F90      		pop r0
- 1782 0138 1F90      		pop r1
- 1783 013a 1895      		reti
- 1784               		.cfi_endproc
- 1785               	.LFE8:
- 1787               		.section	.bss.LeapMonth.1862,"aw",@nobits
- 1790               	LeapMonth.1862:
- 1791 0000 00        		.zero	1
- 1792               		.section	.data.enter.1856,"aw",@progbits
- 1795               	enter.1856:
- 1796 0000 01        		.byte	1
- 1797               		.section	.data.mode.1844,"aw",@progbits
- 1800               	mode.1844:
- 1801 0000 02        		.byte	2
- 1802               		.section	.bss.date.1843,"aw",@nobits
- 1805               	date.1843:
- 1806 0000 0000 00   		.zero	3
- 1807               		.section	.data.enter_function.1842,"aw",@progbits
- 1810               	enter_function.1842:
- 1811 0000 01        		.byte	1
- 1812               		.section	.progmem.data.__c.1806,"a",@progbits
- 1815               	__c.1806:
- 1816 0000 3132 4800 		.string	"12H"
- 1817               		.section	.progmem.data.__c.1804,"a",@progbits
- 1820               	__c.1804:
- 1821 0000 3234 4800 		.string	"24H"
- 1822               		.section	.progmem.data.__c.1802,"a",@progbits
- 1825               	__c.1802:
- 1826 0000 3234 4800 		.string	"24H"
- 1827               		.section	.progmem.data.__c.1800,"a",@progbits
- 1830               	__c.1800:
- 1831 0000 3132 4800 		.string	"12H"
- 1832               		.section	.progmem.data.__c.1798,"a",@progbits
- 1835               	__c.1798:
- 1836 0000 3132 4800 		.string	"12H"
- 1837               		.section	.progmem.data.__c.1796,"a",@progbits
- 1840               	__c.1796:
- 1841 0000 3234 4800 		.string	"24H"
- 1842               		.section	.data.enter.1795,"aw",@progbits
- 1845               	enter.1795:
- 1846 0000 01        		.byte	1
- 1847               		.section	.bss.mode.1785,"aw",@nobits
- 1850               	mode.1785:
- 1851 0000 00        		.zero	1
- 1852               		.section	.bss.time.1784,"aw",@nobits
- 1855               	time.1784:
- 1856 0000 0000 00   		.zero	3
- 1857               		.section	.data.enter_function.1783,"aw",@progbits
- 1860               	enter_function.1783:
- 1861 0000 01        		.byte	1
- 1862               	.global	DATE_FORMAT_NR
- 1863               		.section	.progmem.data.DATE_FORMAT_NR,"a",@progbits
- 1866               	DATE_FORMAT_NR:
- 1867 0000 0000      		.word	EUROPEAN_DATE_NR
- 1868 0002 0000      		.word	AMERICAN_DATE_NR
- 1869 0004 0000      		.word	CANADIAN_DATE_NR
- 1870               	.global	DATEFORMAT_TEXT
- 1871               		.section	.data.DATEFORMAT_TEXT,"aw",@progbits
- 1874               	DATEFORMAT_TEXT:
- 1875 0000 0000      		.word	EUROPEAN_DATE_TEXT
- 1876 0002 0000      		.word	AMERICAN_DATE_TEXT
- 1877 0004 0000      		.word	CANADIAN_DATE_TEXT
- 1878               	.global	CANADIAN_DATE_NR
- 1879               		.section	.progmem.data.CANADIAN_DATE_NR,"a",@progbits
- 1882               	CANADIAN_DATE_NR:
- 1883 0000 00        		.byte	0
- 1884 0001 01        		.byte	1
- 1885 0002 02        		.byte	2
- 1886 0003 03        		.byte	3
- 1887 0004 04        		.byte	4
- 1888 0005 05        		.byte	5
- 1889               	.global	AMERICAN_DATE_NR
- 1890               		.section	.progmem.data.AMERICAN_DATE_NR,"a",@progbits
- 1893               	AMERICAN_DATE_NR:
- 1894 0000 04        		.byte	4
- 1895 0001 05        		.byte	5
- 1896 0002 00        		.byte	0
- 1897 0003 01        		.byte	1
- 1898 0004 02        		.byte	2
- 1899 0005 03        		.byte	3
- 1900               	.global	EUROPEAN_DATE_NR
- 1901               		.section	.progmem.data.EUROPEAN_DATE_NR,"a",@progbits
- 1904               	EUROPEAN_DATE_NR:
- 1905 0000 04        		.byte	4
- 1906 0001 05        		.byte	5
- 1907 0002 02        		.byte	2
- 1908 0003 03        		.byte	3
- 1909 0004 00        		.byte	0
- 1910 0005 01        		.byte	1
- 1911               	.global	CANADIAN_DATE_TEXT
- 1912               		.section	.progmem.data.CANADIAN_DATE_TEXT,"a",@progbits
- 1915               	CANADIAN_DATE_TEXT:
- 1916 0000 5959 4D4D 		.string	"YYMMDD"
- 1916      4444 00
- 1917               	.global	AMERICAN_DATE_TEXT
- 1918               		.section	.progmem.data.AMERICAN_DATE_TEXT,"a",@progbits
- 1921               	AMERICAN_DATE_TEXT:
- 1922 0000 4D4D 4444 		.string	"MMDDYY"
- 1922      5959 00
- 1923               	.global	EUROPEAN_DATE_TEXT
- 1924               		.section	.progmem.data.EUROPEAN_DATE_TEXT,"a",@progbits
- 1927               	EUROPEAN_DATE_TEXT:
- 1928 0000 4444 4D4D 		.string	"DDMMYY"
- 1928      5959 00
- 1929               	.global	clockformat
- 1930               		.section	.data.clockformat,"aw",@progbits
- 1933               	clockformat:
- 1934 0000 01        		.byte	1
- 1935               	.global	TBL_CLOCK_12
- 1936               		.section	.data.TBL_CLOCK_12,"aw",@progbits
- 1939               	TBL_CLOCK_12:
- 1940 0000 0C        		.byte	12
- 1941 0001 01        		.byte	1
- 1942 0002 02        		.byte	2
- 1943 0003 03        		.byte	3
- 1944 0004 04        		.byte	4
- 1945 0005 05        		.byte	5
- 1946 0006 06        		.byte	6
- 1947 0007 07        		.byte	7
- 1948 0008 08        		.byte	8
- 1949 0009 09        		.byte	9
- 1950 000a 0A        		.byte	10
- 1951 000b 0B        		.byte	11
- 1952 000c 0C        		.byte	12
- 1953 000d 01        		.byte	1
- 1954 000e 02        		.byte	2
- 1955 000f 03        		.byte	3
- 1956 0010 04        		.byte	4
- 1957 0011 05        		.byte	5
- 1958 0012 06        		.byte	6
- 1959 0013 07        		.byte	7
- 1960 0014 08        		.byte	8
- 1961 0015 09        		.byte	9
- 1962 0016 0A        		.byte	10
- 1963 0017 0B        		.byte	11
- 1964               	.global	MonthLength
- 1965               		.section	.data.MonthLength,"aw",@progbits
- 1968               	MonthLength:
- 1969 0000 00        		.byte	0
- 1970 0001 1F        		.byte	31
- 1971 0002 1C        		.byte	28
- 1972 0003 1F        		.byte	31
- 1973 0004 1E        		.byte	30
- 1974 0005 1F        		.byte	31
- 1975 0006 1E        		.byte	30
- 1976 0007 1F        		.byte	31
- 1977 0008 1F        		.byte	31
- 1978 0009 1E        		.byte	30
- 1979 000a 1F        		.byte	31
- 1980 000b 1E        		.byte	30
- 1981 000c 1F        		.byte	31
- 1982               	.global	dateformat
- 1983               		.section	.bss.dateformat,"aw",@nobits
- 1986               	dateformat:
- 1987 0000 00        		.zero	1
- 1988               	.global	gPowerSaveTimer
- 1989               		.section	.bss.gPowerSaveTimer,"aw",@nobits
- 1992               	gPowerSaveTimer:
- 1993 0000 00        		.zero	1
- 1994               		.comm	gYEAR,2,1
- 1995               		.comm	gMONTH,1,1
- 1996               		.comm	gDAY,1,1
- 1997               		.comm	gHOUR,1,1
- 1998               		.comm	gMINUTE,1,1
- 1999               		.comm	gSECOND,1,1
- 2000               		.text
- 2001               	.Letext0:
- 2002               		.file 2 "/usr/lib/avr/include/stdint.h"
- 2003               		.file 3 "inc/main.h"
- 2004               		.file 4 "inc/LCD_functions.h"
- 2005               		.file 5 "inc/BCD.h"
+   2               	__SREG__ = 0x3f
+   3               	__SP_H__ = 0x3e
+   4               	__SP_L__ = 0x3d
+   5               	__CCP__  = 0x34
+   6               	__tmp_reg__ = 0
+   7               	__zero_reg__ = 1
+  15               	.Ltext0:
+  16               		.section	.text.__vector_5,"ax",@progbits
+  17               	.global	__vector_5
+  19               	__vector_5:
+  20               	.LFB9:
+  21               	.LSM0:
+  22 0000 1F92      		push __zero_reg__
+  23 0002 0F92      		push r0
+  24 0004 0FB6      		in r0,__SREG__
+  25 0006 0F92      		push r0
+  26 0008 1124      		clr __zero_reg__
+  27 000a 2F93      		push r18
+  28 000c 3F93      		push r19
+  29 000e 4F93      		push r20
+  30 0010 5F93      		push r21
+  31 0012 6F93      		push r22
+  32 0014 7F93      		push r23
+  33 0016 8F93      		push r24
+  34 0018 9F93      		push r25
+  35 001a AF93      		push r26
+  36 001c BF93      		push r27
+  37 001e EF93      		push r30
+  38 0020 FF93      		push r31
+  39               	/* prologue: Signal */
+  40               	/* frame size = 0 */
+  41               	.LSM1:
+  42 0022 8091 0000 		lds r24,gSECOND
+  43 0026 8F5F      		subi r24,lo8(-(1))
+  44 0028 8093 0000 		sts gSECOND,r24
+  45               	.LSM2:
+  46 002c 8091 0000 		lds r24,gSECOND
+  47 0030 8C33      		cpi r24,lo8(60)
+  48 0032 01F0      		breq .+2
+  49 0034 00C0      		rjmp .L8
+  50               	.LSM3:
+  51 0036 1092 0000 		sts gSECOND,__zero_reg__
+  52               	.LSM4:
+  53 003a 8091 0000 		lds r24,gMINUTE
+  54 003e 8F5F      		subi r24,lo8(-(1))
+  55 0040 8093 0000 		sts gMINUTE,r24
+  56               	.LSM5:
+  57 0044 8091 0000 		lds r24,gPowerSaveTimer
+  58 0048 8F5F      		subi r24,lo8(-(1))
+  59 004a 8093 0000 		sts gPowerSaveTimer,r24
+  60               	.LSM6:
+  61 004e 8091 0000 		lds r24,gMINUTE
+  62 0052 8C33      		cpi r24,lo8(60)
+  63 0054 00F4      		brsh .+2
+  64 0056 00C0      		rjmp .L8
+  65               	.LSM7:
+  66 0058 1092 0000 		sts gMINUTE,__zero_reg__
+  67               	.LSM8:
+  68 005c 8091 0000 		lds r24,gHOUR
+  69 0060 8F5F      		subi r24,lo8(-(1))
+  70 0062 8093 0000 		sts gHOUR,r24
+  71               	.LSM9:
+  72 0066 8091 0000 		lds r24,gHOUR
+  73 006a 8831      		cpi r24,lo8(24)
+  74 006c 00F4      		brsh .+2
+  75 006e 00C0      		rjmp .L8
+  76               	.LSM10:
+  77 0070 1092 0000 		sts gHOUR,__zero_reg__
+  78               	.LSM11:
+  79 0074 8091 0000 		lds r24,gDAY
+  80 0078 8F5F      		subi r24,lo8(-(1))
+  81 007a 8093 0000 		sts gDAY,r24
+  82               	.LSM12:
+  83 007e 8091 0000 		lds r24,gMONTH
+  84 0082 8230      		cpi r24,lo8(2)
+  85 0084 01F4      		brne .L3
+  86               	.LSM13:
+  87 0086 8091 0000 		lds r24,gYEAR
+  88 008a 9091 0000 		lds r25,(gYEAR)+1
+  89 008e 8370      		andi r24,lo8(3)
+  90 0090 9070      		andi r25,hi8(3)
+  91 0092 892B      		or r24,r25
+  92 0094 01F4      		brne .L3
+  93               	.LSM14:
+  94 0096 8091 0000 		lds r24,gYEAR
+  95 009a 9091 0000 		lds r25,(gYEAR)+1
+  96 009e 64E6      		ldi r22,lo8(100)
+  97 00a0 70E0      		ldi r23,hi8(100)
+  98 00a2 0E94 0000 		call __udivmodhi4
+  99 00a6 892B      		or r24,r25
+ 100 00a8 01F4      		brne .L5
+ 101               	.LSM15:
+ 102 00aa 8091 0000 		lds r24,gYEAR
+ 103 00ae 9091 0000 		lds r25,(gYEAR)+1
+ 104 00b2 60E9      		ldi r22,lo8(400)
+ 105 00b4 71E0      		ldi r23,hi8(400)
+ 106 00b6 0E94 0000 		call __udivmodhi4
+ 107 00ba 892B      		or r24,r25
+ 108 00bc 01F4      		brne .L3
+ 109               	.L5:
+ 110               	.LSM16:
+ 111 00be 81E0      		ldi r24,lo8(1)
+ 112 00c0 8093 0000 		sts LeapMonth.1664,r24
+ 113 00c4 00C0      		rjmp .L7
+ 114               	.L3:
+ 115               	.LSM17:
+ 116 00c6 1092 0000 		sts LeapMonth.1664,__zero_reg__
+ 117               	.L7:
+ 118               	.LSM18:
+ 119 00ca 2091 0000 		lds r18,gDAY
+ 120 00ce E091 0000 		lds r30,gMONTH
+ 121 00d2 30E0      		ldi r19,lo8(0)
+ 122 00d4 F0E0      		ldi r31,lo8(0)
+ 123 00d6 E050      		subi r30,lo8(-(MonthLength))
+ 124 00d8 F040      		sbci r31,hi8(-(MonthLength))
+ 125 00da 4081      		ld r20,Z
+ 126 00dc 8091 0000 		lds r24,LeapMonth.1664
+ 127 00e0 90E0      		ldi r25,lo8(0)
+ 128 00e2 840F      		add r24,r20
+ 129 00e4 911D      		adc r25,__zero_reg__
+ 130 00e6 8217      		cp r24,r18
+ 131 00e8 9307      		cpc r25,r19
+ 132 00ea 04F4      		brge .L8
+ 133               	.LSM19:
+ 134 00ec 91E0      		ldi r25,lo8(1)
+ 135 00ee 9093 0000 		sts gDAY,r25
+ 136               	.LSM20:
+ 137 00f2 8091 0000 		lds r24,gMONTH
+ 138 00f6 8F5F      		subi r24,lo8(-(1))
+ 139 00f8 8093 0000 		sts gMONTH,r24
+ 140               	.LSM21:
+ 141 00fc 8091 0000 		lds r24,gMONTH
+ 142 0100 8D30      		cpi r24,lo8(13)
+ 143 0102 00F0      		brlo .L8
+ 144               	.LSM22:
+ 145 0104 9093 0000 		sts gMONTH,r25
+ 146               	.LSM23:
+ 147 0108 8091 0000 		lds r24,gYEAR
+ 148 010c 9091 0000 		lds r25,(gYEAR)+1
+ 149 0110 0196      		adiw r24,1
+ 150 0112 9093 0000 		sts (gYEAR)+1,r25
+ 151 0116 8093 0000 		sts gYEAR,r24
+ 152               	.L8:
+ 153               	/* epilogue start */
+ 154               	.LSM24:
+ 155 011a FF91      		pop r31
+ 156 011c EF91      		pop r30
+ 157 011e BF91      		pop r27
+ 158 0120 AF91      		pop r26
+ 159 0122 9F91      		pop r25
+ 160 0124 8F91      		pop r24
+ 161 0126 7F91      		pop r23
+ 162 0128 6F91      		pop r22
+ 163 012a 5F91      		pop r21
+ 164 012c 4F91      		pop r20
+ 165 012e 3F91      		pop r19
+ 166 0130 2F91      		pop r18
+ 167 0132 0F90      		pop r0
+ 168 0134 0FBE      		out __SREG__,r0
+ 169 0136 0F90      		pop r0
+ 170 0138 1F90      		pop __zero_reg__
+ 171 013a 1895      		reti
+ 172               	.LFE9:
+ 174               		.section	.text.SetDateFormat,"ax",@progbits
+ 175               	.global	SetDateFormat
+ 177               	SetDateFormat:
+ 178               	.LFB8:
+ 179               	.LSM25:
+ 180               	.LVL0:
+ 181 0000 1F93      		push r17
+ 182               	/* prologue: function */
+ 183               	/* frame size = 0 */
+ 184 0002 182F      		mov r17,r24
+ 185               	.LSM26:
+ 186 0004 8091 0000 		lds r24,enter.1651
+ 187               	.LVL1:
+ 188 0008 8823      		tst r24
+ 189 000a 01F0      		breq .L10
+ 190               	.LSM27:
+ 191 000c 1092 0000 		sts enter.1651,__zero_reg__
+ 192               	.LSM28:
+ 193 0010 E091 0000 		lds r30,dateformat
+ 194 0014 F0E0      		ldi r31,lo8(0)
+ 195 0016 EE0F      		lsl r30
+ 196 0018 FF1F      		rol r31
+ 197 001a E050      		subi r30,lo8(-(DATEFORMAT_TEXT))
+ 198 001c F040      		sbci r31,hi8(-(DATEFORMAT_TEXT))
+ 199 001e 8081      		ld r24,Z
+ 200 0020 9181      		ldd r25,Z+1
+ 201 0022 61E0      		ldi r22,lo8(1)
+ 202 0024 0E94 0000 		call LCD_puts_f
+ 203               	.L10:
+ 204               	.LSM29:
+ 205 0028 1430      		cpi r17,lo8(4)
+ 206 002a 01F4      		brne .L11
+ 207               	.LSM30:
+ 208 002c 8091 0000 		lds r24,dateformat
+ 209 0030 8230      		cpi r24,lo8(2)
+ 210 0032 00F0      		brlo .L12
+ 211               	.LSM31:
+ 212 0034 1092 0000 		sts dateformat,__zero_reg__
+ 213 0038 00C0      		rjmp .L21
+ 214               	.L12:
+ 215               	.LSM32:
+ 216 003a 8F5F      		subi r24,lo8(-(1))
+ 217 003c 00C0      		rjmp .L20
+ 218               	.L11:
+ 219               	.LSM33:
+ 220 003e 1530      		cpi r17,lo8(5)
+ 221 0040 01F4      		brne .L15
+ 222               	.LSM34:
+ 223 0042 8091 0000 		lds r24,dateformat
+ 224 0046 8823      		tst r24
+ 225 0048 01F4      		brne .L16
+ 226               	.LSM35:
+ 227 004a 82E0      		ldi r24,lo8(2)
+ 228 004c 00C0      		rjmp .L20
+ 229               	.L16:
+ 230               	.LSM36:
+ 231 004e 8150      		subi r24,lo8(-(-1))
+ 232               	.L20:
+ 233 0050 8093 0000 		sts dateformat,r24
+ 234               	.L21:
+ 235               	.LSM37:
+ 236 0054 E091 0000 		lds r30,dateformat
+ 237 0058 F0E0      		ldi r31,lo8(0)
+ 238 005a EE0F      		lsl r30
+ 239 005c FF1F      		rol r31
+ 240 005e E050      		subi r30,lo8(-(DATEFORMAT_TEXT))
+ 241 0060 F040      		sbci r31,hi8(-(DATEFORMAT_TEXT))
+ 242 0062 8081      		ld r24,Z
+ 243 0064 9181      		ldd r25,Z+1
+ 244 0066 61E0      		ldi r22,lo8(1)
+ 245 0068 0E94 0000 		call LCD_puts_f
+ 246 006c 00C0      		rjmp .L22
+ 247               	.L15:
+ 248               	.LSM38:
+ 249 006e 1130      		cpi r17,lo8(1)
+ 250 0070 01F0      		breq .L18
+ 251               	.L22:
+ 252 0072 80E2      		ldi r24,lo8(32)
+ 253 0074 00C0      		rjmp .L14
+ 254               	.L18:
+ 255               	.LSM39:
+ 256 0076 1093 0000 		sts enter.1651,r17
+ 257 007a 8CE1      		ldi r24,lo8(28)
+ 258               	.L14:
+ 259               	/* epilogue start */
+ 260               	.LSM40:
+ 261 007c 1F91      		pop r17
+ 262               	.LVL2:
+ 263 007e 0895      		ret
+ 264               	.LFE8:
+ 266               		.section	.text.SetClockFormat,"ax",@progbits
+ 267               	.global	SetClockFormat
+ 269               	SetClockFormat:
+ 270               	.LFB5:
+ 271               	.LSM41:
+ 272               	.LVL3:
+ 273 0000 1F93      		push r17
+ 274               	/* prologue: function */
+ 275               	/* frame size = 0 */
+ 276 0002 182F      		mov r17,r24
+ 277               	.LSM42:
+ 278 0004 8091 0000 		lds r24,enter.1535
+ 279               	.LVL4:
+ 280 0008 8823      		tst r24
+ 281 000a 01F0      		breq .L24
+ 282               	.LSM43:
+ 283 000c 1092 0000 		sts enter.1535,__zero_reg__
+ 284               	.LSM44:
+ 285 0010 8091 0000 		lds r24,clockformat
+ 286 0014 8130      		cpi r24,lo8(1)
+ 287 0016 01F4      		brne .L25
+ 288               	.LSM45:
+ 289 0018 80E0      		ldi r24,lo8(__c.1536)
+ 290 001a 90E0      		ldi r25,hi8(__c.1536)
+ 291 001c 00C0      		rjmp .L33
+ 292               	.L25:
+ 293               	.LSM46:
+ 294 001e 80E0      		ldi r24,lo8(__c.1538)
+ 295 0020 90E0      		ldi r25,hi8(__c.1538)
+ 296               	.L33:
+ 297 0022 61E0      		ldi r22,lo8(1)
+ 298 0024 0E94 0000 		call LCD_puts_f
+ 299               	.L24:
+ 300               	.LSM47:
+ 301 0028 1430      		cpi r17,lo8(4)
+ 302 002a 01F4      		brne .L26
+ 303               	.LSM48:
+ 304 002c 8091 0000 		lds r24,clockformat
+ 305 0030 8130      		cpi r24,lo8(1)
+ 306 0032 01F4      		brne .L27
+ 307               	.LSM49:
+ 308 0034 1092 0000 		sts clockformat,__zero_reg__
+ 309               	.LSM50:
+ 310 0038 80E0      		ldi r24,lo8(__c.1540)
+ 311 003a 90E0      		ldi r25,hi8(__c.1540)
+ 312 003c 00C0      		rjmp .L34
+ 313               	.L27:
+ 314               	.LSM51:
+ 315 003e 81E0      		ldi r24,lo8(1)
+ 316 0040 8093 0000 		sts clockformat,r24
+ 317               	.LSM52:
+ 318 0044 80E0      		ldi r24,lo8(__c.1542)
+ 319 0046 90E0      		ldi r25,hi8(__c.1542)
+ 320 0048 00C0      		rjmp .L34
+ 321               	.L26:
+ 322               	.LSM53:
+ 323 004a 1530      		cpi r17,lo8(5)
+ 324 004c 01F4      		brne .L29
+ 325               	.LSM54:
+ 326 004e 8091 0000 		lds r24,clockformat
+ 327 0052 8823      		tst r24
+ 328 0054 01F4      		brne .L30
+ 329               	.LSM55:
+ 330 0056 81E0      		ldi r24,lo8(1)
+ 331 0058 8093 0000 		sts clockformat,r24
+ 332               	.LSM56:
+ 333 005c 80E0      		ldi r24,lo8(__c.1544)
+ 334 005e 90E0      		ldi r25,hi8(__c.1544)
+ 335 0060 00C0      		rjmp .L34
+ 336               	.L30:
+ 337               	.LSM57:
+ 338 0062 1092 0000 		sts clockformat,__zero_reg__
+ 339               	.LSM58:
+ 340 0066 80E0      		ldi r24,lo8(__c.1546)
+ 341 0068 90E0      		ldi r25,hi8(__c.1546)
+ 342               	.L34:
+ 343 006a 61E0      		ldi r22,lo8(1)
+ 344 006c 0E94 0000 		call LCD_puts_f
+ 345               	.L35:
+ 346 0070 84E2      		ldi r24,lo8(36)
+ 347 0072 00C0      		rjmp .L28
+ 348               	.L29:
+ 349               	.LSM59:
+ 350 0074 1130      		cpi r17,lo8(1)
+ 351 0076 01F4      		brne .L35
+ 352               	.L31:
+ 353               	.LSM60:
+ 354 0078 1093 0000 		sts enter.1535,r17
+ 355 007c 86E1      		ldi r24,lo8(22)
+ 356               	.L28:
+ 357               	/* epilogue start */
+ 358               	.LSM61:
+ 359 007e 1F91      		pop r17
+ 360               	.LVL5:
+ 361 0080 0895      		ret
+ 362               	.LFE5:
+ 364               		.section	.text.SetDate,"ax",@progbits
+ 365               	.global	SetDate
+ 367               	SetDate:
+ 368               	.LFB7:
+ 369               	.LSM62:
+ 370               	.LVL6:
+ 371 0000 FF92      		push r15
+ 372 0002 0F93      		push r16
+ 373 0004 1F93      		push r17
+ 374               	/* prologue: function */
+ 375               	/* frame size = 0 */
+ 376 0006 F82E      		mov r15,r24
+ 377               	.LSM63:
+ 378 0008 8091 0000 		lds r24,enter_function.1603
+ 379               	.LVL7:
+ 380 000c 8823      		tst r24
+ 381 000e 01F0      		breq .L37
+ 382               	.LSM64:
+ 383 0010 8091 0000 		lds r24,gYEAR
+ 384 0014 9091 0000 		lds r25,(gYEAR)+1
+ 385 0018 8093 0000 		sts date.1604,r24
+ 386               	.LSM65:
+ 387 001c 8091 0000 		lds r24,gMONTH
+ 388 0020 8093 0000 		sts date.1604+1,r24
+ 389               	.LSM66:
+ 390 0024 8091 0000 		lds r24,gDAY
+ 391 0028 8093 0000 		sts date.1604+2,r24
+ 392               	.L37:
+ 393               	.LSM67:
+ 394 002c 8091 0000 		lds r24,mode.1605
+ 395 0030 8823      		tst r24
+ 396 0032 01F4      		brne .L38
+ 397               	.LSM68:
+ 398 0034 8091 0000 		lds r24,date.1604
+ 399 0038 0E94 0000 		call CHAR2BCD2
+ 400 003c 182F      		mov r17,r24
+ 401               	.LVL8:
+ 402               	.LSM69:
+ 403 003e 082F      		mov r16,r24
+ 404 0040 0295      		swap r16
+ 405 0042 0F70      		andi r16,lo8(15)
+ 406               	.LSM70:
+ 407 0044 80E0      		ldi r24,lo8(0)
+ 408 0046 60E2      		ldi r22,lo8(32)
+ 409 0048 0E94 0000 		call LCD_putc
+ 410               	.LSM71:
+ 411 004c 81E0      		ldi r24,lo8(1)
+ 412 004e 60E2      		ldi r22,lo8(32)
+ 413 0050 0E94 0000 		call LCD_putc
+ 414               	.LSM72:
+ 415 0054 82E0      		ldi r24,lo8(2)
+ 416 0056 69E5      		ldi r22,lo8(89)
+ 417 0058 0E94 0000 		call LCD_putc
+ 418               	.LSM73:
+ 419 005c 83E0      		ldi r24,lo8(3)
+ 420 005e 69E5      		ldi r22,lo8(89)
+ 421 0060 00C0      		rjmp .L60
+ 422               	.LVL9:
+ 423               	.L38:
+ 424               	.LSM74:
+ 425 0062 8130      		cpi r24,lo8(1)
+ 426 0064 01F4      		brne .L40
+ 427               	.LSM75:
+ 428 0066 8091 0000 		lds r24,date.1604+1
+ 429 006a 0E94 0000 		call CHAR2BCD2
+ 430 006e 182F      		mov r17,r24
+ 431               	.LVL10:
+ 432               	.LSM76:
+ 433 0070 082F      		mov r16,r24
+ 434 0072 0295      		swap r16
+ 435 0074 0F70      		andi r16,lo8(15)
+ 436               	.LSM77:
+ 437 0076 80E0      		ldi r24,lo8(0)
+ 438 0078 60E2      		ldi r22,lo8(32)
+ 439 007a 0E94 0000 		call LCD_putc
+ 440               	.LSM78:
+ 441 007e 81E0      		ldi r24,lo8(1)
+ 442 0080 60E2      		ldi r22,lo8(32)
+ 443 0082 0E94 0000 		call LCD_putc
+ 444               	.LSM79:
+ 445 0086 82E0      		ldi r24,lo8(2)
+ 446 0088 6DE4      		ldi r22,lo8(77)
+ 447 008a 0E94 0000 		call LCD_putc
+ 448               	.LSM80:
+ 449 008e 83E0      		ldi r24,lo8(3)
+ 450 0090 6DE4      		ldi r22,lo8(77)
+ 451 0092 00C0      		rjmp .L60
+ 452               	.LVL11:
+ 453               	.L40:
+ 454               	.LSM81:
+ 455 0094 8230      		cpi r24,lo8(2)
+ 456 0096 01F4      		brne .L39
+ 457               	.LSM82:
+ 458 0098 8091 0000 		lds r24,date.1604+2
+ 459 009c 0E94 0000 		call CHAR2BCD2
+ 460 00a0 182F      		mov r17,r24
+ 461               	.LVL12:
+ 462               	.LSM83:
+ 463 00a2 082F      		mov r16,r24
+ 464 00a4 0295      		swap r16
+ 465 00a6 0F70      		andi r16,lo8(15)
+ 466               	.LSM84:
+ 467 00a8 80E0      		ldi r24,lo8(0)
+ 468 00aa 60E2      		ldi r22,lo8(32)
+ 469 00ac 0E94 0000 		call LCD_putc
+ 470               	.LSM85:
+ 471 00b0 81E0      		ldi r24,lo8(1)
+ 472 00b2 60E2      		ldi r22,lo8(32)
+ 473 00b4 0E94 0000 		call LCD_putc
+ 474               	.LSM86:
+ 475 00b8 82E0      		ldi r24,lo8(2)
+ 476 00ba 64E4      		ldi r22,lo8(68)
+ 477 00bc 0E94 0000 		call LCD_putc
+ 478               	.LSM87:
+ 479 00c0 83E0      		ldi r24,lo8(3)
+ 480 00c2 64E4      		ldi r22,lo8(68)
+ 481               	.LVL13:
+ 482               	.L60:
+ 483 00c4 0E94 0000 		call LCD_putc
+ 484               	.LSM88:
+ 485 00c8 005D      		subi r16,lo8(-(48))
+ 486 00ca 84E0      		ldi r24,lo8(4)
+ 487 00cc 602F      		mov r22,r16
+ 488 00ce 0E94 0000 		call LCD_putc
+ 489               	.LSM89:
+ 490 00d2 1F70      		andi r17,lo8(15)
+ 491               	.LVL14:
+ 492 00d4 105D      		subi r17,lo8(-(48))
+ 493 00d6 85E0      		ldi r24,lo8(5)
+ 494 00d8 612F      		mov r22,r17
+ 495 00da 0E94 0000 		call LCD_putc
+ 496               	.L39:
+ 497               	.LSM90:
+ 498 00de 86E0      		ldi r24,lo8(6)
+ 499 00e0 60E0      		ldi r22,lo8(0)
+ 500 00e2 0E94 0000 		call LCD_putc
+ 501               	.LSM91:
+ 502 00e6 80E0      		ldi r24,lo8(0)
+ 503 00e8 0E94 0000 		call LCD_Colon
+ 504               	.LSM92:
+ 505 00ec FF20      		tst r15
+ 506 00ee 01F0      		breq .L41
+ 507               	.LSM93:
+ 508 00f0 0E94 0000 		call LCD_FlashReset
+ 509               	.L41:
+ 510               	.LSM94:
+ 511 00f4 81E0      		ldi r24,lo8(1)
+ 512 00f6 60E0      		ldi r22,lo8(0)
+ 513 00f8 0E94 0000 		call LCD_UpdateRequired
+ 514               	.LSM95:
+ 515 00fc 81E0      		ldi r24,lo8(1)
+ 516 00fe 8093 0000 		sts enter_function.1603,r24
+ 517               	.LSM96:
+ 518 0102 84E0      		ldi r24,lo8(4)
+ 519 0104 F816      		cp r15,r24
+ 520 0106 01F4      		brne .L42
+ 521               	.LSM97:
+ 522 0108 E091 0000 		lds r30,mode.1605
+ 523 010c F0E0      		ldi r31,lo8(0)
+ 524 010e E050      		subi r30,lo8(-(date.1604))
+ 525 0110 F040      		sbci r31,hi8(-(date.1604))
+ 526 0112 8081      		ld r24,Z
+ 527 0114 8F5F      		subi r24,lo8(-(1))
+ 528 0116 00C0      		rjmp .L62
+ 529               	.L42:
+ 530               	.LSM98:
+ 531 0118 85E0      		ldi r24,lo8(5)
+ 532 011a F816      		cp r15,r24
+ 533 011c 01F4      		brne .L44
+ 534               	.LSM99:
+ 535 011e E091 0000 		lds r30,mode.1605
+ 536 0122 F0E0      		ldi r31,lo8(0)
+ 537 0124 E050      		subi r30,lo8(-(date.1604))
+ 538 0126 F040      		sbci r31,hi8(-(date.1604))
+ 539 0128 8081      		ld r24,Z
+ 540 012a 8150      		subi r24,lo8(-(-1))
+ 541               	.L62:
+ 542 012c 8083      		st Z,r24
+ 543 012e 00C0      		rjmp .L43
+ 544               	.L44:
+ 545               	.LSM100:
+ 546 0130 83E0      		ldi r24,lo8(3)
+ 547 0132 F816      		cp r15,r24
+ 548 0134 01F4      		brne .L45
+ 549               	.LSM101:
+ 550 0136 8091 0000 		lds r24,mode.1605
+ 551 013a 8823      		tst r24
+ 552 013c 01F4      		brne .L46
+ 553               	.LSM102:
+ 554 013e 82E0      		ldi r24,lo8(2)
+ 555 0140 00C0      		rjmp .L61
+ 556               	.L46:
+ 557               	.LSM103:
+ 558 0142 8150      		subi r24,lo8(-(-1))
+ 559 0144 00C0      		rjmp .L61
+ 560               	.L45:
+ 561               	.LSM104:
+ 562 0146 82E0      		ldi r24,lo8(2)
+ 563 0148 F816      		cp r15,r24
+ 564 014a 01F4      		brne .L47
+ 565               	.LSM105:
+ 566 014c 8091 0000 		lds r24,mode.1605
+ 567 0150 8230      		cpi r24,lo8(2)
+ 568 0152 01F4      		brne .L48
+ 569               	.LSM106:
+ 570 0154 1092 0000 		sts mode.1605,__zero_reg__
+ 571 0158 00C0      		rjmp .L43
+ 572               	.L48:
+ 573               	.LSM107:
+ 574 015a 8F5F      		subi r24,lo8(-(1))
+ 575               	.L61:
+ 576 015c 8093 0000 		sts mode.1605,r24
+ 577 0160 00C0      		rjmp .L43
+ 578               	.L47:
+ 579               	.LSM108:
+ 580 0162 81E0      		ldi r24,lo8(1)
+ 581 0164 F816      		cp r15,r24
+ 582 0166 01F4      		brne .L43
+ 583               	.LSM109:
+ 584               	/* #APP */
+ 585               	 ;  547 "src/drv/RTC.c" 1
+ 586 0168 F894      		cli
+ 587               	 ;  0 "" 2
+ 588               	.LSM110:
+ 589               	/* #NOAPP */
+ 590 016a 8091 0000 		lds r24,date.1604
+ 591 016e 90E0      		ldi r25,lo8(0)
+ 592 0170 9093 0000 		sts (gYEAR)+1,r25
+ 593 0174 8093 0000 		sts gYEAR,r24
+ 594               	.LSM111:
+ 595 0178 8091 0000 		lds r24,date.1604+1
+ 596 017c 8093 0000 		sts gMONTH,r24
+ 597               	.LSM112:
+ 598 0180 8091 0000 		lds r24,date.1604+2
+ 599 0184 8093 0000 		sts gDAY,r24
+ 600               	.LSM113:
+ 601               	/* #APP */
+ 602               	 ;  551 "src/drv/RTC.c" 1
+ 603 0188 7894      		sei
+ 604               	 ;  0 "" 2
+ 605               	.LSM114:
+ 606               	/* #NOAPP */
+ 607 018a 1092 0000 		sts mode.1605,__zero_reg__
+ 608 018e 8CE1      		ldi r24,lo8(28)
+ 609 0190 00C0      		rjmp .L49
+ 610               	.L43:
+ 611               	.LSM115:
+ 612 0192 8091 0000 		lds r24,date.1604
+ 613 0196 8F3F      		cpi r24,lo8(-1)
+ 614 0198 01F4      		brne .L50
+ 615               	.LSM116:
+ 616 019a 83E6      		ldi r24,lo8(99)
+ 617 019c 8093 0000 		sts date.1604,r24
+ 618               	.L50:
+ 619               	.LSM117:
+ 620 01a0 8091 0000 		lds r24,date.1604
+ 621 01a4 8436      		cpi r24,lo8(100)
+ 622 01a6 00F0      		brlo .L51
+ 623               	.LSM118:
+ 624 01a8 1092 0000 		sts date.1604,__zero_reg__
+ 625               	.L51:
+ 626               	.LSM119:
+ 627 01ac 8091 0000 		lds r24,date.1604+1
+ 628 01b0 8823      		tst r24
+ 629 01b2 01F4      		brne .L52
+ 630               	.LSM120:
+ 631 01b4 8CE0      		ldi r24,lo8(12)
+ 632 01b6 8093 0000 		sts date.1604+1,r24
+ 633               	.L52:
+ 634               	.LSM121:
+ 635 01ba 8091 0000 		lds r24,date.1604+1
+ 636 01be 8D30      		cpi r24,lo8(13)
+ 637 01c0 00F0      		brlo .L53
+ 638               	.LSM122:
+ 639 01c2 81E0      		ldi r24,lo8(1)
+ 640 01c4 8093 0000 		sts date.1604+1,r24
+ 641               	.L53:
+ 642               	.LSM123:
+ 643 01c8 8091 0000 		lds r24,gMONTH
+ 644 01cc 8230      		cpi r24,lo8(2)
+ 645 01ce 01F4      		brne .L54
+ 646               	.LSM124:
+ 647 01d0 8091 0000 		lds r24,gYEAR
+ 648 01d4 9091 0000 		lds r25,(gYEAR)+1
+ 649 01d8 8370      		andi r24,lo8(3)
+ 650 01da 9070      		andi r25,hi8(3)
+ 651 01dc 892B      		or r24,r25
+ 652 01de 01F4      		brne .L54
+ 653               	.LSM125:
+ 654 01e0 8091 0000 		lds r24,gYEAR
+ 655 01e4 9091 0000 		lds r25,(gYEAR)+1
+ 656 01e8 64E6      		ldi r22,lo8(100)
+ 657 01ea 70E0      		ldi r23,hi8(100)
+ 658 01ec 0E94 0000 		call __udivmodhi4
+ 659 01f0 892B      		or r24,r25
+ 660 01f2 01F4      		brne .L55
+ 661               	.LSM126:
+ 662 01f4 8091 0000 		lds r24,gYEAR
+ 663 01f8 9091 0000 		lds r25,(gYEAR)+1
+ 664 01fc 60E9      		ldi r22,lo8(400)
+ 665 01fe 71E0      		ldi r23,hi8(400)
+ 666 0200 0E94 0000 		call __udivmodhi4
+ 667 0204 892B      		or r24,r25
+ 668 0206 01F0      		breq .L55
+ 669               	.L54:
+ 670               	.LSM127:
+ 671 0208 E091 0000 		lds r30,date.1604+1
+ 672 020c F0E0      		ldi r31,lo8(0)
+ 673 020e E050      		subi r30,lo8(-(MonthLength))
+ 674 0210 F040      		sbci r31,hi8(-(MonthLength))
+ 675 0212 E081      		ld r30,Z
+ 676               	.LVL15:
+ 677 0214 00C0      		rjmp .L56
+ 678               	.LVL16:
+ 679               	.L55:
+ 680 0216 EDE1      		ldi r30,lo8(29)
+ 681               	.LVL17:
+ 682               	.L56:
+ 683               	.LSM128:
+ 684 0218 8091 0000 		lds r24,date.1604+2
+ 685 021c 8823      		tst r24
+ 686 021e 01F4      		brne .L57
+ 687               	.LSM129:
+ 688 0220 E093 0000 		sts date.1604+2,r30
+ 689               	.L57:
+ 690               	.LSM130:
+ 691 0224 8091 0000 		lds r24,date.1604+2
+ 692 0228 E817      		cp r30,r24
+ 693 022a 00F4      		brsh .L58
+ 694               	.LSM131:
+ 695 022c 81E0      		ldi r24,lo8(1)
+ 696 022e 8093 0000 		sts date.1604+2,r24
+ 697               	.L58:
+ 698               	.LSM132:
+ 699 0232 1092 0000 		sts enter_function.1603,__zero_reg__
+ 700 0236 8EE1      		ldi r24,lo8(30)
+ 701               	.L49:
+ 702               	/* epilogue start */
+ 703               	.LSM133:
+ 704 0238 1F91      		pop r17
+ 705               	.LVL18:
+ 706 023a 0F91      		pop r16
+ 707 023c FF90      		pop r15
+ 708               	.LVL19:
+ 709 023e 0895      		ret
+ 710               	.LFE7:
+ 712               		.section	.text.ShowDate,"ax",@progbits
+ 713               	.global	ShowDate
+ 715               	ShowDate:
+ 716               	.LFB6:
+ 717               	.LSM134:
+ 718               	.LVL20:
+ 719 0000 9F92      		push r9
+ 720 0002 AF92      		push r10
+ 721 0004 BF92      		push r11
+ 722 0006 CF92      		push r12
+ 723 0008 DF92      		push r13
+ 724 000a EF92      		push r14
+ 725 000c FF92      		push r15
+ 726 000e 0F93      		push r16
+ 727 0010 1F93      		push r17
+ 728 0012 CF93      		push r28
+ 729 0014 DF93      		push r29
+ 730               	/* prologue: function */
+ 731               	/* frame size = 0 */
+ 732 0016 982E      		mov r9,r24
+ 733               	.LSM135:
+ 734 0018 8091 0000 		lds r24,gYEAR
+ 735 001c 9091 0000 		lds r25,(gYEAR)+1
+ 736               	.LVL21:
+ 737 0020 0E94 0000 		call CHAR2BCD2
+ 738 0024 182F      		mov r17,r24
+ 739               	.LVL22:
+ 740               	.LSM136:
+ 741 0026 082F      		mov r16,r24
+ 742 0028 0295      		swap r16
+ 743 002a 0F70      		andi r16,lo8(15)
+ 744               	.LSM137:
+ 745 002c 8091 0000 		lds r24,gMONTH
+ 746 0030 0E94 0000 		call CHAR2BCD2
+ 747 0034 F82E      		mov r15,r24
+ 748               	.LVL23:
+ 749               	.LSM138:
+ 750 0036 D82E      		mov r13,r24
+ 751 0038 D294      		swap r13
+ 752 003a 4FE0      		ldi r20,lo8(15)
+ 753 003c D422      		and r13,r20
+ 754               	.LSM139:
+ 755 003e 8091 0000 		lds r24,gDAY
+ 756 0042 0E94 0000 		call CHAR2BCD2
+ 757 0046 E82E      		mov r14,r24
+ 758               	.LVL24:
+ 759               	.LSM140:
+ 760 0048 C82E      		mov r12,r24
+ 761 004a C294      		swap r12
+ 762 004c 3FE0      		ldi r19,lo8(15)
+ 763 004e C322      		and r12,r19
+ 764               	.LBB2:
+ 765               	.LSM141:
+ 766 0050 8091 0000 		lds r24,dateformat
+ 767 0054 90E0      		ldi r25,lo8(0)
+ 768               	.LVL25:
+ 769 0056 880F      		lsl r24
+ 770 0058 991F      		rol r25
+ 771               	.LVL26:
+ 772 005a 8050      		subi r24,lo8(-(DATE_FORMAT_NR))
+ 773 005c 9040      		sbci r25,hi8(-(DATE_FORMAT_NR))
+ 774 005e FC01      		movw r30,r24
+ 775               	/* #APP */
+ 776               	 ;  410 "src/drv/RTC.c" 1
+ 777 0060 2591      		lpm r18, Z+
+ 778 0062 3491      		lpm r19, Z
+ 779               		
+ 780               	 ;  0 "" 2
+ 781               	.LVL27:
+ 782               	/* #NOAPP */
+ 783               	.LBE2:
+ 784               	.LBB3:
+ 785               	.LSM142:
+ 786 0064 E901      		movw r28,r18
+ 787               	.LVL28:
+ 788 0066 2196      		adiw r28,1
+ 789 0068 F901      		movw r30,r18
+ 790               	/* #APP */
+ 791               	 ;  411 "src/drv/RTC.c" 1
+ 792 006a 8491      		lpm r24, Z
+ 793               		
+ 794               	 ;  0 "" 2
+ 795               	.LVL29:
+ 796               	/* #NOAPP */
+ 797               	.LBE3:
+ 798 006c 005D      		subi r16,lo8(-(48))
+ 799 006e 602F      		mov r22,r16
+ 800 0070 0E94 0000 		call LCD_putc
+ 801               	.LVL30:
+ 802               	.LBB4:
+ 803               	.LSM143:
+ 804 0074 5E01      		movw r10,r28
+ 805 0076 0894      		sec
+ 806 0078 A11C      		adc r10,__zero_reg__
+ 807 007a B11C      		adc r11,__zero_reg__
+ 808               	.LVL31:
+ 809 007c FE01      		movw r30,r28
+ 810               	/* #APP */
+ 811               	 ;  412 "src/drv/RTC.c" 1
+ 812 007e 8491      		lpm r24, Z
+ 813               		
+ 814               	 ;  0 "" 2
+ 815               	.LVL32:
+ 816               	/* #NOAPP */
+ 817               	.LBE4:
+ 818 0080 1F70      		andi r17,lo8(15)
+ 819 0082 105D      		subi r17,lo8(-(48))
+ 820 0084 612F      		mov r22,r17
+ 821 0086 0E94 0000 		call LCD_putc
+ 822               	.LVL33:
+ 823               	.LBB5:
+ 824               	.LSM144:
+ 825 008a E501      		movw r28,r10
+ 826 008c 2196      		adiw r28,1
+ 827               	.LVL34:
+ 828 008e F501      		movw r30,r10
+ 829               	/* #APP */
+ 830               	 ;  413 "src/drv/RTC.c" 1
+ 831 0090 8491      		lpm r24, Z
+ 832               		
+ 833               	 ;  0 "" 2
+ 834               	.LVL35:
+ 835               	/* #NOAPP */
+ 836               	.LBE5:
+ 837 0092 F0E3      		ldi r31,lo8(48)
+ 838 0094 DF0E      		add r13,r31
+ 839 0096 6D2D      		mov r22,r13
+ 840 0098 0E94 0000 		call LCD_putc
+ 841               	.LVL36:
+ 842               	.LBB6:
+ 843               	.LSM145:
+ 844 009c 8E01      		movw r16,r28
+ 845 009e 0F5F      		subi r16,lo8(-(1))
+ 846 00a0 1F4F      		sbci r17,hi8(-(1))
+ 847               	.LVL37:
+ 848 00a2 FE01      		movw r30,r28
+ 849               	/* #APP */
+ 850               	 ;  414 "src/drv/RTC.c" 1
+ 851 00a4 8491      		lpm r24, Z
+ 852               		
+ 853               	 ;  0 "" 2
+ 854               	.LVL38:
+ 855               	/* #NOAPP */
+ 856               	.LBE6:
+ 857 00a6 FFE0      		ldi r31,lo8(15)
+ 858 00a8 FF22      		and r15,r31
+ 859 00aa 90E3      		ldi r25,lo8(48)
+ 860 00ac F90E      		add r15,r25
+ 861 00ae 6F2D      		mov r22,r15
+ 862 00b0 0E94 0000 		call LCD_putc
+ 863               	.LVL39:
+ 864               	.LBB7:
+ 865               	.LSM146:
+ 866 00b4 F801      		movw r30,r16
+ 867               	/* #APP */
+ 868               	 ;  415 "src/drv/RTC.c" 1
+ 869 00b6 8491      		lpm r24, Z
+ 870               		
+ 871               	 ;  0 "" 2
+ 872               	.LVL40:
+ 873               	/* #NOAPP */
+ 874               	.LBE7:
+ 875 00b8 F0E3      		ldi r31,lo8(48)
+ 876 00ba CF0E      		add r12,r31
+ 877 00bc 6C2D      		mov r22,r12
+ 878 00be 0E94 0000 		call LCD_putc
+ 879               	.LVL41:
+ 880               	.LBB8:
+ 881               	.LSM147:
+ 882 00c2 0F5F      		subi r16,lo8(-(1))
+ 883 00c4 1F4F      		sbci r17,hi8(-(1))
+ 884 00c6 F801      		movw r30,r16
+ 885               	/* #APP */
+ 886               	 ;  416 "src/drv/RTC.c" 1
+ 887 00c8 8491      		lpm r24, Z
+ 888               		
+ 889               	 ;  0 "" 2
+ 890               	.LVL42:
+ 891               	/* #NOAPP */
+ 892               	.LBE8:
+ 893 00ca FFE0      		ldi r31,lo8(15)
+ 894 00cc EF22      		and r14,r31
+ 895 00ce 90E3      		ldi r25,lo8(48)
+ 896 00d0 E90E      		add r14,r25
+ 897 00d2 6E2D      		mov r22,r14
+ 898 00d4 0E94 0000 		call LCD_putc
+ 899               	.LVL43:
+ 900               	.LSM148:
+ 901 00d8 86E0      		ldi r24,lo8(6)
+ 902 00da 60E0      		ldi r22,lo8(0)
+ 903 00dc 0E94 0000 		call LCD_putc
+ 904               	.LSM149:
+ 905 00e0 81E0      		ldi r24,lo8(1)
+ 906 00e2 0E94 0000 		call LCD_Colon
+ 907               	.LSM150:
+ 908 00e6 81E0      		ldi r24,lo8(1)
+ 909 00e8 60E0      		ldi r22,lo8(0)
+ 910 00ea 0E94 0000 		call LCD_UpdateRequired
+ 911               	.LSM151:
+ 912 00ee E3E0      		ldi r30,lo8(3)
+ 913 00f0 9E16      		cp r9,r30
+ 914 00f2 01F4      		brne .L64
+ 915 00f4 8BE1      		ldi r24,lo8(27)
+ 916 00f6 00C0      		rjmp .L65
+ 917               	.L64:
+ 918               	.LSM152:
+ 919 00f8 F2E0      		ldi r31,lo8(2)
+ 920 00fa 9F16      		cp r9,r31
+ 921 00fc 01F0      		breq .L66
+ 922 00fe 8CE1      		ldi r24,lo8(28)
+ 923 0100 00C0      		rjmp .L65
+ 924               	.L66:
+ 925 0102 8DE1      		ldi r24,lo8(29)
+ 926               	.L65:
+ 927               	/* epilogue start */
+ 928               	.LSM153:
+ 929 0104 DF91      		pop r29
+ 930 0106 CF91      		pop r28
+ 931 0108 1F91      		pop r17
+ 932               	.LVL44:
+ 933 010a 0F91      		pop r16
+ 934               	.LVL45:
+ 935 010c FF90      		pop r15
+ 936               	.LVL46:
+ 937 010e EF90      		pop r14
+ 938               	.LVL47:
+ 939 0110 DF90      		pop r13
+ 940 0112 CF90      		pop r12
+ 941 0114 BF90      		pop r11
+ 942 0116 AF90      		pop r10
+ 943 0118 9F90      		pop r9
+ 944               	.LVL48:
+ 945 011a 0895      		ret
+ 946               	.LFE6:
+ 948               		.section	.text.SetClock,"ax",@progbits
+ 949               	.global	SetClock
+ 951               	SetClock:
+ 952               	.LFB4:
+ 953               	.LSM154:
+ 954               	.LVL49:
+ 955 0000 EF92      		push r14
+ 956 0002 FF92      		push r15
+ 957 0004 0F93      		push r16
+ 958 0006 1F93      		push r17
+ 959               	/* prologue: function */
+ 960               	/* frame size = 0 */
+ 961 0008 E82E      		mov r14,r24
+ 962               	.LSM155:
+ 963 000a 8091 0000 		lds r24,enter_function.1471
+ 964               	.LVL50:
+ 965 000e 8823      		tst r24
+ 966 0010 01F0      		breq .L69
+ 967               	.LSM156:
+ 968 0012 8091 0000 		lds r24,gHOUR
+ 969 0016 8093 0000 		sts time.1472,r24
+ 970               	.LSM157:
+ 971 001a 8091 0000 		lds r24,gMINUTE
+ 972 001e 8093 0000 		sts time.1472+1,r24
+ 973               	.LSM158:
+ 974 0022 8091 0000 		lds r24,gSECOND
+ 975 0026 8093 0000 		sts time.1472+2,r24
+ 976               	.L69:
+ 977               	.LSM159:
+ 978 002a 8091 0000 		lds r24,clockformat
+ 979 002e 8823      		tst r24
+ 980 0030 01F4      		brne .L70
+ 981               	.LSM160:
+ 982 0032 E091 0000 		lds r30,time.1472
+ 983 0036 F0E0      		ldi r31,lo8(0)
+ 984 0038 E050      		subi r30,lo8(-(TBL_CLOCK_12))
+ 985 003a F040      		sbci r31,hi8(-(TBL_CLOCK_12))
+ 986 003c 8081      		ld r24,Z
+ 987 003e 00C0      		rjmp .L100
+ 988               	.L70:
+ 989               	.LSM161:
+ 990 0040 8091 0000 		lds r24,time.1472
+ 991               	.L100:
+ 992 0044 0E94 0000 		call CHAR2BCD2
+ 993 0048 182F      		mov r17,r24
+ 994               	.LVL51:
+ 995               	.LSM162:
+ 996 004a 8091 0000 		lds r24,time.1472+1
+ 997 004e 0E94 0000 		call CHAR2BCD2
+ 998 0052 082F      		mov r16,r24
+ 999               	.LVL52:
+ 1000               	.LSM163:
+ 1001 0054 8091 0000 		lds r24,time.1472+2
+ 1002 0058 0E94 0000 		call CHAR2BCD2
+ 1003 005c F82E      		mov r15,r24
+ 1004               	.LVL53:
+ 1005               	.LSM164:
+ 1006 005e 8091 0000 		lds r24,mode.1473
+ 1007 0062 8823      		tst r24
+ 1008 0064 01F0      		breq .L72
+ 1009 0066 60E0      		ldi r22,lo8(0)
+ 1010 0068 00C0      		rjmp .L73
+ 1011               	.L72:
+ 1012 006a 60E8      		ldi r22,lo8(-128)
+ 1013               	.L73:
+ 1014               	.LSM165:
+ 1015 006c 812F      		mov r24,r17
+ 1016 006e 8295      		swap r24
+ 1017 0070 8F70      		andi r24,lo8(15)
+ 1018               	.LSM166:
+ 1019 0072 805D      		subi r24,lo8(-(48))
+ 1020 0074 682B      		or r22,r24
+ 1021 0076 80E0      		ldi r24,lo8(0)
+ 1022 0078 0E94 0000 		call LCD_putc
+ 1023               	.LSM167:
+ 1024 007c 8091 0000 		lds r24,mode.1473
+ 1025 0080 8823      		tst r24
+ 1026 0082 01F0      		breq .L74
+ 1027 0084 60E0      		ldi r22,lo8(0)
+ 1028 0086 00C0      		rjmp .L75
+ 1029               	.L74:
+ 1030 0088 60E8      		ldi r22,lo8(-128)
+ 1031               	.L75:
+ 1032 008a 1F70      		andi r17,lo8(15)
+ 1033 008c 105D      		subi r17,lo8(-(48))
+ 1034 008e 612B      		or r22,r17
+ 1035 0090 81E0      		ldi r24,lo8(1)
+ 1036 0092 0E94 0000 		call LCD_putc
+ 1037               	.LSM168:
+ 1038 0096 8091 0000 		lds r24,mode.1473
+ 1039 009a 8130      		cpi r24,lo8(1)
+ 1040 009c 01F0      		breq .L76
+ 1041 009e 60E0      		ldi r22,lo8(0)
+ 1042 00a0 00C0      		rjmp .L77
+ 1043               	.L76:
+ 1044 00a2 60E8      		ldi r22,lo8(-128)
+ 1045               	.L77:
+ 1046               	.LSM169:
+ 1047 00a4 802F      		mov r24,r16
+ 1048 00a6 8295      		swap r24
+ 1049 00a8 8F70      		andi r24,lo8(15)
+ 1050               	.LSM170:
+ 1051 00aa 805D      		subi r24,lo8(-(48))
+ 1052 00ac 682B      		or r22,r24
+ 1053 00ae 82E0      		ldi r24,lo8(2)
+ 1054 00b0 0E94 0000 		call LCD_putc
+ 1055               	.LSM171:
+ 1056 00b4 8091 0000 		lds r24,mode.1473
+ 1057 00b8 8130      		cpi r24,lo8(1)
+ 1058 00ba 01F0      		breq .L78
+ 1059 00bc 60E0      		ldi r22,lo8(0)
+ 1060 00be 00C0      		rjmp .L79
+ 1061               	.L78:
+ 1062 00c0 60E8      		ldi r22,lo8(-128)
+ 1063               	.L79:
+ 1064 00c2 0F70      		andi r16,lo8(15)
+ 1065 00c4 005D      		subi r16,lo8(-(48))
+ 1066 00c6 602B      		or r22,r16
+ 1067 00c8 83E0      		ldi r24,lo8(3)
+ 1068 00ca 0E94 0000 		call LCD_putc
+ 1069               	.LSM172:
+ 1070 00ce 8091 0000 		lds r24,mode.1473
+ 1071 00d2 8230      		cpi r24,lo8(2)
+ 1072 00d4 01F0      		breq .L80
+ 1073 00d6 60E0      		ldi r22,lo8(0)
+ 1074 00d8 00C0      		rjmp .L81
+ 1075               	.L80:
+ 1076 00da 60E8      		ldi r22,lo8(-128)
+ 1077               	.L81:
+ 1078               	.LSM173:
+ 1079 00dc 8F2D      		mov r24,r15
+ 1080 00de 8295      		swap r24
+ 1081 00e0 8F70      		andi r24,lo8(15)
+ 1082               	.LSM174:
+ 1083 00e2 805D      		subi r24,lo8(-(48))
+ 1084 00e4 682B      		or r22,r24
+ 1085 00e6 84E0      		ldi r24,lo8(4)
+ 1086 00e8 0E94 0000 		call LCD_putc
+ 1087               	.LSM175:
+ 1088 00ec 8091 0000 		lds r24,mode.1473
+ 1089 00f0 8230      		cpi r24,lo8(2)
+ 1090 00f2 01F0      		breq .L82
+ 1091 00f4 60E0      		ldi r22,lo8(0)
+ 1092 00f6 00C0      		rjmp .L83
+ 1093               	.L82:
+ 1094 00f8 60E8      		ldi r22,lo8(-128)
+ 1095               	.L83:
+ 1096 00fa 8FE0      		ldi r24,lo8(15)
+ 1097 00fc F822      		and r15,r24
+ 1098 00fe 80E3      		ldi r24,lo8(48)
+ 1099 0100 F80E      		add r15,r24
+ 1100 0102 6F29      		or r22,r15
+ 1101 0104 85E0      		ldi r24,lo8(5)
+ 1102 0106 0E94 0000 		call LCD_putc
+ 1103               	.LSM176:
+ 1104 010a 86E0      		ldi r24,lo8(6)
+ 1105 010c 60E0      		ldi r22,lo8(0)
+ 1106 010e 0E94 0000 		call LCD_putc
+ 1107               	.LSM177:
+ 1108 0112 81E0      		ldi r24,lo8(1)
+ 1109 0114 0E94 0000 		call LCD_Colon
+ 1110               	.LSM178:
+ 1111 0118 EE20      		tst r14
+ 1112 011a 01F0      		breq .L84
+ 1113               	.LSM179:
+ 1114 011c 0E94 0000 		call LCD_FlashReset
+ 1115               	.L84:
+ 1116               	.LSM180:
+ 1117 0120 81E0      		ldi r24,lo8(1)
+ 1118 0122 60E0      		ldi r22,lo8(0)
+ 1119 0124 0E94 0000 		call LCD_UpdateRequired
+ 1120               	.LSM181:
+ 1121 0128 81E0      		ldi r24,lo8(1)
+ 1122 012a 8093 0000 		sts enter_function.1471,r24
+ 1123               	.LSM182:
+ 1124 012e 84E0      		ldi r24,lo8(4)
+ 1125 0130 E816      		cp r14,r24
+ 1126 0132 01F4      		brne .L85
+ 1127               	.LSM183:
+ 1128 0134 E091 0000 		lds r30,mode.1473
+ 1129 0138 F0E0      		ldi r31,lo8(0)
+ 1130 013a E050      		subi r30,lo8(-(time.1472))
+ 1131 013c F040      		sbci r31,hi8(-(time.1472))
+ 1132 013e 8081      		ld r24,Z
+ 1133 0140 8F5F      		subi r24,lo8(-(1))
+ 1134 0142 00C0      		rjmp .L102
+ 1135               	.L85:
+ 1136               	.LSM184:
+ 1137 0144 85E0      		ldi r24,lo8(5)
+ 1138 0146 E816      		cp r14,r24
+ 1139 0148 01F4      		brne .L87
+ 1140               	.LSM185:
+ 1141 014a E091 0000 		lds r30,mode.1473
+ 1142 014e F0E0      		ldi r31,lo8(0)
+ 1143 0150 E050      		subi r30,lo8(-(time.1472))
+ 1144 0152 F040      		sbci r31,hi8(-(time.1472))
+ 1145 0154 8081      		ld r24,Z
+ 1146 0156 8150      		subi r24,lo8(-(-1))
+ 1147               	.L102:
+ 1148 0158 8083      		st Z,r24
+ 1149 015a 00C0      		rjmp .L86
+ 1150               	.L87:
+ 1151               	.LSM186:
+ 1152 015c 83E0      		ldi r24,lo8(3)
+ 1153 015e E816      		cp r14,r24
+ 1154 0160 01F4      		brne .L88
+ 1155               	.LSM187:
+ 1156 0162 8091 0000 		lds r24,mode.1473
+ 1157 0166 8823      		tst r24
+ 1158 0168 01F4      		brne .L89
+ 1159               	.LSM188:
+ 1160 016a 82E0      		ldi r24,lo8(2)
+ 1161 016c 00C0      		rjmp .L101
+ 1162               	.L89:
+ 1163               	.LSM189:
+ 1164 016e 8150      		subi r24,lo8(-(-1))
+ 1165 0170 00C0      		rjmp .L101
+ 1166               	.L88:
+ 1167               	.LSM190:
+ 1168 0172 82E0      		ldi r24,lo8(2)
+ 1169 0174 E816      		cp r14,r24
+ 1170 0176 01F4      		brne .L90
+ 1171               	.LSM191:
+ 1172 0178 8091 0000 		lds r24,mode.1473
+ 1173 017c 8230      		cpi r24,lo8(2)
+ 1174 017e 01F4      		brne .L91
+ 1175               	.LSM192:
+ 1176 0180 1092 0000 		sts mode.1473,__zero_reg__
+ 1177 0184 00C0      		rjmp .L86
+ 1178               	.L91:
+ 1179               	.LSM193:
+ 1180 0186 8F5F      		subi r24,lo8(-(1))
+ 1181               	.L101:
+ 1182 0188 8093 0000 		sts mode.1473,r24
+ 1183 018c 00C0      		rjmp .L86
+ 1184               	.L90:
+ 1185               	.LSM194:
+ 1186 018e 81E0      		ldi r24,lo8(1)
+ 1187 0190 E816      		cp r14,r24
+ 1188 0192 01F4      		brne .L86
+ 1189               	.LSM195:
+ 1190               	/* #APP */
+ 1191               	 ;  280 "src/drv/RTC.c" 1
+ 1192 0194 F894      		cli
+ 1193               	 ;  0 "" 2
+ 1194               	.LSM196:
+ 1195               	/* #NOAPP */
+ 1196 0196 8091 0000 		lds r24,time.1472
+ 1197 019a 8093 0000 		sts gHOUR,r24
+ 1198               	.LSM197:
+ 1199 019e 8091 0000 		lds r24,time.1472+1
+ 1200 01a2 8093 0000 		sts gMINUTE,r24
+ 1201               	.LSM198:
+ 1202 01a6 8091 0000 		lds r24,time.1472+2
+ 1203 01aa 8093 0000 		sts gSECOND,r24
+ 1204               	.LSM199:
+ 1205               	/* #APP */
+ 1206               	 ;  284 "src/drv/RTC.c" 1
+ 1207 01ae 7894      		sei
+ 1208               	 ;  0 "" 2
+ 1209               	.LSM200:
+ 1210               	/* #NOAPP */
+ 1211 01b0 1092 0000 		sts mode.1473,__zero_reg__
+ 1212 01b4 86E1      		ldi r24,lo8(22)
+ 1213 01b6 00C0      		rjmp .L92
+ 1214               	.L86:
+ 1215               	.LSM201:
+ 1216 01b8 8091 0000 		lds r24,time.1472
+ 1217 01bc 8F3F      		cpi r24,lo8(-1)
+ 1218 01be 01F4      		brne .L93
+ 1219               	.LSM202:
+ 1220 01c0 87E1      		ldi r24,lo8(23)
+ 1221 01c2 8093 0000 		sts time.1472,r24
+ 1222               	.L93:
+ 1223               	.LSM203:
+ 1224 01c6 8091 0000 		lds r24,time.1472
+ 1225 01ca 8831      		cpi r24,lo8(24)
+ 1226 01cc 00F0      		brlo .L94
+ 1227               	.LSM204:
+ 1228 01ce 1092 0000 		sts time.1472,__zero_reg__
+ 1229               	.L94:
+ 1230               	.LSM205:
+ 1231 01d2 8091 0000 		lds r24,time.1472+1
+ 1232 01d6 8F3F      		cpi r24,lo8(-1)
+ 1233 01d8 01F4      		brne .L95
+ 1234               	.LSM206:
+ 1235 01da 8BE3      		ldi r24,lo8(59)
+ 1236 01dc 8093 0000 		sts time.1472+1,r24
+ 1237               	.L95:
+ 1238               	.LSM207:
+ 1239 01e0 8091 0000 		lds r24,time.1472+1
+ 1240 01e4 8C33      		cpi r24,lo8(60)
+ 1241 01e6 00F0      		brlo .L96
+ 1242               	.LSM208:
+ 1243 01e8 1092 0000 		sts time.1472+1,__zero_reg__
+ 1244               	.L96:
+ 1245               	.LSM209:
+ 1246 01ec 8091 0000 		lds r24,time.1472+2
+ 1247 01f0 8F3F      		cpi r24,lo8(-1)
+ 1248 01f2 01F4      		brne .L97
+ 1249               	.LSM210:
+ 1250 01f4 8BE3      		ldi r24,lo8(59)
+ 1251 01f6 8093 0000 		sts time.1472+2,r24
+ 1252               	.L97:
+ 1253               	.LSM211:
+ 1254 01fa 8091 0000 		lds r24,time.1472+2
+ 1255 01fe 8C33      		cpi r24,lo8(60)
+ 1256 0200 00F0      		brlo .L98
+ 1257               	.LSM212:
+ 1258 0202 1092 0000 		sts time.1472+2,__zero_reg__
+ 1259               	.L98:
+ 1260               	.LSM213:
+ 1261 0206 1092 0000 		sts enter_function.1471,__zero_reg__
+ 1262 020a 88E1      		ldi r24,lo8(24)
+ 1263               	.L92:
+ 1264               	/* epilogue start */
+ 1265               	.LSM214:
+ 1266 020c 1F91      		pop r17
+ 1267               	.LVL54:
+ 1268 020e 0F91      		pop r16
+ 1269               	.LVL55:
+ 1270 0210 FF90      		pop r15
+ 1271               	.LVL56:
+ 1272 0212 EF90      		pop r14
+ 1273               	.LVL57:
+ 1274 0214 0895      		ret
+ 1275               	.LFE4:
+ 1277               		.section	.text.ShowClock,"ax",@progbits
+ 1278               	.global	ShowClock
+ 1280               	ShowClock:
+ 1281               	.LFB3:
+ 1282               	.LSM215:
+ 1283               	.LVL58:
+ 1284 0000 BF92      		push r11
+ 1285 0002 CF92      		push r12
+ 1286 0004 DF92      		push r13
+ 1287 0006 EF92      		push r14
+ 1288 0008 FF92      		push r15
+ 1289 000a 0F93      		push r16
+ 1290 000c 1F93      		push r17
+ 1291               	/* prologue: function */
+ 1292               	/* frame size = 0 */
+ 1293 000e B82E      		mov r11,r24
+ 1294               	.LSM216:
+ 1295 0010 8091 0000 		lds r24,clockformat
+ 1296               	.LVL59:
+ 1297 0014 8823      		tst r24
+ 1298 0016 01F4      		brne .L104
+ 1299               	.LSM217:
+ 1300 0018 E091 0000 		lds r30,gHOUR
+ 1301 001c F0E0      		ldi r31,lo8(0)
+ 1302 001e E050      		subi r30,lo8(-(TBL_CLOCK_12))
+ 1303 0020 F040      		sbci r31,hi8(-(TBL_CLOCK_12))
+ 1304 0022 8081      		ld r24,Z
+ 1305 0024 00C0      		rjmp .L110
+ 1306               	.L104:
+ 1307               	.LSM218:
+ 1308 0026 8091 0000 		lds r24,gHOUR
+ 1309               	.L110:
+ 1310 002a 0E94 0000 		call CHAR2BCD2
+ 1311 002e 082F      		mov r16,r24
+ 1312               	.LVL60:
+ 1313               	.LSM219:
+ 1314 0030 182F      		mov r17,r24
+ 1315 0032 1295      		swap r17
+ 1316 0034 1F70      		andi r17,lo8(15)
+ 1317               	.LSM220:
+ 1318 0036 8091 0000 		lds r24,gMINUTE
+ 1319 003a 0E94 0000 		call CHAR2BCD2
+ 1320 003e C82E      		mov r12,r24
+ 1321               	.LVL61:
+ 1322               	.LSM221:
+ 1323 0040 E82E      		mov r14,r24
+ 1324 0042 E294      		swap r14
+ 1325 0044 6FE0      		ldi r22,lo8(15)
+ 1326 0046 E622      		and r14,r22
+ 1327               	.LSM222:
+ 1328 0048 8091 0000 		lds r24,gSECOND
+ 1329 004c 0E94 0000 		call CHAR2BCD2
+ 1330 0050 F82E      		mov r15,r24
+ 1331               	.LVL62:
+ 1332               	.LSM223:
+ 1333 0052 D82E      		mov r13,r24
+ 1334 0054 D294      		swap r13
+ 1335 0056 5FE0      		ldi r21,lo8(15)
+ 1336 0058 D522      		and r13,r21
+ 1337               	.LSM224:
+ 1338 005a 105D      		subi r17,lo8(-(48))
+ 1339 005c 80E0      		ldi r24,lo8(0)
+ 1340 005e 612F      		mov r22,r17
+ 1341 0060 0E94 0000 		call LCD_putc
+ 1342               	.LSM225:
+ 1343 0064 0F70      		andi r16,lo8(15)
+ 1344 0066 005D      		subi r16,lo8(-(48))
+ 1345 0068 81E0      		ldi r24,lo8(1)
+ 1346 006a 602F      		mov r22,r16
+ 1347 006c 0E94 0000 		call LCD_putc
+ 1348               	.LSM226:
+ 1349 0070 80E3      		ldi r24,lo8(48)
+ 1350 0072 E80E      		add r14,r24
+ 1351 0074 82E0      		ldi r24,lo8(2)
+ 1352 0076 6E2D      		mov r22,r14
+ 1353 0078 0E94 0000 		call LCD_putc
+ 1354               	.LSM227:
+ 1355 007c 8FE0      		ldi r24,lo8(15)
+ 1356 007e C822      		and r12,r24
+ 1357 0080 80E3      		ldi r24,lo8(48)
+ 1358 0082 C80E      		add r12,r24
+ 1359 0084 83E0      		ldi r24,lo8(3)
+ 1360 0086 6C2D      		mov r22,r12
+ 1361 0088 0E94 0000 		call LCD_putc
+ 1362               	.LSM228:
+ 1363 008c 80E3      		ldi r24,lo8(48)
+ 1364 008e D80E      		add r13,r24
+ 1365 0090 84E0      		ldi r24,lo8(4)
+ 1366 0092 6D2D      		mov r22,r13
+ 1367 0094 0E94 0000 		call LCD_putc
+ 1368               	.LSM229:
+ 1369 0098 8FE0      		ldi r24,lo8(15)
+ 1370 009a F822      		and r15,r24
+ 1371 009c 80E3      		ldi r24,lo8(48)
+ 1372 009e F80E      		add r15,r24
+ 1373 00a0 85E0      		ldi r24,lo8(5)
+ 1374 00a2 6F2D      		mov r22,r15
+ 1375 00a4 0E94 0000 		call LCD_putc
+ 1376               	.LSM230:
+ 1377 00a8 86E0      		ldi r24,lo8(6)
+ 1378 00aa 60E0      		ldi r22,lo8(0)
+ 1379 00ac 0E94 0000 		call LCD_putc
+ 1380               	.LSM231:
+ 1381 00b0 81E0      		ldi r24,lo8(1)
+ 1382 00b2 0E94 0000 		call LCD_Colon
+ 1383               	.LSM232:
+ 1384 00b6 81E0      		ldi r24,lo8(1)
+ 1385 00b8 60E0      		ldi r22,lo8(0)
+ 1386 00ba 0E94 0000 		call LCD_UpdateRequired
+ 1387               	.LSM233:
+ 1388 00be 83E0      		ldi r24,lo8(3)
+ 1389 00c0 B816      		cp r11,r24
+ 1390 00c2 01F4      		brne .L106
+ 1391 00c4 85E1      		ldi r24,lo8(21)
+ 1392 00c6 00C0      		rjmp .L107
+ 1393               	.L106:
+ 1394               	.LSM234:
+ 1395 00c8 82E0      		ldi r24,lo8(2)
+ 1396 00ca B816      		cp r11,r24
+ 1397 00cc 01F0      		breq .L108
+ 1398 00ce 86E1      		ldi r24,lo8(22)
+ 1399 00d0 00C0      		rjmp .L107
+ 1400               	.L108:
+ 1401 00d2 87E1      		ldi r24,lo8(23)
+ 1402               	.L107:
+ 1403               	/* epilogue start */
+ 1404               	.LSM235:
+ 1405 00d4 1F91      		pop r17
+ 1406 00d6 0F91      		pop r16
+ 1407               	.LVL63:
+ 1408 00d8 FF90      		pop r15
+ 1409               	.LVL64:
+ 1410 00da EF90      		pop r14
+ 1411 00dc DF90      		pop r13
+ 1412 00de CF90      		pop r12
+ 1413               	.LVL65:
+ 1414 00e0 BF90      		pop r11
+ 1415               	.LVL66:
+ 1416 00e2 0895      		ret
+ 1417               	.LFE3:
+ 1419               		.section	.text.RTC_init,"ax",@progbits
+ 1420               	.global	RTC_init
+ 1422               	RTC_init:
+ 1423               	.LFB2:
+ 1424               	.LSM236:
+ 1425               	/* prologue: function */
+ 1426               	/* frame size = 0 */
+ 1427               	.LSM237:
+ 1428 0000 88EE      		ldi r24,lo8(1000)
+ 1429 0002 93E0      		ldi r25,hi8(1000)
+ 1430 0004 0E94 0000 		call Delay
+ 1431               	.LSM238:
+ 1432               	/* #APP */
+ 1433               	 ;  111 "src/drv/RTC.c" 1
+ 1434 0008 F894      		cli
+ 1435               	 ;  0 "" 2
+ 1436               	.LSM239:
+ 1437               	/* #NOAPP */
+ 1438 000a 8091 7000 		lds r24,112
+ 1439 000e 8E7F      		andi r24,lo8(-2)
+ 1440 0010 8093 7000 		sts 112,r24
+ 1441               	.LSM240:
+ 1442 0014 88E0      		ldi r24,lo8(8)
+ 1443 0016 8093 B600 		sts 182,r24
+ 1444               	.LSM241:
+ 1445 001a 1092 B200 		sts 178,__zero_reg__
+ 1446               	.LSM242:
+ 1447 001e 8091 B000 		lds r24,176
+ 1448 0022 8560      		ori r24,lo8(5)
+ 1449 0024 8093 B000 		sts 176,r24
+ 1450               	.L112:
+ 1451               	.LSM243:
+ 1452 0028 2091 B600 		lds r18,182
+ 1453 002c 8091 B600 		lds r24,182
+ 1454 0030 90E0      		ldi r25,lo8(0)
+ 1455 0032 8470      		andi r24,lo8(4)
+ 1456 0034 9070      		andi r25,hi8(4)
+ 1457 0036 30E0      		ldi r19,lo8(0)
+ 1458 0038 2170      		andi r18,lo8(1)
+ 1459 003a 3070      		andi r19,hi8(1)
+ 1460 003c 822B      		or r24,r18
+ 1461 003e 932B      		or r25,r19
+ 1462 0040 892B      		or r24,r25
+ 1463 0042 01F4      		brne .L112
+ 1464               	.LSM244:
+ 1465 0044 8FEF      		ldi r24,lo8(-1)
+ 1466 0046 87BB      		out 55-32,r24
+ 1467               	.LSM245:
+ 1468 0048 8091 7000 		lds r24,112
+ 1469 004c 8160      		ori r24,lo8(1)
+ 1470 004e 8093 7000 		sts 112,r24
+ 1471               	.LSM246:
+ 1472               	/* #APP */
+ 1473               	 ;  125 "src/drv/RTC.c" 1
+ 1474 0052 7894      		sei
+ 1475               	 ;  0 "" 2
+ 1476               	.LSM247:
+ 1477               	/* #NOAPP */
+ 1478 0054 1092 0000 		sts gSECOND,__zero_reg__
+ 1479               	.LSM248:
+ 1480 0058 1092 0000 		sts gMINUTE,__zero_reg__
+ 1481               	.LSM249:
+ 1482 005c 8CE0      		ldi r24,lo8(12)
+ 1483 005e 8093 0000 		sts gHOUR,r24
+ 1484               	.LSM250:
+ 1485 0062 8093 0000 		sts gDAY,r24
+ 1486               	.LSM251:
+ 1487 0066 83E0      		ldi r24,lo8(3)
+ 1488 0068 8093 0000 		sts gMONTH,r24
+ 1489               	.LSM252:
+ 1490 006c 89E0      		ldi r24,lo8(9)
+ 1491 006e 90E0      		ldi r25,hi8(9)
+ 1492 0070 9093 0000 		sts (gYEAR)+1,r25
+ 1493 0074 8093 0000 		sts gYEAR,r24
+ 1494               	/* epilogue start */
+ 1495               	.LSM253:
+ 1496 0078 0895      		ret
+ 1497               	.LFE2:
+ 1499               	.global	gPowerSaveTimer
+ 1500               		.section	.bss.gPowerSaveTimer,"aw",@nobits
+ 1503               	gPowerSaveTimer:
+ 1504 0000 00        		.skip 1,0
+ 1505               	.global	dateformat
+ 1506               		.section	.bss.dateformat,"aw",@nobits
+ 1509               	dateformat:
+ 1510 0000 00        		.skip 1,0
+ 1511               	.global	MonthLength
+ 1512               		.section	.data.MonthLength,"aw",@progbits
+ 1515               	MonthLength:
+ 1516 0000 00        		.byte	0
+ 1517 0001 1F        		.byte	31
+ 1518 0002 1C        		.byte	28
+ 1519 0003 1F        		.byte	31
+ 1520 0004 1E        		.byte	30
+ 1521 0005 1F        		.byte	31
+ 1522 0006 1E        		.byte	30
+ 1523 0007 1F        		.byte	31
+ 1524 0008 1F        		.byte	31
+ 1525 0009 1E        		.byte	30
+ 1526 000a 1F        		.byte	31
+ 1527 000b 1E        		.byte	30
+ 1528 000c 1F        		.byte	31
+ 1529               	.global	TBL_CLOCK_12
+ 1530               		.section	.data.TBL_CLOCK_12,"aw",@progbits
+ 1533               	TBL_CLOCK_12:
+ 1534 0000 0C        		.byte	12
+ 1535 0001 01        		.byte	1
+ 1536 0002 02        		.byte	2
+ 1537 0003 03        		.byte	3
+ 1538 0004 04        		.byte	4
+ 1539 0005 05        		.byte	5
+ 1540 0006 06        		.byte	6
+ 1541 0007 07        		.byte	7
+ 1542 0008 08        		.byte	8
+ 1543 0009 09        		.byte	9
+ 1544 000a 0A        		.byte	10
+ 1545 000b 0B        		.byte	11
+ 1546 000c 0C        		.byte	12
+ 1547 000d 01        		.byte	1
+ 1548 000e 02        		.byte	2
+ 1549 000f 03        		.byte	3
+ 1550 0010 04        		.byte	4
+ 1551 0011 05        		.byte	5
+ 1552 0012 06        		.byte	6
+ 1553 0013 07        		.byte	7
+ 1554 0014 08        		.byte	8
+ 1555 0015 09        		.byte	9
+ 1556 0016 0A        		.byte	10
+ 1557 0017 0B        		.byte	11
+ 1558               	.global	clockformat
+ 1559               		.section	.data.clockformat,"aw",@progbits
+ 1562               	clockformat:
+ 1563 0000 01        		.byte	1
+ 1564               	.global	EUROPEAN_DATE_TEXT
+ 1565               		.section	.progmem.data,"a",@progbits
+ 1568               	EUROPEAN_DATE_TEXT:
+ 1569 0000 4444 4D4D 		.string	"DDMMYY"
+ 1569      5959 00
+ 1570               	.global	AMERICAN_DATE_TEXT
+ 1573               	AMERICAN_DATE_TEXT:
+ 1574 0007 4D4D 4444 		.string	"MMDDYY"
+ 1574      5959 00
+ 1575               	.global	CANADIAN_DATE_TEXT
+ 1578               	CANADIAN_DATE_TEXT:
+ 1579 000e 5959 4D4D 		.string	"YYMMDD"
+ 1579      4444 00
+ 1580               	.global	EUROPEAN_DATE_NR
+ 1583               	EUROPEAN_DATE_NR:
+ 1584 0015 04        		.byte	4
+ 1585 0016 05        		.byte	5
+ 1586 0017 02        		.byte	2
+ 1587 0018 03        		.byte	3
+ 1588 0019 00        		.byte	0
+ 1589 001a 01        		.byte	1
+ 1590               	.global	AMERICAN_DATE_NR
+ 1593               	AMERICAN_DATE_NR:
+ 1594 001b 04        		.byte	4
+ 1595 001c 05        		.byte	5
+ 1596 001d 00        		.byte	0
+ 1597 001e 01        		.byte	1
+ 1598 001f 02        		.byte	2
+ 1599 0020 03        		.byte	3
+ 1600               	.global	CANADIAN_DATE_NR
+ 1603               	CANADIAN_DATE_NR:
+ 1604 0021 00        		.byte	0
+ 1605 0022 01        		.byte	1
+ 1606 0023 02        		.byte	2
+ 1607 0024 03        		.byte	3
+ 1608 0025 04        		.byte	4
+ 1609 0026 05        		.byte	5
+ 1610               	.global	DATEFORMAT_TEXT
+ 1611               		.section	.data.DATEFORMAT_TEXT,"aw",@progbits
+ 1614               	DATEFORMAT_TEXT:
+ 1615 0000 0000      		.word	EUROPEAN_DATE_TEXT
+ 1616 0002 0000      		.word	AMERICAN_DATE_TEXT
+ 1617 0004 0000      		.word	CANADIAN_DATE_TEXT
+ 1618               	.global	DATE_FORMAT_NR
+ 1619               		.section	.progmem.data
+ 1622               	DATE_FORMAT_NR:
+ 1623 0027 0000      		.word	EUROPEAN_DATE_NR
+ 1624 0029 0000      		.word	AMERICAN_DATE_NR
+ 1625 002b 0000      		.word	CANADIAN_DATE_NR
+ 1626               		.section	.bss.LeapMonth.1664,"aw",@nobits
+ 1629               	LeapMonth.1664:
+ 1630 0000 00        		.skip 1,0
+ 1631               		.section	.data.enter.1651,"aw",@progbits
+ 1634               	enter.1651:
+ 1635 0000 01        		.byte	1
+ 1636               		.section	.data.mode.1605,"aw",@progbits
+ 1639               	mode.1605:
+ 1640 0000 02        		.byte	2
+ 1641               		.section	.bss.date.1604,"aw",@nobits
+ 1644               	date.1604:
+ 1645 0000 0000 00   		.skip 3,0
+ 1646               		.section	.data.enter_function.1603,"aw",@progbits
+ 1649               	enter_function.1603:
+ 1650 0000 01        		.byte	1
+ 1651               		.section	.progmem.data
+ 1654               	__c.1546:
+ 1655 002d 3132 4800 		.string	"12H"
+ 1658               	__c.1544:
+ 1659 0031 3234 4800 		.string	"24H"
+ 1662               	__c.1542:
+ 1663 0035 3234 4800 		.string	"24H"
+ 1666               	__c.1540:
+ 1667 0039 3132 4800 		.string	"12H"
+ 1670               	__c.1538:
+ 1671 003d 3132 4800 		.string	"12H"
+ 1674               	__c.1536:
+ 1675 0041 3234 4800 		.string	"24H"
+ 1676               		.section	.data.enter.1535,"aw",@progbits
+ 1679               	enter.1535:
+ 1680 0000 01        		.byte	1
+ 1681               		.section	.bss.mode.1473,"aw",@nobits
+ 1684               	mode.1473:
+ 1685 0000 00        		.skip 1,0
+ 1686               		.section	.bss.time.1472,"aw",@nobits
+ 1689               	time.1472:
+ 1690 0000 0000 00   		.skip 3,0
+ 1691               		.section	.data.enter_function.1471,"aw",@progbits
+ 1694               	enter_function.1471:
+ 1695 0000 01        		.byte	1
+ 1696               		.comm gSECOND,1,1
+ 1697               		.comm gMINUTE,1,1
+ 1698               		.comm gHOUR,1,1
+ 1699               		.comm gDAY,1,1
+ 1700               		.comm gMONTH,1,1
+ 1701               		.comm gYEAR,2,1
+ 1782               	.Letext0:
 DEFINED SYMBOLS
-                            *ABS*:0000000000000000 RTC.c
-     /tmp/ccuXknu7.s:2      *ABS*:000000000000003e __SP_H__
-     /tmp/ccuXknu7.s:3      *ABS*:000000000000003d __SP_L__
-     /tmp/ccuXknu7.s:4      *ABS*:000000000000003f __SREG__
-     /tmp/ccuXknu7.s:5      *ABS*:0000000000000000 __tmp_reg__
-     /tmp/ccuXknu7.s:6      *ABS*:0000000000000001 __zero_reg__
-     /tmp/ccuXknu7.s:13     .text.RTC_init:0000000000000000 RTC_init
-                            *COM*:0000000000000001 gSECOND
-                            *COM*:0000000000000001 gMINUTE
-                            *COM*:0000000000000001 gHOUR
-                            *COM*:0000000000000001 gDAY
-                            *COM*:0000000000000001 gMONTH
-                            *COM*:0000000000000002 gYEAR
-     /tmp/ccuXknu7.s:91     .text.ShowClock:0000000000000000 ShowClock
-     /tmp/ccuXknu7.s:1933   .data.clockformat:0000000000000000 clockformat
-     /tmp/ccuXknu7.s:1939   .data.TBL_CLOCK_12:0000000000000000 TBL_CLOCK_12
-     /tmp/ccuXknu7.s:287    .text.SetClock:0000000000000000 SetClock
-     /tmp/ccuXknu7.s:1860   .data.enter_function.1783:0000000000000000 enter_function.1783
-     /tmp/ccuXknu7.s:1855   .bss.time.1784:0000000000000000 time.1784
-     /tmp/ccuXknu7.s:1850   .bss.mode.1785:0000000000000000 mode.1785
-     /tmp/ccuXknu7.s:680    .text.SetClockFormat:0000000000000000 SetClockFormat
-     /tmp/ccuXknu7.s:1845   .data.enter.1795:0000000000000000 enter.1795
-     /tmp/ccuXknu7.s:1840   .progmem.data.__c.1796:0000000000000000 __c.1796
-     /tmp/ccuXknu7.s:1835   .progmem.data.__c.1798:0000000000000000 __c.1798
-     /tmp/ccuXknu7.s:1830   .progmem.data.__c.1800:0000000000000000 __c.1800
-     /tmp/ccuXknu7.s:1825   .progmem.data.__c.1802:0000000000000000 __c.1802
-     /tmp/ccuXknu7.s:1820   .progmem.data.__c.1804:0000000000000000 __c.1804
-     /tmp/ccuXknu7.s:1815   .progmem.data.__c.1806:0000000000000000 __c.1806
-     /tmp/ccuXknu7.s:794    .text.ShowDate:0000000000000000 ShowDate
-     /tmp/ccuXknu7.s:1986   .bss.dateformat:0000000000000000 dateformat
-     /tmp/ccuXknu7.s:1866   .progmem.data.DATE_FORMAT_NR:0000000000000000 DATE_FORMAT_NR
-     /tmp/ccuXknu7.s:1100   .text.SetDate:0000000000000000 SetDate
-     /tmp/ccuXknu7.s:1810   .data.enter_function.1842:0000000000000000 enter_function.1842
-     /tmp/ccuXknu7.s:1805   .bss.date.1843:0000000000000000 date.1843
-     /tmp/ccuXknu7.s:1800   .data.mode.1844:0000000000000000 mode.1844
-     /tmp/ccuXknu7.s:1968   .data.MonthLength:0000000000000000 MonthLength
-     /tmp/ccuXknu7.s:1484   .text.SetDateFormat:0000000000000000 SetDateFormat
-     /tmp/ccuXknu7.s:1795   .data.enter.1856:0000000000000000 enter.1856
-     /tmp/ccuXknu7.s:1874   .data.DATEFORMAT_TEXT:0000000000000000 DATEFORMAT_TEXT
-     /tmp/ccuXknu7.s:1586   .text.__vector_5:0000000000000000 __vector_5
-     /tmp/ccuXknu7.s:1992   .bss.gPowerSaveTimer:0000000000000000 gPowerSaveTimer
-     /tmp/ccuXknu7.s:1790   .bss.LeapMonth.1862:0000000000000000 LeapMonth.1862
-     /tmp/ccuXknu7.s:1904   .progmem.data.EUROPEAN_DATE_NR:0000000000000000 EUROPEAN_DATE_NR
-     /tmp/ccuXknu7.s:1893   .progmem.data.AMERICAN_DATE_NR:0000000000000000 AMERICAN_DATE_NR
-     /tmp/ccuXknu7.s:1882   .progmem.data.CANADIAN_DATE_NR:0000000000000000 CANADIAN_DATE_NR
-     /tmp/ccuXknu7.s:1927   .progmem.data.EUROPEAN_DATE_TEXT:0000000000000000 EUROPEAN_DATE_TEXT
-     /tmp/ccuXknu7.s:1921   .progmem.data.AMERICAN_DATE_TEXT:0000000000000000 AMERICAN_DATE_TEXT
-     /tmp/ccuXknu7.s:1915   .progmem.data.CANADIAN_DATE_TEXT:0000000000000000 CANADIAN_DATE_TEXT
+                            *ABS*:00000000 RTC.c
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:2      *ABS*:0000003f __SREG__
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:3      *ABS*:0000003e __SP_H__
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:4      *ABS*:0000003d __SP_L__
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:5      *ABS*:00000034 __CCP__
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:6      *ABS*:00000000 __tmp_reg__
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:7      *ABS*:00000001 __zero_reg__
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:19     .text.__vector_5:00000000 __vector_5
+                            *COM*:00000001 gSECOND
+                            *COM*:00000001 gMINUTE
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1503   .bss.gPowerSaveTimer:00000000 gPowerSaveTimer
+                            *COM*:00000001 gHOUR
+                            *COM*:00000001 gDAY
+                            *COM*:00000001 gMONTH
+                            *COM*:00000002 gYEAR
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1629   .bss.LeapMonth.1664:00000000 LeapMonth.1664
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1515   .data.MonthLength:00000000 MonthLength
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:177    .text.SetDateFormat:00000000 SetDateFormat
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1634   .data.enter.1651:00000000 enter.1651
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1509   .bss.dateformat:00000000 dateformat
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1614   .data.DATEFORMAT_TEXT:00000000 DATEFORMAT_TEXT
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:269    .text.SetClockFormat:00000000 SetClockFormat
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1679   .data.enter.1535:00000000 enter.1535
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1562   .data.clockformat:00000000 clockformat
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1674   .progmem.data:00000041 __c.1536
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1670   .progmem.data:0000003d __c.1538
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1666   .progmem.data:00000039 __c.1540
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1662   .progmem.data:00000035 __c.1542
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1658   .progmem.data:00000031 __c.1544
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1654   .progmem.data:0000002d __c.1546
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:367    .text.SetDate:00000000 SetDate
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1649   .data.enter_function.1603:00000000 enter_function.1603
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1644   .bss.date.1604:00000000 date.1604
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1639   .data.mode.1605:00000000 mode.1605
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:715    .text.ShowDate:00000000 ShowDate
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1622   .progmem.data:00000027 DATE_FORMAT_NR
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:951    .text.SetClock:00000000 SetClock
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1694   .data.enter_function.1471:00000000 enter_function.1471
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1689   .bss.time.1472:00000000 time.1472
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1533   .data.TBL_CLOCK_12:00000000 TBL_CLOCK_12
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1684   .bss.mode.1473:00000000 mode.1473
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1280   .text.ShowClock:00000000 ShowClock
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1422   .text.RTC_init:00000000 RTC_init
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1568   .progmem.data:00000000 EUROPEAN_DATE_TEXT
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1573   .progmem.data:00000007 AMERICAN_DATE_TEXT
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1578   .progmem.data:0000000e CANADIAN_DATE_TEXT
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1583   .progmem.data:00000015 EUROPEAN_DATE_NR
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1593   .progmem.data:0000001b AMERICAN_DATE_NR
+C:\Users\MainUser\AppData\Local\Temp/ccVMiSEE.s:1603   .progmem.data:00000021 CANADIAN_DATE_NR
 
 UNDEFINED SYMBOLS
-Delay
+__udivmodhi4
+LCD_puts_f
 CHAR2BCD2
 LCD_putc
 LCD_Colon
-LCD_UpdateRequired
 LCD_FlashReset
-LCD_puts_f
-__udivmodhi4
+LCD_UpdateRequired
+Delay
 __do_copy_data
 __do_clear_bss

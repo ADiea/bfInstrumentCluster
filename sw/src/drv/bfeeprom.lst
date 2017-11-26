@@ -1,267 +1,131 @@
    1               		.file	"bfeeprom.c"
-   2               	__SP_H__ = 0x3e
-   3               	__SP_L__ = 0x3d
-   4               	__SREG__ = 0x3f
-   5               	__tmp_reg__ = 0
-   6               	__zero_reg__ = 1
-   7               		.text
-   8               	.Ltext0:
-   9               		.cfi_sections	.debug_frame
-  10               		.section	.text.StoreEEPROM,"ax",@progbits
-  11               	.global	StoreEEPROM
-  13               	StoreEEPROM:
-  14               	.LFB0:
-  15               		.file 1 "src/drv/bfeeprom.c"
-   1:src/drv/bfeeprom.c **** //***************************************************************************
-   2:src/drv/bfeeprom.c **** //
-   3:src/drv/bfeeprom.c **** //  File........: eeprom.c
-   4:src/drv/bfeeprom.c **** //
-   5:src/drv/bfeeprom.c **** //  Author(s)...: ATMEL Norway
-   6:src/drv/bfeeprom.c **** //
-   7:src/drv/bfeeprom.c **** //  Target(s)...: ATmega169
-   8:src/drv/bfeeprom.c **** //
-   9:src/drv/bfeeprom.c **** //  Compiler....: AVR-GCC 4.1.1; avr-libc 1.4.5
-  10:src/drv/bfeeprom.c **** //
-  11:src/drv/bfeeprom.c **** //  Description.: AVR Butterfly EEPROM routines
-  12:src/drv/bfeeprom.c **** //
-  13:src/drv/bfeeprom.c **** //  Revisions...: 1.0
-  14:src/drv/bfeeprom.c **** //
-  15:src/drv/bfeeprom.c **** //  YYYYMMDD - VER. - COMMENT                                       - SIGN.
-  16:src/drv/bfeeprom.c **** //
-  17:src/drv/bfeeprom.c **** //  20030116 - 1.0  - Created                                       - LHM
-  18:src/drv/bfeeprom.c **** //  20031009          port to avr-gcc/avr-libc                      - M.Thomas
-  19:src/drv/bfeeprom.c **** //  20070129          use avr-libc ATmega169-eeprom-support         - mt
-  20:src/drv/bfeeprom.c **** //
-  21:src/drv/bfeeprom.c **** //***************************************************************************
-  22:src/drv/bfeeprom.c **** 
-  23:src/drv/bfeeprom.c **** #include <avr/io.h>
-  24:src/drv/bfeeprom.c **** #include <avr/eeprom.h>
-  25:src/drv/bfeeprom.c **** 
-  26:src/drv/bfeeprom.c **** /*****************************************************************************
-  27:src/drv/bfeeprom.c **** *
-  28:src/drv/bfeeprom.c **** *   Function name : StoreEEPROM
-  29:src/drv/bfeeprom.c **** *
-  30:src/drv/bfeeprom.c **** *   Returns :       None
-  31:src/drv/bfeeprom.c **** *
-  32:src/drv/bfeeprom.c **** *   Parameters :    Pointer to string, number of bytes to write, adress in EEPROM
-  33:src/drv/bfeeprom.c **** *
-  34:src/drv/bfeeprom.c **** *   Purpose :       Write byte(s) to the EEPROM
-  35:src/drv/bfeeprom.c **** *
-  36:src/drv/bfeeprom.c **** *****************************************************************************/
-  37:src/drv/bfeeprom.c **** void StoreEEPROM(char *pBuffer, char num_bytes, unsigned char* EE_START_ADR)
-  38:src/drv/bfeeprom.c **** {
-  16               		.loc 1 38 0
-  17               		.cfi_startproc
-  18               	.LVL0:
-  19 0000 DF92      		push r13
-  20               	.LCFI0:
-  21               		.cfi_def_cfa_offset 3
-  22               		.cfi_offset 13, -2
-  23 0002 EF92      		push r14
-  24               	.LCFI1:
-  25               		.cfi_def_cfa_offset 4
-  26               		.cfi_offset 14, -3
-  27 0004 FF92      		push r15
-  28               	.LCFI2:
-  29               		.cfi_def_cfa_offset 5
-  30               		.cfi_offset 15, -4
-  31 0006 0F93      		push r16
-  32               	.LCFI3:
-  33               		.cfi_def_cfa_offset 6
-  34               		.cfi_offset 16, -5
-  35 0008 1F93      		push r17
-  36               	.LCFI4:
-  37               		.cfi_def_cfa_offset 7
-  38               		.cfi_offset 17, -6
-  39 000a CF93      		push r28
-  40               	.LCFI5:
-  41               		.cfi_def_cfa_offset 8
-  42               		.cfi_offset 28, -7
-  43 000c DF93      		push r29
-  44               	.LCFI6:
-  45               		.cfi_def_cfa_offset 9
-  46               		.cfi_offset 29, -8
-  47               	/* prologue: function */
-  48               	/* frame size = 0 */
-  49               	/* stack size = 7 */
-  50               	.L__stack_usage = 7
-  51 000e D62E      		mov r13,r22
-  52 0010 8A01      		movw r16,r20
-  53               	.LVL1:
-  54 0012 7C01      		movw r14,r24
-  39:src/drv/bfeeprom.c ****     unsigned char i;
-  40:src/drv/bfeeprom.c ****     for (i=0;i<num_bytes;i++) {
-  55               		.loc 1 40 0
-  56 0014 EA01      		movw r28,r20
-  57               	.LVL2:
-  58               	.L2:
-  59 0016 8C2F      		mov r24,r28
-  60 0018 801B      		sub r24,r16
-  61               		.loc 1 40 0 is_stmt 0 discriminator 1
-  62 001a 8D15      		cp r24,r13
-  63 001c 00F4      		brsh .L5
-  41:src/drv/bfeeprom.c ****         // mt __EEPUT(EEPROM_START_ADR++, pBuffer[i]); // Store parameters
-  42:src/drv/bfeeprom.c ****         eeprom_write_byte(EE_START_ADR, pBuffer[i]);
-  64               		.loc 1 42 0 is_stmt 1 discriminator 3
-  65 001e F701      		movw r30,r14
-  66 0020 6191      		ld r22,Z+
-  67 0022 7F01      		movw r14,r30
-  68 0024 CE01      		movw r24,r28
-  69 0026 0E94 0000 		call eeprom_write_byte
-  70               	.LVL3:
-  43:src/drv/bfeeprom.c ****         EE_START_ADR++;
-  71               		.loc 1 43 0 discriminator 3
-  72 002a 2196      		adiw r28,1
-  73               	.LVL4:
-  74 002c 00C0      		rjmp .L2
-  75               	.L5:
-  76               	/* epilogue start */
-  44:src/drv/bfeeprom.c ****     }
-  45:src/drv/bfeeprom.c **** }
-  77               		.loc 1 45 0
-  78 002e DF91      		pop r29
-  79 0030 CF91      		pop r28
-  80               	.LVL5:
-  81 0032 1F91      		pop r17
-  82 0034 0F91      		pop r16
-  83 0036 FF90      		pop r15
-  84 0038 EF90      		pop r14
-  85 003a DF90      		pop r13
-  86               	.LVL6:
-  87 003c 0895      		ret
-  88               		.cfi_endproc
-  89               	.LFE0:
-  91               		.section	.text.LoadEEPROM,"ax",@progbits
-  92               	.global	LoadEEPROM
-  94               	LoadEEPROM:
-  95               	.LFB1:
-  46:src/drv/bfeeprom.c **** 
-  47:src/drv/bfeeprom.c **** 
-  48:src/drv/bfeeprom.c **** /*****************************************************************************
-  49:src/drv/bfeeprom.c **** *
-  50:src/drv/bfeeprom.c **** *   Function name : ReadEEPROM
-  51:src/drv/bfeeprom.c **** *
-  52:src/drv/bfeeprom.c **** *   Returns :       None
-  53:src/drv/bfeeprom.c **** *
-  54:src/drv/bfeeprom.c **** *   Parameters :    Pointer to string, number of bytes to read, adress in EEPROM
-  55:src/drv/bfeeprom.c **** *
-  56:src/drv/bfeeprom.c **** *   Purpose :       Write byte(s) to the EEPROM
-  57:src/drv/bfeeprom.c **** *
-  58:src/drv/bfeeprom.c **** *****************************************************************************/
-  59:src/drv/bfeeprom.c **** 
-  60:src/drv/bfeeprom.c **** void LoadEEPROM(char *pBuffer, char num_bytes, unsigned char* EE_START_ADR)
-  61:src/drv/bfeeprom.c **** {
-  96               		.loc 1 61 0
-  97               		.cfi_startproc
-  98               	.LVL7:
-  99 0000 CF92      		push r12
- 100               	.LCFI7:
- 101               		.cfi_def_cfa_offset 3
- 102               		.cfi_offset 12, -2
- 103 0002 DF92      		push r13
- 104               	.LCFI8:
- 105               		.cfi_def_cfa_offset 4
- 106               		.cfi_offset 13, -3
- 107 0004 EF92      		push r14
- 108               	.LCFI9:
- 109               		.cfi_def_cfa_offset 5
- 110               		.cfi_offset 14, -4
- 111 0006 FF92      		push r15
- 112               	.LCFI10:
- 113               		.cfi_def_cfa_offset 6
- 114               		.cfi_offset 15, -5
- 115 0008 0F93      		push r16
- 116               	.LCFI11:
- 117               		.cfi_def_cfa_offset 7
- 118               		.cfi_offset 16, -6
- 119 000a 1F93      		push r17
- 120               	.LCFI12:
- 121               		.cfi_def_cfa_offset 8
- 122               		.cfi_offset 17, -7
- 123 000c CF93      		push r28
- 124               	.LCFI13:
- 125               		.cfi_def_cfa_offset 9
- 126               		.cfi_offset 28, -8
- 127 000e DF93      		push r29
- 128               	.LCFI14:
- 129               		.cfi_def_cfa_offset 10
- 130               		.cfi_offset 29, -9
- 131 0010 1F92      		push __zero_reg__
- 132               	.LCFI15:
- 133               		.cfi_def_cfa_offset 11
- 134 0012 CDB7      		in r28,__SP_L__
- 135 0014 DEB7      		in r29,__SP_H__
- 136               	.LCFI16:
- 137               		.cfi_def_cfa_register 28
- 138               	/* prologue: function */
- 139               	/* frame size = 1 */
- 140               	/* stack size = 9 */
- 141               	.L__stack_usage = 9
- 142 0016 8A01      		movw r16,r20
- 143               	.LVL8:
- 144 0018 7C01      		movw r14,r24
-  62:src/drv/bfeeprom.c ****     unsigned char i;
-  63:src/drv/bfeeprom.c ****     for (i=0;i<num_bytes;i++) {
- 145               		.loc 1 63 0
- 146 001a 6A01      		movw r12,r20
- 147               	.LVL9:
- 148               	.L7:
- 149 001c 8C2D      		mov r24,r12
- 150 001e 801B      		sub r24,r16
- 151               		.loc 1 63 0 is_stmt 0 discriminator 1
- 152 0020 8617      		cp r24,r22
- 153 0022 00F4      		brsh .L9
-  64:src/drv/bfeeprom.c ****         // mt __EEGET(pBuffer[i], EEPROM_START_ADR++); // Load parameters
-  65:src/drv/bfeeprom.c ****         pBuffer[i]=eeprom_read_byte(EE_START_ADR);
- 154               		.loc 1 65 0 is_stmt 1 discriminator 3
- 155 0024 C601      		movw r24,r12
- 156 0026 6983      		std Y+1,r22
- 157 0028 0E94 0000 		call eeprom_read_byte
- 158               	.LVL10:
- 159 002c F701      		movw r30,r14
- 160 002e 8193      		st Z+,r24
- 161 0030 7F01      		movw r14,r30
-  66:src/drv/bfeeprom.c ****         EE_START_ADR++;
- 162               		.loc 1 66 0 discriminator 3
- 163 0032 FFEF      		ldi r31,-1
- 164 0034 CF1A      		sub r12,r31
- 165 0036 DF0A      		sbc r13,r31
- 166               	.LVL11:
- 167 0038 6981      		ldd r22,Y+1
- 168 003a 00C0      		rjmp .L7
- 169               	.L9:
- 170               	/* epilogue start */
-  67:src/drv/bfeeprom.c ****     }
-  68:src/drv/bfeeprom.c **** }
- 171               		.loc 1 68 0
- 172 003c 0F90      		pop __tmp_reg__
- 173 003e DF91      		pop r29
- 174 0040 CF91      		pop r28
- 175 0042 1F91      		pop r17
- 176 0044 0F91      		pop r16
- 177               	.LVL12:
- 178 0046 FF90      		pop r15
- 179 0048 EF90      		pop r14
- 180 004a DF90      		pop r13
- 181 004c CF90      		pop r12
- 182               	.LVL13:
- 183 004e 0895      		ret
- 184               		.cfi_endproc
- 185               	.LFE1:
- 187               		.text
- 188               	.Letext0:
- 189               		.file 2 "/usr/lib/avr/include/stdint.h"
- 190               		.file 3 "/usr/lib/avr/include/avr/eeprom.h"
+   2               	__SREG__ = 0x3f
+   3               	__SP_H__ = 0x3e
+   4               	__SP_L__ = 0x3d
+   5               	__CCP__  = 0x34
+   6               	__tmp_reg__ = 0
+   7               	__zero_reg__ = 1
+  15               	.Ltext0:
+  16               		.section	.text.LoadEEPROM,"ax",@progbits
+  17               	.global	LoadEEPROM
+  19               	LoadEEPROM:
+  20               	.LFB3:
+  21               	.LSM0:
+  22               	.LVL0:
+  23 0000 DF92      		push r13
+  24 0002 EF92      		push r14
+  25 0004 FF92      		push r15
+  26 0006 0F93      		push r16
+  27 0008 1F93      		push r17
+  28 000a CF93      		push r28
+  29 000c DF93      		push r29
+  30               	/* prologue: function */
+  31               	/* frame size = 0 */
+  32 000e 7C01      		movw r14,r24
+  33 0010 D62E      		mov r13,r22
+  34 0012 8A01      		movw r16,r20
+  35               	.LSM1:
+  36 0014 C0E0      		ldi r28,lo8(0)
+  37 0016 D0E0      		ldi r29,hi8(0)
+  38 0018 00C0      		rjmp .L2
+  39               	.LVL1:
+  40               	.L3:
+  41               	.LSM2:
+  42 001a 0E94 0000 		call __eerd_byte_m169
+  43               	.LVL2:
+  44 001e F701      		movw r30,r14
+  45 0020 EC0F      		add r30,r28
+  46 0022 FD1F      		adc r31,r29
+  47 0024 8083      		st Z,r24
+  48 0026 2196      		adiw r28,1
+  49               	.LVL3:
+  50               	.L2:
+  51 0028 C801      		movw r24,r16
+  52 002a 8C0F      		add r24,r28
+  53 002c 9D1F      		adc r25,r29
+  54               	.LVL4:
+  55               	.LSM3:
+  56 002e CD15      		cp r28,r13
+  57 0030 00F0      		brlo .L3
+  58               	/* epilogue start */
+  59               	.LSM4:
+  60 0032 DF91      		pop r29
+  61 0034 CF91      		pop r28
+  62 0036 1F91      		pop r17
+  63 0038 0F91      		pop r16
+  64 003a FF90      		pop r15
+  65 003c EF90      		pop r14
+  66               	.LVL5:
+  67 003e DF90      		pop r13
+  68               	.LVL6:
+  69 0040 0895      		ret
+  70               	.LFE3:
+  72               		.section	.text.StoreEEPROM,"ax",@progbits
+  73               	.global	StoreEEPROM
+  75               	StoreEEPROM:
+  76               	.LFB2:
+  77               	.LSM5:
+  78               	.LVL7:
+  79 0000 DF92      		push r13
+  80 0002 EF92      		push r14
+  81 0004 FF92      		push r15
+  82 0006 0F93      		push r16
+  83 0008 1F93      		push r17
+  84 000a CF93      		push r28
+  85 000c DF93      		push r29
+  86               	/* prologue: function */
+  87               	/* frame size = 0 */
+  88 000e 7C01      		movw r14,r24
+  89 0010 D62E      		mov r13,r22
+  90 0012 8A01      		movw r16,r20
+  91               	.LSM6:
+  92 0014 C0E0      		ldi r28,lo8(0)
+  93 0016 D0E0      		ldi r29,hi8(0)
+  94 0018 00C0      		rjmp .L6
+  95               	.LVL8:
+  96               	.L7:
+  97               	.LSM7:
+  98 001a F701      		movw r30,r14
+  99 001c EC0F      		add r30,r28
+ 100 001e FD1F      		adc r31,r29
+ 101 0020 C801      		movw r24,r16
+ 102 0022 6081      		ld r22,Z
+ 103 0024 0E94 0000 		call __eewr_byte_m169
+ 104               	.LSM8:
+ 105 0028 0F5F      		subi r16,lo8(-(1))
+ 106 002a 1F4F      		sbci r17,hi8(-(1))
+ 107 002c 2196      		adiw r28,1
+ 108               	.LVL9:
+ 109               	.L6:
+ 110               	.LSM9:
+ 111 002e CD15      		cp r28,r13
+ 112 0030 00F0      		brlo .L7
+ 113               	/* epilogue start */
+ 114               	.LSM10:
+ 115 0032 DF91      		pop r29
+ 116 0034 CF91      		pop r28
+ 117 0036 1F91      		pop r17
+ 118 0038 0F91      		pop r16
+ 119               	.LVL10:
+ 120 003a FF90      		pop r15
+ 121 003c EF90      		pop r14
+ 122               	.LVL11:
+ 123 003e DF90      		pop r13
+ 124               	.LVL12:
+ 125 0040 0895      		ret
+ 126               	.LFE2:
+ 160               	.Letext0:
 DEFINED SYMBOLS
-                            *ABS*:0000000000000000 bfeeprom.c
-     /tmp/cccxFnNf.s:2      *ABS*:000000000000003e __SP_H__
-     /tmp/cccxFnNf.s:3      *ABS*:000000000000003d __SP_L__
-     /tmp/cccxFnNf.s:4      *ABS*:000000000000003f __SREG__
-     /tmp/cccxFnNf.s:5      *ABS*:0000000000000000 __tmp_reg__
-     /tmp/cccxFnNf.s:6      *ABS*:0000000000000001 __zero_reg__
-     /tmp/cccxFnNf.s:13     .text.StoreEEPROM:0000000000000000 StoreEEPROM
-     /tmp/cccxFnNf.s:94     .text.LoadEEPROM:0000000000000000 LoadEEPROM
+                            *ABS*:00000000 bfeeprom.c
+C:\Users\MainUser\AppData\Local\Temp/ccZE3cQW.s:2      *ABS*:0000003f __SREG__
+C:\Users\MainUser\AppData\Local\Temp/ccZE3cQW.s:3      *ABS*:0000003e __SP_H__
+C:\Users\MainUser\AppData\Local\Temp/ccZE3cQW.s:4      *ABS*:0000003d __SP_L__
+C:\Users\MainUser\AppData\Local\Temp/ccZE3cQW.s:5      *ABS*:00000034 __CCP__
+C:\Users\MainUser\AppData\Local\Temp/ccZE3cQW.s:6      *ABS*:00000000 __tmp_reg__
+C:\Users\MainUser\AppData\Local\Temp/ccZE3cQW.s:7      *ABS*:00000001 __zero_reg__
+C:\Users\MainUser\AppData\Local\Temp/ccZE3cQW.s:19     .text.LoadEEPROM:00000000 LoadEEPROM
+C:\Users\MainUser\AppData\Local\Temp/ccZE3cQW.s:75     .text.StoreEEPROM:00000000 StoreEEPROM
 
 UNDEFINED SYMBOLS
-eeprom_write_byte
-eeprom_read_byte
+__eerd_byte_m169
+__eewr_byte_m169
